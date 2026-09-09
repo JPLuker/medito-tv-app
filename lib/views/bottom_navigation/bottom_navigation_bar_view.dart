@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/constants/constants.dart';
 import 'package:medito/constants/icons/medito_icons.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/providers/providers.dart';
 import 'package:medito/providers/stats_provider.dart';
 import 'package:medito/views/explore/widgets/explore_view.dart';
@@ -24,7 +25,7 @@ class BottomNavigationBarView extends ConsumerStatefulWidget {
 
 class _BottomNavigationBarViewState
     extends ConsumerState<BottomNavigationBarView> {
-  // Maps NavigationBar destination index -> page index in _pages.
+  // Maps navigation destination index -> page index in _pages.
   static const _pageIndexForDestination = [0, 1, 3];
 
   late int _currentPageIndex;
@@ -70,6 +71,13 @@ class _BottomNavigationBarViewState
     final selectedDestination = _pageIndexForDestination.indexOf(
       _currentPageIndex,
     );
+    final capabilities = ref.watch(deviceCapabilitiesProvider);
+    final isTv = capabilities.maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
+
+    final pageStack = IndexedStack(index: _currentPageIndex, children: _pages);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -87,66 +95,132 @@ class _BottomNavigationBarViewState
           if (didPop) return;
           _onDestinationSelected(0);
         },
-        child: Scaffold(
-          floatingActionButtonLocation:
-              FloatingActionButtonLocation.centerFloat,
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: selectedDestination >= 0 ? selectedDestination : 0,
-            labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
-            indicatorColor: Colors.transparent,
-            overlayColor: WidgetStateProperty.all(Colors.transparent),
-            labelTextStyle: WidgetStateProperty.resolveWith((states) {
-              final baseStyle = Theme.of(context).textTheme.labelMedium;
-              final color = states.contains(WidgetState.selected)
-                  ? selectedColor
-                  : unselectedColor;
-              return baseStyle?.copyWith(color: color);
-            }),
-            onDestinationSelected: (index) =>
-                _onDestinationSelected(_pageIndexForDestination[index]),
-            destinations: [
-              NavigationDestination(
-                icon: MeditoIcon(
-                  assetName: MeditoIcons.home,
-                  color: unselectedColor,
-                ),
-                selectedIcon: MeditoIcon(
-                  assetName: MeditoIcons.home,
-                  color: selectedColor,
-                ),
-                label: l10n.home,
-              ),
-              NavigationDestination(
-                icon: GestureDetector(
-                  onDoubleTap: _onExploreDoubleTap,
-                  child: MeditoIcon(
-                    assetName: MeditoIcons.book,
-                    color: unselectedColor,
+        child: FocusTraversalGroup(
+          policy: ReadingOrderTraversalPolicy(),
+          child: Scaffold(
+            floatingActionButtonLocation:
+                FloatingActionButtonLocation.centerFloat,
+            bottomNavigationBar: isTv
+                ? null
+                : NavigationBar(
+                    selectedIndex: selectedDestination >= 0
+                        ? selectedDestination
+                        : 0,
+                    labelBehavior:
+                        NavigationDestinationLabelBehavior.onlyShowSelected,
+                    indicatorColor: Colors.transparent,
+                    overlayColor: WidgetStateProperty.all(Colors.transparent),
+                    labelTextStyle: WidgetStateProperty.resolveWith((states) {
+                      final baseStyle = Theme.of(context).textTheme.labelMedium;
+                      final color = states.contains(WidgetState.selected)
+                          ? selectedColor
+                          : unselectedColor;
+                      return baseStyle?.copyWith(color: color);
+                    }),
+                    onDestinationSelected: (index) => _onDestinationSelected(
+                      _pageIndexForDestination[index],
+                    ),
+                    destinations: [
+                      NavigationDestination(
+                        icon: MeditoIcon(
+                          assetName: MeditoIcons.home,
+                          color: unselectedColor,
+                        ),
+                        selectedIcon: MeditoIcon(
+                          assetName: MeditoIcons.home,
+                          color: selectedColor,
+                        ),
+                        label: l10n.home,
+                      ),
+                      NavigationDestination(
+                        icon: GestureDetector(
+                          onDoubleTap: _onExploreDoubleTap,
+                          child: MeditoIcon(
+                            assetName: MeditoIcons.book,
+                            color: unselectedColor,
+                          ),
+                        ),
+                        selectedIcon: GestureDetector(
+                          onDoubleTap: _onExploreDoubleTap,
+                          child: MeditoIcon(
+                            assetName: MeditoIcons.book,
+                            color: selectedColor,
+                          ),
+                        ),
+                        label: l10n.explore,
+                      ),
+                      NavigationDestination(
+                        icon: MeditoIcon(
+                          assetName: MeditoIcons.settings,
+                          color: unselectedColor,
+                        ),
+                        selectedIcon: MeditoIcon(
+                          assetName: MeditoIcons.settings,
+                          color: selectedColor,
+                        ),
+                        label: l10n.settings,
+                      ),
+                    ],
                   ),
-                ),
-                selectedIcon: GestureDetector(
-                  onDoubleTap: _onExploreDoubleTap,
-                  child: MeditoIcon(
-                    assetName: MeditoIcons.book,
-                    color: selectedColor,
-                  ),
-                ),
-                label: l10n.explore,
-              ),
-              NavigationDestination(
-                icon: MeditoIcon(
-                  assetName: MeditoIcons.settings,
-                  color: unselectedColor,
-                ),
-                selectedIcon: MeditoIcon(
-                  assetName: MeditoIcons.settings,
-                  color: selectedColor,
-                ),
-                label: l10n.settings,
-              ),
-            ],
+            body: isTv
+                ? Row(
+                    children: [
+                      SafeArea(
+                        right: false,
+                        child: NavigationRail(
+                          minWidth: 112,
+                          labelType: NavigationRailLabelType.all,
+                          groupAlignment: -1,
+                          selectedIndex: selectedDestination >= 0
+                              ? selectedDestination
+                              : 0,
+                          onDestinationSelected: (index) =>
+                              _onDestinationSelected(
+                                _pageIndexForDestination[index],
+                              ),
+                          destinations: [
+                            NavigationRailDestination(
+                              icon: MeditoIcon(
+                                assetName: MeditoIcons.home,
+                                color: unselectedColor,
+                              ),
+                              selectedIcon: MeditoIcon(
+                                assetName: MeditoIcons.home,
+                                color: selectedColor,
+                              ),
+                              label: Text(l10n.home),
+                            ),
+                            NavigationRailDestination(
+                              icon: MeditoIcon(
+                                assetName: MeditoIcons.book,
+                                color: unselectedColor,
+                              ),
+                              selectedIcon: MeditoIcon(
+                                assetName: MeditoIcons.book,
+                                color: selectedColor,
+                              ),
+                              label: Text(l10n.explore),
+                            ),
+                            NavigationRailDestination(
+                              icon: MeditoIcon(
+                                assetName: MeditoIcons.settings,
+                                color: unselectedColor,
+                              ),
+                              selectedIcon: MeditoIcon(
+                                assetName: MeditoIcons.settings,
+                                color: selectedColor,
+                              ),
+                              label: Text(l10n.settings),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const VerticalDivider(width: 1),
+                      Expanded(child: pageStack),
+                    ],
+                  )
+                : pageStack,
           ),
-          body: IndexedStack(index: _currentPageIndex, children: _pages),
         ),
       ),
     );
