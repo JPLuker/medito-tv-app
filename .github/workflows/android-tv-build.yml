@@ -1,0 +1,118 @@
+name: Android TV Build
+
+on:
+  push:
+    branches:
+      - feature/android-tv-support
+  workflow_dispatch:
+
+jobs:
+  tv-build:
+    name: Android TV AAB
+    runs-on: ubuntu-latest
+    environment: prod
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2.12.0
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Run build_runner
+        run: flutter packages pub run build_runner build --delete-conflicting-outputs
+
+      - name: Run pigeon
+        run: flutter pub run pigeon --input pigeon_conf.dart --package_name=medito
+
+      - name: Write .prod.json
+        env:
+          PROD_ENV: ${{ secrets.PROD_ENV }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+
+          raw = os.environ["PROD_ENV"]
+          try:
+            data = json.loads(raw)
+          except json.JSONDecodeError:
+            data = {}
+            for line in raw.strip().strip("{}").splitlines():
+              line = line.strip().rstrip(",")
+              if ":" in line:
+                key, _, value = line.partition(":")
+                data[key.strip()] = value.strip()
+
+          if not data:
+            sys.exit("Failed to parse PROD_ENV secret")
+
+          with open(".prod.json", "w") as f:
+            json.dump(data, f, indent=2)
+          PY
+
+      - name: Write google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+
+      - name: Write firebase_options.dart
+        env:
+          FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
+        run: printf '%s' "$FIREBASE_OPTIONS_DART" > lib/firebase_options.dart
+
+      - name: Write keystore.properties
+        env:
+          KEYSTORE_PROPERTIES: ${{ secrets.KEYSTORE_PROPERTIES }}
+        run: printf '%s' "$KEYSTORE_PROPERTIES" > android/keystore.properties
+
+      - name: Write keystore file
+        env:
+          KEYSTORE_FILE: ${{ secrets.KEYSTORE_FILE }}
+        run: printf '%s' "$KEYSTORE_FILE" | base64 -d > android/meditokey.jks
+
+      - name: Build Android App Bundle
+        run: |
+          flutter build appbundle --flavor prod --release \
+            --dart-define-from-file=.prod.json \
+            --dart-define=MOCK_MODE=false \
+            --obfuscate --split-debug-info=./symbols
+
+          AAB=$(find build/app/outputs/bundle -type f -name '*.aab' | head -n 1)
+          test -n "$AAB"
+          echo "Built: $AAB"
+          ls -lh "$AAB"
+
+      - name: Verify merged TV manifest
+        run: |
+          MANIFEST=$(find build/app/intermediates -type f -name AndroidManifest.xml \
+            | grep -E 'prodRelease|prod_release' \
+            | head -n 1 || true)
+
+          if [ -z "$MANIFEST" ]; then
+            MANIFEST=$(find build/app/intermediates -type f -name AndroidManifest.xml | head -n 1 || true)
+          fi
+
+          test -n "$MANIFEST"
+          echo "Checking merged manifest: $MANIFEST"
+          grep -q 'android.software.leanback' "$MANIFEST"
+          grep -q 'android.hardware.touchscreen' "$MANIFEST"
+          grep -q 'android.hardware.faketouch' "$MANIFEST"
+          grep -q 'android.intent.category.LEANBACK_LAUNCHER' "$MANIFEST"
+          grep -q 'tv_banner' "$MANIFEST"
+
+      - name: Upload TV AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: medito-android-tv-aab
+          path: build/app/outputs/bundle/**/*.aab
+          retention-days: 14
