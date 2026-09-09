@@ -6,6 +6,10 @@ on:
       - feature/android-tv-support
   workflow_dispatch:
 
+concurrency:
+  group: android-tv-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   tv-build:
     name: Android TV AAB
