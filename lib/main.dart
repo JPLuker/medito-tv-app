@@ -1,7 +1,6 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:async';
-import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +13,7 @@ import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/constants/http/http_constants.dart';
 import 'package:medito/constants/theme/app_theme.dart';
 import 'package:medito/firebase_options.dart';
+import 'package:medito/platform/platform_info.dart';
 import 'package:medito/providers/auth/auth_state_provider.dart';
 import 'package:medito/providers/notification/reminder_provider.dart';
 import 'package:medito/providers/locale_provider.dart';
@@ -208,9 +208,9 @@ void setupAudioCallback() {
 }
 
 Future<void> initializeAudioService() async {
-  if (Platform.isAndroid) {
+  if (isAndroidPlatform) {
     setupAudioCallback();
-  } else if (Platform.isIOS) {
+  } else if (isIosPlatform) {
     iosAudioHandler = await AudioService.init(
       builder: () => IosAudioHandler(),
       config: const AudioServiceConfig(
@@ -332,7 +332,7 @@ class _ParentWidgetState extends ConsumerState<ParentWidget>
           child: MaintenanceChecker(
             child: MaterialApp(
               debugShowCheckedModeBanner: false,
-              scaffoldMessengerKey: scaffoldMessengerKey,
+              scaffoldMessengerKey: scaffoldMessenger_key,
               navigatorKey: navigatorKey,
               theme: appTheme(context, ThemeMode.light),
               darkTheme: appTheme(context, ThemeMode.dark),
@@ -382,7 +382,7 @@ class _ParentWidgetState extends ConsumerState<ParentWidget>
 
     _refreshAuthToken();
 
-    if (Platform.isIOS) {
+    if (isIosPlatform) {
       // Process any pending track completions when app comes back to foreground
       processPendingCompletedTracks().then((processedCount) {
         if (processedCount > 0) {
