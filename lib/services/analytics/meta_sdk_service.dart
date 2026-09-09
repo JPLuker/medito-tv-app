@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:facebook_app_events/facebook_app_events.dart';
@@ -8,6 +6,7 @@ import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:medito/constants/http/http_constants.dart';
 import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:medito/constants/strings/shared_preference_constants.dart';
+import 'package:medito/platform/platform_info.dart';
 import 'package:medito/utils/logger.dart';
 
 class MetaSdkService {
@@ -70,7 +69,7 @@ class MetaSdkService {
   /// This is required for iOS 14+ SKAdNetwork attribution
   /// Call this after ATT permission has been requested
   Future<void> updateTrackingStatus() async {
-    if (!Platform.isIOS) {
+    if (!isIosPlatform) {
       return;
     }
 
