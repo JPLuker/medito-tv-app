@@ -332,7 +332,7 @@ class _ParentWidgetState extends ConsumerState<ParentWidget>
           child: MaintenanceChecker(
             child: MaterialApp(
               debugShowCheckedModeBanner: false,
-              scaffoldMessengerKey: scaffoldMessenger_key,
+              scaffoldMessengerKey: scaffoldMessengerKey,
               navigatorKey: navigatorKey,
               theme: appTheme(context, ThemeMode.light),
               darkTheme: appTheme(context, ThemeMode.dark),
