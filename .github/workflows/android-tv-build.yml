@@ -10,7 +10,6 @@ jobs:
   tv-build:
     name: Android TV AAB
     runs-on: ubuntu-latest
-    environment: prod
 
     steps:
       - uses: actions/checkout@v4
@@ -35,56 +34,55 @@ jobs:
       - name: Run pigeon
         run: flutter pub run pigeon --input pigeon_conf.dart --package_name=medito
 
-      - name: Write .prod.json
-        env:
-          PROD_ENV: ${{ secrets.PROD_ENV }}
+      - name: Create compile-only Android config
         run: |
-          python3 - <<'PY'
-          import json, os, sys
+          cat > android/keystore.properties <<'EOF'
+          appId=meditofoundation.medito
+          storeFile=tv-ci.jks
+          storePassword=android
+          keyAlias=androiddebugkey
+          keyPassword=android
+          EOF
 
-          raw = os.environ["PROD_ENV"]
-          try:
-            data = json.loads(raw)
-          except json.JSONDecodeError:
-            data = {}
-            for line in raw.strip().strip("{}").splitlines():
-              line = line.strip().rstrip(",")
-              if ":" in line:
-                key, _, value = line.partition(":")
-                data[key.strip()] = value.strip()
+          keytool -genkeypair \
+            -keystore android/tv-ci.jks \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android TV CI,OU=CI,O=Medito,L=Test,ST=Test,C=US"
 
-          if not data:
-            sys.exit("Failed to parse PROD_ENV secret")
+          cat > android/app/google-services.json <<'EOF'
+          {
+            "project_info": {
+              "project_number": "123456789",
+              "project_id": "medito-tv-ci",
+              "storage_bucket": "medito-tv-ci.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:123456789:android:0000000000000000",
+                  "android_client_info": {
+                    "package_name": "meditofoundation.medito"
+                  }
+                },
+                "api_key": [
+                  { "current_key": "mock-api-key" }
+                ]
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
 
-          with open(".prod.json", "w") as f:
-            json.dump(data, f, indent=2)
-          PY
-
-      - name: Write google-services.json
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
-
-      - name: Write firebase_options.dart
-        env:
-          FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
-        run: printf '%s' "$FIREBASE_OPTIONS_DART" > lib/firebase_options.dart
-
-      - name: Write keystore.properties
-        env:
-          KEYSTORE_PROPERTIES: ${{ secrets.KEYSTORE_PROPERTIES }}
-        run: printf '%s' "$KEYSTORE_PROPERTIES" > android/keystore.properties
-
-      - name: Write keystore file
-        env:
-          KEYSTORE_FILE: ${{ secrets.KEYSTORE_FILE }}
-        run: printf '%s' "$KEYSTORE_FILE" | base64 -d > android/meditokey.jks
-
-      - name: Build Android App Bundle
+      - name: Build Android TV App Bundle
         run: |
           flutter build appbundle --flavor prod --release \
-            --dart-define-from-file=.prod.json \
-            --dart-define=MOCK_MODE=false \
+            --dart-define-from-file=.mock.json \
+            --dart-define=MOCK_MODE=true \
             --obfuscate --split-debug-info=./symbols
 
           AAB=$(find build/app/outputs/bundle -type f -name '*.aab' | head -n 1)
@@ -94,13 +92,10 @@ jobs:
 
       - name: Verify merged TV manifest
         run: |
-          MANIFEST=$(find build/app/intermediates -type f -name AndroidManifest.xml \
-            | grep -E 'prodRelease|prod_release' \
+          MANIFEST=$(grep -rl 'android.intent.category.LEANBACK_LAUNCHER' \
+            build/app/intermediates --include=AndroidManifest.xml \
+            | grep -E 'prodRelease|prod_release|release' \
             | head -n 1 || true)
-
-          if [ -z "$MANIFEST" ]; then
-            MANIFEST=$(find build/app/intermediates -type f -name AndroidManifest.xml | head -n 1 || true)
-          fi
 
           test -n "$MANIFEST"
           echo "Checking merged manifest: $MANIFEST"
@@ -109,6 +104,29 @@ jobs:
           grep -q 'android.hardware.faketouch' "$MANIFEST"
           grep -q 'android.intent.category.LEANBACK_LAUNCHER' "$MANIFEST"
           grep -q 'tv_banner' "$MANIFEST"
+
+          # The combined phone/TV bundle must not declare touch or Leanback as required.
+          python3 - "$MANIFEST" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          manifest_path = sys.argv[1]
+          root = ET.parse(manifest_path).getroot()
+          android = '{http://schemas.android.com/apk/res/android}'
+          features = {
+              node.get(android + 'name'): node.get(android + 'required')
+              for node in root.findall('uses-feature')
+          }
+
+          expected_optional = [
+              'android.software.leanback',
+              'android.hardware.touchscreen',
+              'android.hardware.faketouch',
+          ]
+          for feature in expected_optional:
+              if features.get(feature) != 'false':
+                  raise SystemExit(f'{feature} must be android:required="false"; got {features.get(feature)!r}')
+          PY
 
       - name: Upload TV AAB
         uses: actions/upload-artifact@v4
