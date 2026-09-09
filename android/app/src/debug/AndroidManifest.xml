@@ -11,7 +11,7 @@
         android:name="android.hardware.faketouch"
         android:required="false" />
 
-    <application>
+    <application android:banner="@drawable/tv_banner">
         <activity android:name=".MainActivity">
             <!-- Exposes the debug build in the Android TV / Google TV launcher. -->
             <intent-filter>
