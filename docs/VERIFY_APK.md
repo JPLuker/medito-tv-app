@@ -44,3 +44,101 @@ The output certificate fingerprints should match:
 ```
 // TODO: add Medito certificate fingerprints
 ```
+
+---
+
+# Android App Bundle / Android TV verification
+
+Google Play TV distribution uses an Android App Bundle (`.aab`) rather than the APK-only release path used by older Medito workflows.
+
+The Android TV work is tracked in `docs/ANDROID_TV_PROGRESS.md`.
+
+## Build an AAB
+
+For a real release, use the normal production configuration and signing material:
+
+```bash
+flutter build appbundle --flavor prod --release \
+  --dart-define-from-file=.prod.json \
+  --dart-define=MOCK_MODE=false \
+  --obfuscate --split-debug-info=./symbols
+```
+
+Expected output is under:
+
+```text
+build/app/outputs/bundle/
+```
+
+The `feature/android-tv-support` CI workflow also builds a compile-only/mock AAB. That artifact is intended to prove the code and manifest merge; it is **not** a production release artifact and uses throwaway CI signing/configuration.
+
+## Verify the AAB signature container
+
+An AAB is JAR-signed. To inspect/verify the local bundle container:
+
+```bash
+jarsigner -verify -verbose -certs path/to/app.aab
+```
+
+For Play-distributed installs, remember that Google Play App Signing may sign generated APKs with the Play app-signing key rather than the local/upload key used for the AAB. Do not assume the final device APK fingerprint will necessarily equal the local AAB upload-key fingerprint.
+
+## Verify the Android TV manifest declarations
+
+Using `bundletool`:
+
+```bash
+bundletool dump manifest \
+  --bundle=path/to/app.aab \
+  --module=base > /tmp/medito-tv-manifest.xml
+```
+
+Then confirm the TV requirements:
+
+```bash
+grep 'android.software.leanback' /tmp/medito-tv-manifest.xml
+grep 'android.hardware.touchscreen' /tmp/medito-tv-manifest.xml
+grep 'android.hardware.faketouch' /tmp/medito-tv-manifest.xml
+grep 'android.intent.category.LEANBACK_LAUNCHER' /tmp/medito-tv-manifest.xml
+grep 'tv_banner' /tmp/medito-tv-manifest.xml
+```
+
+For the combined phone + TV application, the expected feature policy is:
+
+```text
+android.software.leanback      required=false
+android.hardware.touchscreen   required=false
+android.hardware.faketouch     required=false
+```
+
+`MainActivity` must expose `android.intent.category.LEANBACK_LAUNCHER` for TV launcher discovery.
+
+## Verify the TV banner source asset
+
+The current launcher banner is:
+
+```text
+android/app/src/main/res/drawable-xhdpi/tv_banner.png
+```
+
+Expected dimensions:
+
+```text
+320x180
+```
+
+The release/debug TV manifest overlays should reference it as:
+
+```xml
+android:banner="@drawable/tv_banner"
+```
+
+## CI verification
+
+`.github/workflows/android-tv-build.yml` automatically:
+
+1. builds a release-mode `prod` AAB with mock/compile-only configuration,
+2. finds the merged manifest,
+3. checks for the Leanback/touch/faketouch/launcher/banner declarations, and
+4. uploads the resulting AAB artifact.
+
+A green Android TV CI build is required before treating the TV manifest/AAB foundation as complete.
