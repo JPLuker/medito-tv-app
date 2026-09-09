@@ -12,7 +12,7 @@
         android:name="android.hardware.faketouch"
         android:required="false" />
 
-    <application>
+    <application android:banner="@drawable/tv_banner">
         <activity android:name=".MainActivity">
             <intent-filter tools:node="remove">
                 <action android:name="android.intent.action.MAIN" />
