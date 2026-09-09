@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +7,7 @@ import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:medito/constants/strings/shared_preference_constants.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/app_globals.dart' show appReadyCompleter;
+import 'package:medito/platform/platform_info.dart';
 import 'package:medito/providers/providers.dart';
 import 'package:medito/routes/routes.dart';
 import 'package:medito/utils/logger.dart';
@@ -173,9 +173,14 @@ class DeepLinkService {
       if (source != AnalyticsEventConstants.widgetDeepLinkSource) return;
 
       final widgetType = uri.queryParameters['widget'] ?? 'unknown';
+      final platform = isIosPlatform
+          ? 'ios'
+          : isAndroidPlatform
+          ? 'android'
+          : 'web';
       final params = <String, Object>{
         AnalyticsEventConstants.paramWidgetType: widgetType,
-        'platform': Platform.isIOS ? 'ios' : 'android',
+        'platform': platform,
       };
 
       // Include the track id when present so we can correlate widget taps
