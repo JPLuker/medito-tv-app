@@ -12,13 +12,13 @@ concurrency:
 
 jobs:
   tv-build:
-    name: Android TV AAB
+    name: Android TV AAB + Google TV Smoke Test
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -131,6 +131,90 @@ jobs:
               if features.get(feature) != 'false':
                   raise SystemExit(f'{feature} must be android:required="false"; got {features.get(feature)!r}')
           PY
+
+      - name: Build installable TV smoke-test APK
+        run: |
+          flutter build apk --flavor prod --debug \
+            --dart-define-from-file=.mock.json \
+            --dart-define=MOCK_MODE=true
+
+          test -f build/app/outputs/flutter-apk/app-prod-debug.apk
+          ls -lh build/app/outputs/flutter-apk/app-prod-debug.apk
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Smoke test on Google TV emulator
+        timeout-minutes: 15
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google-tv
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          enable-hw-keyboard: true
+          script: |
+            set -euo pipefail
+            APK=build/app/outputs/flutter-apk/app-prod-debug.apk
+            PACKAGE=meditofoundation.medito
+
+            adb install -r "$APK"
+
+            echo "Google TV system features:"
+            adb shell pm list features | grep -E 'leanback|television|touchscreen|faketouch' || true
+            adb shell pm list features | grep -q 'feature:android.software.leanback'
+
+            echo "Resolving Leanback launcher activity:"
+            RESOLVED=$(adb shell cmd package resolve-activity --brief \
+              -a android.intent.action.MAIN \
+              -c android.intent.category.LEANBACK_LAUNCHER \
+              "$PACKAGE" | tr -d '\r')
+            echo "$RESOLVED"
+            echo "$RESOLVED" | grep -q 'meditofoundation.medito/.MainActivity'
+
+            adb logcat -c
+            adb shell am start -W \
+              -a android.intent.action.MAIN \
+              -c android.intent.category.LEANBACK_LAUNCHER \
+              -n "$PACKAGE/.MainActivity"
+            sleep 10
+
+            # Exercise the same key events delivered by a basic TV remote.
+            adb shell input keyevent KEYCODE_DPAD_RIGHT
+            adb shell input keyevent KEYCODE_DPAD_DOWN
+            adb shell input keyevent KEYCODE_DPAD_LEFT
+            adb shell input keyevent KEYCODE_DPAD_UP
+            sleep 2
+
+            # The app must still be alive after startup and D-pad navigation.
+            adb shell pidof "$PACKAGE"
+
+            mkdir -p /tmp/android-tv-smoke
+            adb exec-out screencap -p > /tmp/android-tv-smoke/screenshot.png
+            adb shell uiautomator dump /sdcard/window.xml || true
+            adb pull /sdcard/window.xml /tmp/android-tv-smoke/window.xml || true
+            adb logcat -d > /tmp/android-tv-smoke/logcat.txt
+
+            if grep -E 'FATAL EXCEPTION|Process: meditofoundation.medito.*has died' \
+              /tmp/android-tv-smoke/logcat.txt; then
+              echo "Medito crashed during Google TV smoke test"
+              exit 1
+            fi
+
+      - name: Upload Google TV smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: medito-google-tv-smoke
+          path: /tmp/android-tv-smoke/
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Upload TV AAB
         uses: actions/upload-artifact@v4
