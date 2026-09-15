@@ -272,6 +272,18 @@ abstract class AppLocalizations {
   /// **'Search meditations'**
   String get searchMeditations;
 
+  /// Label of the search button in the floating navigation bar
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get search;
+
+  /// Shown on the search page before anything is typed
+  ///
+  /// In en, this message translates to:
+  /// **'Find a pack or a session. Try sleep, anxiety or focus.'**
+  String get searchEmptyHint;
+
   /// No description provided for @share.
   ///
   /// In en, this message translates to:
@@ -1808,6 +1820,24 @@ abstract class AppLocalizations {
   /// **'No time picked yet — choose one above, or skip for now.'**
   String get reminderCustomCancelled;
 
+  /// Title of the settings tile that opens the reminder time bottom sheet (replaced the Smart Reminders switch)
+  ///
+  /// In en, this message translates to:
+  /// **'Daily reminder'**
+  String get reminderTitle;
+
+  /// Subtitle on the settings reminder tile when no daily reminder is scheduled
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get reminderOff;
+
+  /// Last row of the reminder time bottom sheet; cancels the scheduled reminders
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off reminders'**
+  String get reminderTurnOff;
+
   /// No description provided for @onboardingBatteryTitle.
   ///
   /// In en, this message translates to:
@@ -2414,6 +2444,24 @@ abstract class AppLocalizations {
   /// **'Connection timed out'**
   String get errorTimeoutMessage;
 
+  /// No description provided for @errorHostLookupMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t reach Medito\'s servers. Check for a VPN, ad blocker or Private DNS setting.'**
+  String get errorHostLookupMessage;
+
+  /// No description provided for @errorConnectTimeoutMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection to Medito\'s servers timed out. Please try again.'**
+  String get errorConnectTimeoutMessage;
+
+  /// No description provided for @errorServerUnreachableMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t connect to Medito\'s servers. Please try again later.'**
+  String get errorServerUnreachableMessage;
+
   /// No description provided for @errorUnauthorizedMessage.
   ///
   /// In en, this message translates to:
@@ -2456,17 +2504,83 @@ abstract class AppLocalizations {
   /// **'Zen Mode'**
   String get zenMode;
 
-  /// Subtitle for zen mode setting in customization section
-  ///
-  /// In en, this message translates to:
-  /// **'Hide all stats, streak, scores app-wide'**
-  String get zenModeSubtitle;
-
   /// Message shown when zen mode is enabled
   ///
   /// In en, this message translates to:
   /// **'Stats will be hidden throughout the app'**
   String get zenModeEnabledMessage;
+
+  /// Zen Mode state label; button in the sheet and subtitle on the settings row
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get zenModeOn;
+
+  /// Zen Mode state label; button in the sheet and subtitle on the settings row
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get zenModeOff;
+
+  /// Description under the Off option in the Zen Mode sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Show your streak, stats and consistency score.'**
+  String get zenModeOffDescription;
+
+  /// Description under the On option in the Zen Mode sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Hide your streak, stats and consistency score everywhere in the app.'**
+  String get zenModeOnDescription;
+
+  /// Small note under the Zen Mode options
+  ///
+  /// In en, this message translates to:
+  /// **'Your progress is recorded either way.'**
+  String get zenModeFootnote;
+
+  /// State label for 'Silence phone during meditation'; option in the sheet and subtitle on the settings row
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get dndOn;
+
+  /// State label for 'Silence phone during meditation'; option in the sheet and subtitle on the settings row
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get dndOff;
+
+  /// Description under the On option in the silence-phone sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on Do Not Disturb while a session plays and turn it off again when it ends. Alarms still sound.'**
+  String get dndOnDescription;
+
+  /// Description under the Off option in the silence-phone sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Leave your phone\'s notifications as they are during sessions.'**
+  String get dndOffDescription;
+
+  /// Small note under the silence-phone options explaining the Android permission
+  ///
+  /// In en, this message translates to:
+  /// **'Needs Do Not Disturb access on Android. Medito only changes it during a session.'**
+  String get dndFootnote;
+
+  /// Title of the dialog shown when the user turns on silence-phone without the Android permission
+  ///
+  /// In en, this message translates to:
+  /// **'Allow Do Not Disturb access'**
+  String get dndAccessTitle;
+
+  /// Body of the dialog explaining the Android Do Not Disturb access permission before opening system settings
+  ///
+  /// In en, this message translates to:
+  /// **'To silence your phone during meditation, Android needs to give Medito Do Not Disturb access. On the next screen, find Medito in the list and turn it on, then come back to the app.'**
+  String get dndAccessBody;
 
   /// Message shown in zen mode after completing meditation
   ///
@@ -3110,6 +3224,12 @@ abstract class AppLocalizations {
   /// **'System'**
   String get systemTheme;
 
+  /// Description under the System option in the theme sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Follows your device setting'**
+  String get systemThemeDescription;
+
   /// Light theme option
   ///
   /// In en, this message translates to:
@@ -3751,6 +3871,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your Path'**
   String get upNextTitle;
+
+  /// Caption next to the pack progress bar on the Your Path card, e.g. 3 of 7
+  ///
+  /// In en, this message translates to:
+  /// **'{completed} of {total}'**
+  String upNextProgress(int completed, int total);
 
   /// Headline on the Up Next card when every session in the pinned pack is complete
   ///

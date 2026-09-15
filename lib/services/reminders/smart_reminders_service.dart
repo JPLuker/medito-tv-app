@@ -61,22 +61,42 @@ class SmartRemindersService {
     return TimeOfDay(hour: savedHour, minute: savedMinute);
   }
 
-  Future<TimeOfDay> enable() async {
+  /// Turn reminders on without asking for a time (end-of-session card,
+  /// permission repair on Home). Keeps the hour the user chose earlier
+  /// (onboarding chips or Settings); only when none was ever saved does it
+  /// fall back to "same time tomorrow". Returns the hour used.
+  Future<TimeOfDay> enable({AppLocalizations? l10n}) async {
+    final time = getSavedTime() ?? _computeDefaultTimeFromNow();
+    await enableAt(time, l10n: l10n);
+    return time;
+  }
+
+  /// Turn reminders on at a time the user chose (Settings bottom sheet /
+  /// onboarding chips), instead of the silent "same time tomorrow" default of
+  /// [enable]. The series is anchored to the next occurrence of [time].
+  Future<DateTime> enableAt(TimeOfDay time, {AppLocalizations? l10n}) async {
     await prefs.setBool(SharedPreferenceConstants.dailyReminderEnabled, true);
+    await _saveTime(time);
 
     final now = DateTime.now();
-    final time = _computeDefaultTimeFromNow();
-    final anchor = now.add(const Duration(days: 1));
+    final candidate = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      time.hour,
+      time.minute,
+    );
+    final anchor = candidate.isBefore(now)
+        ? candidate.add(const Duration(days: 1))
+        : candidate;
 
     final scheduler = SmartRemindersScheduler(
       prefs: prefs,
       reminders: reminders,
     );
-    await scheduler.scheduleSeriesFromAnchor(anchor);
+    await scheduler.scheduleSeriesFromAnchor(anchor, l10n: l10n);
 
-    await _saveTime(time);
-
-    return time;
+    return anchor;
   }
 
   Future<void> disable() async {

@@ -5,14 +5,18 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/constants/constants.dart';
 import 'package:medito/constants/icons/medito_icons.dart';
+import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/providers/providers.dart';
 import 'package:medito/providers/stats_provider.dart';
+import 'package:medito/services/analytics/firebase_analytics_service.dart';
+import 'package:medito/views/bottom_navigation/widgets/floating_nav_bar.dart';
+import 'package:medito/views/bottom_navigation/widgets/floating_search_field.dart';
 import 'package:medito/views/explore/widgets/explore_view.dart';
 import 'package:medito/views/home/home_view.dart';
 import 'package:medito/views/path/path_view.dart';
+import 'package:medito/views/search/search_results.dart';
 import 'package:medito/views/settings/settings_screen.dart';
-import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/widgets/medito_icon.dart';
 
 class BottomNavigationBarView extends ConsumerStatefulWidget {
@@ -25,14 +29,22 @@ class BottomNavigationBarView extends ConsumerStatefulWidget {
 
 class _BottomNavigationBarViewState
     extends ConsumerState<BottomNavigationBarView> {
-  // Maps navigation destination index -> page index in _pages.
+  // Maps nav destination index -> page index in _pages.
   static const _pageIndexForDestination = [0, 1, 3];
+  static const _searchDebounce = Duration(milliseconds: 500);
 
   late int _currentPageIndex;
-  final _searchFocusNode = FocusNode();
   final _exploreViewKey = GlobalKey<ExploreViewState>();
-
   late final List<Widget> _pages;
+
+  // Search expands in place: the nav capsule holds the field and results
+  // overlay the current tab. On TV, the same search state is presented in a
+  // dedicated top field because the phone nav capsule is intentionally hidden.
+  bool _searchOpen = false;
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
+  Timer? _searchDebounceTimer;
 
   @override
   void initState() {
@@ -42,7 +54,7 @@ class _BottomNavigationBarViewState
     _currentPageIndex = saved <= 1 ? saved : 0;
     _pages = [
       const HomeView(),
-      ExploreView(key: _exploreViewKey, searchFocusNode: _searchFocusNode),
+      ExploreView(key: _exploreViewKey),
       const JourneyView(),
       const SettingsScreen(),
     ];
@@ -56,6 +68,8 @@ class _BottomNavigationBarViewState
 
   @override
   void dispose() {
+    _searchDebounceTimer?.cancel();
+    _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
   }
@@ -66,8 +80,6 @@ class _BottomNavigationBarViewState
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final unselectedColor = colorScheme.onSurfaceVariant;
-    final selectedColor = context.brandPurple;
     final selectedDestination = _pageIndexForDestination.indexOf(
       _currentPageIndex,
     );
@@ -76,8 +88,75 @@ class _BottomNavigationBarViewState
       data: (value) => value.isAndroidTv,
       orElse: () => false,
     );
+    final unselectedColor = colorScheme.onSurfaceVariant;
+    final selectedColor = context.brandPurple;
 
-    final pageStack = IndexedStack(index: _currentPageIndex, children: _pages);
+    final pageBody = Stack(
+      children: [
+        IndexedStack(index: _currentPageIndex, children: _pages),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          child: _searchOpen
+              ? Material(
+                  key: const ValueKey('search'),
+                  color: theme.scaffoldBackgroundColor,
+                  child: SafeArea(
+                    bottom: false,
+                    child: isTv
+                        ? Column(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  24,
+                                  16,
+                                  24,
+                                  8,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        height: 56,
+                                        decoration: BoxDecoration(
+                                          color: theme.cardColor,
+                                          borderRadius: BorderRadius.circular(
+                                            28,
+                                          ),
+                                        ),
+                                        child: FloatingSearchField(
+                                          controller: _searchController,
+                                          focusNode: _searchFocusNode,
+                                          onChanged: _onSearchChanged,
+                                          onClear: _clearSearch,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    TextButton(
+                                      onPressed: _closeSearch,
+                                      child: Text(l10n.cancel),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: SearchResults(
+                                  query: _searchQuery,
+                                  onBeforeNavigate: _searchFocusNode.unfocus,
+                                ),
+                              ),
+                            ],
+                          )
+                        : SearchResults(
+                            query: _searchQuery,
+                            onBeforeNavigate: _searchFocusNode.unfocus,
+                          ),
+                  ),
+                )
+              : const SizedBox.shrink(key: ValueKey('tabs')),
+        ),
+      ],
+    );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -90,77 +169,58 @@ class _BottomNavigationBarViewState
             : Brightness.dark,
       ),
       child: PopScope(
-        canPop: _currentPageIndex == 0,
+        canPop: !_searchOpen && _currentPageIndex == 0,
         onPopInvokedWithResult: (didPop, _) {
           if (didPop) return;
-          _onDestinationSelected(0);
+          if (_searchOpen) {
+            _closeSearch();
+          } else {
+            _onDestinationSelected(0);
+          }
         },
         child: FocusTraversalGroup(
           policy: ReadingOrderTraversalPolicy(),
           child: Scaffold(
             floatingActionButtonLocation:
                 FloatingActionButtonLocation.centerFloat,
+            extendBody: !isTv,
             bottomNavigationBar: isTv
                 ? null
-                : NavigationBar(
+                : FloatingNavBar(
                     selectedIndex: selectedDestination >= 0
                         ? selectedDestination
                         : 0,
-                    labelBehavior:
-                        NavigationDestinationLabelBehavior.onlyShowSelected,
-                    indicatorColor: Colors.transparent,
-                    overlayColor: WidgetStateProperty.all(Colors.transparent),
-                    labelTextStyle: WidgetStateProperty.resolveWith((states) {
-                      final baseStyle = Theme.of(context).textTheme.labelMedium;
-                      final color = states.contains(WidgetState.selected)
-                          ? selectedColor
-                          : unselectedColor;
-                      return baseStyle?.copyWith(color: color);
-                    }),
-                    onDestinationSelected: (index) => _onDestinationSelected(
+                    onSelected: (index) => _onDestinationSelected(
                       _pageIndexForDestination[index],
                     ),
-                    destinations: [
-                      NavigationDestination(
-                        icon: MeditoIcon(
-                          assetName: MeditoIcons.home,
-                          color: unselectedColor,
-                        ),
-                        selectedIcon: MeditoIcon(
-                          assetName: MeditoIcons.home,
-                          color: selectedColor,
-                        ),
+                    items: [
+                      FloatingNavItem(
+                        icon: MeditoIcons.home,
                         label: l10n.home,
                       ),
-                      NavigationDestination(
-                        icon: GestureDetector(
-                          onDoubleTap: _onExploreDoubleTap,
-                          child: MeditoIcon(
-                            assetName: MeditoIcons.book,
-                            color: unselectedColor,
-                          ),
-                        ),
-                        selectedIcon: GestureDetector(
-                          onDoubleTap: _onExploreDoubleTap,
-                          child: MeditoIcon(
-                            assetName: MeditoIcons.book,
-                            color: selectedColor,
-                          ),
-                        ),
+                      FloatingNavItem(
+                        icon: MeditoIcons.book,
                         label: l10n.explore,
                       ),
-                      NavigationDestination(
-                        icon: MeditoIcon(
-                          assetName: MeditoIcons.settings,
-                          color: unselectedColor,
-                        ),
-                        selectedIcon: MeditoIcon(
-                          assetName: MeditoIcons.settings,
-                          color: selectedColor,
-                        ),
+                      FloatingNavItem(
+                        icon: MeditoIcons.settings,
                         label: l10n.settings,
                       ),
                     ],
+                    action: FloatingNavAction(
+                      icon: MeditoIcons.search,
+                      label: l10n.search,
+                      onTap: _openSearch,
+                    ),
+                    expanded: _searchOpen,
+                    expandedChild: FloatingSearchField(
+                      controller: _searchController,
+                      focusNode: _searchFocusNode,
+                      onChanged: _onSearchChanged,
+                      onClear: _clearSearch,
+                    ),
+                    cancelLabel: l10n.cancel,
+                    onCancel: _closeSearch,
                   ),
             body: isTv
                 ? Row(
@@ -178,6 +238,19 @@ class _BottomNavigationBarViewState
                               _onDestinationSelected(
                                 _pageIndexForDestination[index],
                               ),
+                          trailing: Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: IconButton(
+                              tooltip: l10n.search,
+                              onPressed: _openSearch,
+                              icon: MeditoIcon(
+                                assetName: MeditoIcons.search,
+                                color: _searchOpen
+                                    ? selectedColor
+                                    : unselectedColor,
+                              ),
+                            ),
+                          ),
                           destinations: [
                             NavigationRailDestination(
                               icon: MeditoIcon(
@@ -216,32 +289,56 @@ class _BottomNavigationBarViewState
                         ),
                       ),
                       const VerticalDivider(width: 1),
-                      Expanded(child: pageStack),
+                      Expanded(child: pageBody),
                     ],
                   )
-                : pageStack,
+                : pageBody,
           ),
         ),
       ),
     );
   }
 
-  void _onExploreDoubleTap() {
-    if (_currentPageIndex == 1) {
-      _searchFocusNode.requestFocus();
-    } else {
-      _onDestinationSelected(1);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _searchFocusNode.requestFocus();
-      });
-    }
+  void _openSearch() {
+    if (_searchOpen) return;
+    unawaited(
+      ref
+          .read(analyticsServiceProvider)
+          .logFirstActionAfterOnboardingIfNeeded('search'),
+    );
+    unawaited(FirebaseAnalyticsService().logScreenView(screenName: 'Search'));
+    setState(() => _searchOpen = true);
+  }
+
+  /// Empties the field but stays in search.
+  void _clearSearch() {
+    _searchDebounceTimer?.cancel();
+    _searchController.clear();
+    setState(() => _searchQuery = '');
+    _searchFocusNode.requestFocus();
+  }
+
+  void _closeSearch() {
+    _searchDebounceTimer?.cancel();
+    _searchFocusNode.unfocus();
+    _searchController.clear();
+    setState(() {
+      _searchOpen = false;
+      _searchQuery = '';
+    });
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(_searchDebounce, () {
+      if (!mounted) return;
+      // The search backend is ASCII-only.
+      final asciiQuery = value.replaceAll(RegExp(r'[^\x00-\x7F]'), '');
+      setState(() => _searchQuery = asciiQuery);
+    });
   }
 
   void _onDestinationSelected(int index) {
-    if (_currentPageIndex == 1 && index != 1) {
-      _searchFocusNode.unfocus();
-    }
-
     if (index != _currentPageIndex) {
       const tabTargets = {0: 'tab_home', 1: 'tab_explore', 3: 'tab_settings'};
       final target = tabTargets[index];

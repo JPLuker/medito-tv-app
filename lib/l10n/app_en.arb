@@ -29,6 +29,14 @@
   "x09": "x0.9",
   "x1": "x1",
   "searchMeditations": "Search meditations",
+  "search": "Search",
+  "@search": {
+    "description": "Label of the search button in the floating navigation bar"
+  },
+  "searchEmptyHint": "Find a pack or a session. Try sleep, anxiety or focus.",
+  "@searchEmptyHint": {
+    "description": "Shown on the search page before anything is typed"
+  },
   "share": "Share",
   "tapToShare": "Tap to share",
   "id": "id",
@@ -379,6 +387,18 @@
   "@reminderCustomCancelled": {
     "description": "Feedback shown when the user opens the custom time picker and dismisses it without choosing, so the tap is not a silent dead end"
   },
+  "reminderTitle": "Daily reminder",
+  "@reminderTitle": {
+    "description": "Title of the settings tile that opens the reminder time bottom sheet (replaced the Smart Reminders switch)"
+  },
+  "reminderOff": "Off",
+  "@reminderOff": {
+    "description": "Subtitle on the settings reminder tile when no daily reminder is scheduled"
+  },
+  "reminderTurnOff": "Turn off reminders",
+  "@reminderTurnOff": {
+    "description": "Last row of the reminder time bottom sheet; cancels the scheduled reminders"
+  },
   "onboardingBatteryTitle": "One Setting, Smoother Meditations",
   "onboardingBatteryBody": "Your phone can pause Medito mid-session. One quick change prevents this.",
   "onboardingBatteryOptimize": "Update Setting",
@@ -486,6 +506,9 @@
   "errorNetworkMessage": "Unable to connect to server",
   "errorNoInternetMessage": "No internet connection",
   "errorTimeoutMessage": "Connection timed out",
+  "errorHostLookupMessage": "Couldn't reach Medito's servers. Check for a VPN, ad blocker or Private DNS setting.",
+  "errorConnectTimeoutMessage": "Connection to Medito's servers timed out. Please try again.",
+  "errorServerUnreachableMessage": "Couldn't connect to Medito's servers. Please try again later.",
   "errorUnauthorizedMessage": "Session expired, please sign in again",
   "errorNotFoundMessage": "Content not found",
   "errorServerMessage": "Server error, please try again later",
@@ -496,13 +519,57 @@
   "@zenMode": {
     "description": "Title for zen mode setting in customization section"
   },
-  "zenModeSubtitle": "Hide all stats, streak, scores app-wide",
-  "@zenModeSubtitle": {
-    "description": "Subtitle for zen mode setting in customization section"
-  },
   "zenModeEnabledMessage": "Stats will be hidden throughout the app",
   "@zenModeEnabledMessage": {
     "description": "Message shown when zen mode is enabled"
+  },
+  "zenModeOn": "On",
+  "@zenModeOn": {
+    "description": "Zen Mode state label; button in the sheet and subtitle on the settings row"
+  },
+  "zenModeOff": "Off",
+  "@zenModeOff": {
+    "description": "Zen Mode state label; button in the sheet and subtitle on the settings row"
+  },
+  "zenModeOffDescription": "Show your streak, stats and consistency score.",
+  "@zenModeOffDescription": {
+    "description": "Description under the Off option in the Zen Mode sheet"
+  },
+  "zenModeOnDescription": "Hide your streak, stats and consistency score everywhere in the app.",
+  "@zenModeOnDescription": {
+    "description": "Description under the On option in the Zen Mode sheet"
+  },
+  "zenModeFootnote": "Your progress is recorded either way.",
+  "@zenModeFootnote": {
+    "description": "Small note under the Zen Mode options"
+  },
+  "dndOn": "On",
+  "@dndOn": {
+    "description": "State label for 'Silence phone during meditation'; option in the sheet and subtitle on the settings row"
+  },
+  "dndOff": "Off",
+  "@dndOff": {
+    "description": "State label for 'Silence phone during meditation'; option in the sheet and subtitle on the settings row"
+  },
+  "dndOnDescription": "Turn on Do Not Disturb while a session plays and turn it off again when it ends. Alarms still sound.",
+  "@dndOnDescription": {
+    "description": "Description under the On option in the silence-phone sheet"
+  },
+  "dndOffDescription": "Leave your phone's notifications as they are during sessions.",
+  "@dndOffDescription": {
+    "description": "Description under the Off option in the silence-phone sheet"
+  },
+  "dndFootnote": "Needs Do Not Disturb access on Android. Medito only changes it during a session.",
+  "@dndFootnote": {
+    "description": "Small note under the silence-phone options explaining the Android permission"
+  },
+  "dndAccessTitle": "Allow Do Not Disturb access",
+  "@dndAccessTitle": {
+    "description": "Title of the dialog shown when the user turns on silence-phone without the Android permission"
+  },
+  "dndAccessBody": "To silence your phone during meditation, Android needs to give Medito Do Not Disturb access. On the next screen, find Medito in the list and turn it on, then come back to the app.",
+  "@dndAccessBody": {
+    "description": "Body of the dialog explaining the Android Do Not Disturb access permission before opening system settings"
   },
   "mindClear": "Mind Clear",
   "@mindClear": {
@@ -758,6 +825,10 @@
   "systemTheme": "System",
   "@systemTheme": {
     "description": "System theme option that follows device settings"
+  },
+  "systemThemeDescription": "Follows your device setting",
+  "@systemThemeDescription": {
+    "description": "Description under the System option in the theme sheet"
   },
   "lightTheme": "Light",
   "@lightTheme": {
@@ -1230,6 +1301,14 @@
   "upNextTitle": "Your Path",
   "@upNextTitle": {
     "description": "Title for the Your Path section on the home screen"
+  },
+  "upNextProgress": "{completed} of {total}",
+  "@upNextProgress": {
+    "description": "Caption next to the pack progress bar on the Your Path card, e.g. 3 of 7",
+    "placeholders": {
+      "completed": {"type": "int"},
+      "total": {"type": "int"}
+    }
   },
   "upNextPackCompletedTitle": "You finished {packTitle}",
   "@upNextPackCompletedTitle": {

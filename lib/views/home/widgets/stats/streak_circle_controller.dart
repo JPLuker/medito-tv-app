@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:medito/models/local_audio_completed.dart';
 import 'package:medito/models/local_all_stats.dart';
 import 'package:medito/providers/streak_circle_display_provider.dart';
+import 'package:medito/views/home/widgets/stats/streak_circle_constants.dart';
 
 class StreakCircleController extends ChangeNotifier {
   final TickerProvider vsync;
@@ -13,11 +14,20 @@ class StreakCircleController extends ChangeNotifier {
   StreakCircleController({required this.vsync}) {
     animationController = AnimationController(
       vsync: vsync,
-      duration: const Duration(seconds: 3),
+      duration: StreakCircleConstants.animationDuration,
     );
   }
 
   bool get isAnimating => _isAnimating;
+
+  /// Mirrors the platform's reduced-motion setting
+  /// (`MediaQuery.disableAnimations`, which Android raises when its animator
+  /// scale is 0). While set, [updateAnimation] never starts the ring: the
+  /// travelling glow repaints a blurred sweep every frame for as long as Home
+  /// is on screen, which is exactly the kind of decoration reduced motion asks
+  /// us to drop, and on a software-rendered emulator it was enough to take the
+  /// whole emulator process down (CI upgrade test, 2026-09-15).
+  bool reduceMotion = false;
 
   bool shouldShowConsistencyScore(
     LocalAllStats stats, [
@@ -54,6 +64,7 @@ class StreakCircleController extends ChangeNotifier {
   }
 
   void updateAnimation(bool shouldAnimate) {
+    if (reduceMotion) shouldAnimate = false;
     if (shouldAnimate && !_isAnimating) {
       animationController.repeat();
       _isAnimating = true;

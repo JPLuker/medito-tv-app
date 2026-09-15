@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:medito/models/local_all_stats.dart';
 import 'package:medito/models/local_audio_completed.dart';
+import 'package:medito/views/home/widgets/stats/streak_circle_constants.dart';
 import 'package:medito/views/home/widgets/stats/streak_circle_controller.dart';
 
 void main() {
@@ -21,7 +22,7 @@ void main() {
       expect(controller.animationController, isNotNull);
       expect(
         controller.animationController.duration,
-        const Duration(seconds: 3),
+        StreakCircleConstants.animationDuration,
       );
       expect(controller.isAnimating, false);
     });
@@ -35,6 +36,22 @@ void main() {
     test('updateAnimation stops animation when shouldAnimate is false', () {
       controller.updateAnimation(true);
       controller.updateAnimation(false);
+      expect(controller.isAnimating, false);
+      expect(controller.animationController.isAnimating, false);
+    });
+
+    test('updateAnimation never starts the ring under reduced motion', () {
+      controller.reduceMotion = true;
+      controller.updateAnimation(true);
+      expect(controller.isAnimating, false);
+      expect(controller.animationController.isAnimating, false);
+    });
+
+    test('reduced motion turning on stops a ring that is already running', () {
+      controller.updateAnimation(true);
+      expect(controller.isAnimating, true);
+      controller.reduceMotion = true;
+      controller.updateAnimation(true);
       expect(controller.isAnimating, false);
       expect(controller.animationController.isAnimating, false);
     });
