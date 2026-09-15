@@ -154,7 +154,7 @@ jobs:
         with:
           api-level: 34
           target: google-tv
-          arch: x86_64
+          arch: x86
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
