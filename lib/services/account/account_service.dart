@@ -3,6 +3,7 @@ import 'package:medito/constants/http/http_constants.dart' as http_constants;
 import 'package:medito/repositories/auth/auth_repository.dart';
 import 'package:medito/utils/logger.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:medito/services/device_capabilities_service.dart';
 
 final dev = const AppLoggerAdapter('ACCOUNT_SERVICE');
 
