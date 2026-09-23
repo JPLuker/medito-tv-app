@@ -3,6 +3,7 @@ import 'package:medito/utils/utils.dart';
 import 'package:medito/widgets/markdown_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 
 import '../../constants/colors/color_constants.dart';
 import 'package:medito/l10n/app_localizations.dart';
@@ -24,6 +25,10 @@ class MaintenanceView extends ConsumerStatefulWidget {
 class _MaintenanceViewState extends ConsumerState<MaintenanceView> {
   @override
   Widget build(BuildContext context) {
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
     var markDownTheme = Theme.of(context).textTheme.bodyMedium?.copyWith(
       color: ColorConstants.white,
       fontSize: 16,
@@ -69,7 +74,8 @@ class _MaintenanceViewState extends ConsumerState<MaintenanceView> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      if (widget.maintenanceModel.ctaLabel != null &&
+                      if (!isTv &&
+                          widget.maintenanceModel.ctaLabel != null &&
                           widget.maintenanceModel.ctaLabel!.isNotEmpty)
                         SizedBox(
                           width: double.infinity,
