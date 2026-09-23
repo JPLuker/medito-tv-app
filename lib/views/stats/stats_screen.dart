@@ -5,6 +5,7 @@ import 'package:medito/constants/icons/medito_icons.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/models/local_all_stats.dart';
 import 'package:medito/providers/stats_provider.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/providers/streak_circle_display_provider.dart';
 import 'package:medito/widgets/dialogs/medito_dialog.dart';
 import 'package:medito/widgets/dialogs/medito_dialog_buttons.dart';
@@ -287,6 +288,11 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
   }
 
   Column _statsList(BuildContext context, LocalAllStats stats, WidgetRef ref) {
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -334,6 +340,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
             ],
           ),
         ),
+        if (!isTv)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 16),
           child: SizedBox(
