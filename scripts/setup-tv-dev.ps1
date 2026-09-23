@@ -123,14 +123,67 @@ try {
     if (-not (Test-Path $AndroidHome)) {
         Write-Warning "Android SDK not found at '$AndroidHome'. Install it from Android Studio > Tools > SDK Manager."
     } else {
-        $cmdlineTools = @(
-            (Join-Path $AndroidHome "cmdline-tools\latest\bin\sdkmanager.bat"),
+        $SdkManager = Join-Path $AndroidHome "cmdline-tools\latest\bin\sdkmanager.bat"
+        $AndroidCliCandidates = @(
             (Join-Path $AndroidHome "cmdline-tools\latest\bin\android.bat"),
-            (Join-Path $AndroidHome "cmdline-tools\latest\bin\android.exe")
-        )
-        if (-not ($cmdlineTools | Where-Object { Test-Path $_ })) {
+            (Join-Path $AndroidHome "cmdline-tools\latest\bin\android.exe"),
+            (Get-Command android -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1)
+        ) | Where-Object { $_ -and (Test-Path $_) }
+        $AndroidCli = $AndroidCliCandidates | Select-Object -First 1
+
+        if (-not (Test-Path $SdkManager) -and -not $AndroidCli) {
             Write-Warning "Android SDK Command-line Tools were not detected. Install 'Android SDK Command-line Tools (latest)' in Android Studio > Tools > SDK Manager > SDK Tools."
         }
+
+        Write-Step "Checking required Android NDK"
+        $RequiredNdkVersion = "28.2.13676358"
+        $RequiredNdk = Join-Path $AndroidHome "ndk\$RequiredNdkVersion"
+
+        if (-not (Test-Path (Join-Path $RequiredNdk "source.properties"))) {
+            Write-Host "NDK $RequiredNdkVersion is not installed."
+
+            $installed = $false
+
+            if ($AndroidCli) {
+                Write-Host "Installing NDK with Android CLI: $AndroidCli"
+                & $AndroidCli --sdk="$AndroidHome" sdk install "ndk/$RequiredNdkVersion"
+                if ($LASTEXITCODE -eq 0 -and (Test-Path (Join-Path $RequiredNdk "source.properties"))) {
+                    $installed = $true
+                } else {
+                    Write-Warning "Android CLI did not install NDK $RequiredNdkVersion successfully."
+                }
+            }
+
+            if (-not $installed -and (Test-Path $SdkManager)) {
+                Write-Host "Trying legacy sdkmanager fallback..."
+                & $SdkManager --install "ndk;$RequiredNdkVersion"
+                if ($LASTEXITCODE -eq 0 -and (Test-Path (Join-Path $RequiredNdk "source.properties"))) {
+                    $installed = $true
+                }
+            }
+
+            if (-not $installed) {
+                throw @"
+Required Android NDK $RequiredNdkVersion is missing.
+
+Install it in Android Studio:
+  Tools -> SDK Manager -> SDK Tools
+  -> Show Package Details
+  -> NDK (Side by side)
+  -> $RequiredNdkVersion
+  -> Apply
+
+Then rerun:
+  .\scripts\setup-tv-dev.ps1
+"@
+            }
+        } else {
+            Write-Host "Required NDK already installed: $RequiredNdk"
+        }
+
+        $env:ANDROID_HOME = $AndroidHome
+        $env:ANDROID_SDK_ROOT = $AndroidHome
+        $env:ANDROID_NDK_HOME = $RequiredNdk
     }
 
     Write-Step "Preparing local debug signing"
