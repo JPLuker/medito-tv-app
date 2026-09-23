@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/constants/icons/medito_icons.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/providers/providers.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/providers/stats_provider.dart';
 import 'package:medito/repositories/auth/auth_repository.dart';
 import 'package:medito/services/account/account_service.dart';
@@ -22,9 +23,13 @@ class AccountSectionWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authRepository = ref.watch(authRepositorySyncProvider);
     final user = authRepository.currentUser;
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
 
     if (user != null && user.email != null && user.email!.isNotEmpty) {
-      return _buildSignedInUserSection(context, ref, user.email!);
+      return _buildSignedInUserSection(context, ref, user.email!, isTv: isTv);
     } else {
       return _buildSignedOutUserSection(context, ref);
     }
@@ -33,8 +38,9 @@ class AccountSectionWidget extends ConsumerWidget {
   Widget _buildSignedInUserSection(
     BuildContext context,
     WidgetRef ref,
-    String email,
-  ) {
+    String email, {
+    required bool isTv,
+  }) {
     final authRepository = ref.watch(authRepositorySyncProvider);
     final accountService = ref.watch(accountServiceProvider);
 
@@ -98,6 +104,7 @@ class AccountSectionWidget extends ConsumerWidget {
               }
             },
           ),
+          if (!isTv)
           RowItemWidget(
             icon: MeditoIcon(
               assetName: MeditoIcons.xmark,
