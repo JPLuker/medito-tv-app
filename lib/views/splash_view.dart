@@ -11,6 +11,7 @@ import 'package:medito/exceptions/app_error.dart';
 import 'package:medito/firebase_options.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/providers/providers.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/providers/root/root_combine_provider.dart';
 import 'package:medito/providers/stripe/payment_service_provider.dart';
 import 'package:medito/providers/stats_provider.dart';
@@ -443,9 +444,38 @@ class SplashViewState extends ConsumerState<SplashView>
 
       if (!mounted) return;
 
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const OnboardingPagerScreen()),
-      );
+      var isAndroidTv = false;
+      try {
+        final capabilities = await ref.read(deviceCapabilitiesProvider.future);
+        isAndroidTv = capabilities.isAndroidTv;
+      } catch (e) {
+        AppLogger.w(
+          'SPLASH',
+          'Could not determine TV capabilities after anonymous sign-in: $e',
+        );
+      }
+
+      if (!mounted) return;
+
+      if (isAndroidTv) {
+        AppLogger.i(
+          'SPLASH',
+          'Android TV detected; skipping onboarding and opening the main app',
+        );
+        if (!appReadyCompleter.isCompleted) appReadyCompleter.complete();
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) =>
+                const RootPageView(firstChild: BottomNavigationBarView()),
+          ),
+        );
+      } else {
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const OnboardingPagerScreen(),
+          ),
+        );
+      }
     } on EmailExistsError catch (_) {
       if (!mounted) return;
 
