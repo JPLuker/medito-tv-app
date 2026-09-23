@@ -20,7 +20,7 @@ class _AudioSpeedComponentState extends ConsumerState<AudioSpeedWidget> {
 
   @override
   Widget build(BuildContext context) {
-    var isSelected = _currentSpeed != 1.0;
+    final isSelected = _currentSpeed != 1.0;
     final l10n = AppLocalizations.of(context)!;
 
     return Semantics(
@@ -32,37 +32,37 @@ class _AudioSpeedComponentState extends ConsumerState<AudioSpeedWidget> {
           borderRadius: BorderRadius.circular(6),
           focusColor: Colors.white.withValues(alpha: 0.18),
           onTap: () {
-          setState(() {
-            _currentIndex = (_currentIndex + 1) % _speedOptions.length;
-          });
-          widget.onSpeedChanged(_currentSpeed);
-        },
-        child: ExcludeSemantics(
-          child: IntrinsicWidth(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              height: 48,
-              alignment: Alignment.center,
-              decoration: isSelected
-                  ? BoxDecoration(
-                      color: ColorConstants.graphite.withAlpha(200),
-                      borderRadius: BorderRadius.circular(6),
-                    )
-                  : null,
-              child: Text(
-                '${_currentSpeed.toStringAsFixed(1)}×',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: ColorConstants.white,
-                  fontFamily: dmMono,
-                  fontSize: 18,
+            setState(() {
+              _currentIndex = (_currentIndex + 1) % _speedOptions.length;
+            });
+            widget.onSpeedChanged(_currentSpeed);
+          },
+          child: ExcludeSemantics(
+            child: IntrinsicWidth(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                height: 48,
+                alignment: Alignment.center,
+                decoration: isSelected
+                    ? BoxDecoration(
+                        color: ColorConstants.graphite.withAlpha(200),
+                        borderRadius: BorderRadius.circular(6),
+                      )
+                    : null,
+                child: Text(
+                  '${_currentSpeed.toStringAsFixed(1)}×',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: ColorConstants.white,
+                    fontFamily: dmMono,
+                    fontSize: 18,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
               ),
             ),
           ),
         ),
       ),
-    ),
     );
   }
 }
