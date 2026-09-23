@@ -358,8 +358,14 @@ class StreakCircleState extends ConsumerState<StreakCircle>
         child: Semantics(
           label: AppLocalizations.of(context)!.refresh,
           button: true,
-          child: GestureDetector(
+          child: InkWell(
             onTap: () => ref.refresh(statsProvider),
+            borderRadius: BorderRadius.circular(
+              StreakCircleConstants.borderRadius,
+            ),
+            focusColor: Theme.of(
+              context,
+            ).colorScheme.primary.withValues(alpha: 0.18),
             child: ExcludeSemantics(
               child: MeditoIcon(
                 assetName: MeditoIcons.help,
