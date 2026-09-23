@@ -70,6 +70,7 @@ class AnalyticsSettingsScreen extends ConsumerWidget {
                   ref.invalidate(_firebaseEnabledProvider);
                 },
               ),
+              if (!isTv)
               _SwitchTile(
                 label: 'Meta (Facebook) App Events',
                 provider: _metaEnabledProvider,
