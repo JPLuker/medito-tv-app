@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/constants/enums/home_widget_type.dart';
 import 'package:medito/models/home/product/product_model.dart';
 import 'package:medito/providers/home/products_provider.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/utils/logger.dart';
 import 'package:medito/views/home/widgets/products/products_widget.dart';
 
@@ -11,6 +12,12 @@ class HomeProductsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
+    if (isTv) return const SizedBox.shrink();
+
     final products = ref.watch(productsProvider);
 
     return products.when(
