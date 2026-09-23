@@ -35,9 +35,13 @@ class _PackCardWidgetState extends State<PackCardWidget> {
       backgroundColor: backgroundColor,
       borderRadius: 14,
       borderWidth: 0.5,
-      child: InkWell(
-        onTap: widget.onTap,
-        child: Column(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(14),
+          focusColor: theme.colorScheme.primary.withValues(alpha: 0.16),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -62,6 +66,7 @@ class _PackCardWidgetState extends State<PackCardWidget> {
           ],
         ),
       ),
+    ),
     );
   }
 
