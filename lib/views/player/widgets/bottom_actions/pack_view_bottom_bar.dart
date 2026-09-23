@@ -15,6 +15,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../../models/favorites/favorite_item.dart';
 import '../../../../models/pack/pack_model.dart';
 import '../../../../providers/favorites/favorites_provider.dart';
+import '../../../../providers/device_capabilities_provider.dart';
 import '../../../../widgets/add_to_siri_util.dart';
 import '../../../../widgets/medito_icon.dart';
 import '../../../../widgets/snackbar_widget.dart';
@@ -142,6 +143,10 @@ class _PackViewBottomBarState extends ConsumerState<PackViewBottomBar> {
     final packData = ref.watch(packProvider(packId: widget.packId));
     final favoritesState = ref.watch(favoritesNotifierProvider);
     final currentUpNextPackId = ref.watch(upNextPackIdProvider);
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
     final isDefaultPack = widget.packId == ConfigConstants.basicsPackId;
 
     return packData.when(
@@ -162,6 +167,7 @@ class _PackViewBottomBarState extends ConsumerState<PackViewBottomBar> {
               isUpNext,
               containsOnlyTracks,
               isDefaultPack,
+              isTv,
             );
           },
           loading: () {
@@ -173,6 +179,7 @@ class _PackViewBottomBarState extends ConsumerState<PackViewBottomBar> {
               isUpNext,
               containsOnlyTracks,
               isDefaultPack,
+              isTv,
             );
           },
           error: (error, stack) {
@@ -184,6 +191,7 @@ class _PackViewBottomBarState extends ConsumerState<PackViewBottomBar> {
               isUpNext,
               containsOnlyTracks,
               isDefaultPack,
+              isTv,
             );
           },
         );
@@ -200,6 +208,7 @@ class _PackViewBottomBarState extends ConsumerState<PackViewBottomBar> {
     bool isUpNext,
     bool containsOnlyTracks,
     bool isDefaultPack,
+    bool isTv,
   ) {
     final favouriteColour = isFavorite
         ? context.brandPurple
@@ -220,18 +229,20 @@ class _PackViewBottomBarState extends ConsumerState<PackViewBottomBar> {
         onTap: widget.onBackPressed,
         semanticLabel: l10n.goBack,
       ),
-      rightCenterItem: BottomActionBarItem(
-        child: MeditoIcon(
-          assetName: Platform.isIOS
-              ? MeditoIcons.shareIos
-              : MeditoIcons.shareAndroid,
-          color: Theme.of(context).colorScheme.onSurface,
-        ),
-        onTap: Platform.isIOS
-            ? () => _showBottomSheet(context)
-            : () => _sharePack(context),
-        semanticLabel: l10n.share,
-      ),
+      rightCenterItem: isTv
+          ? null
+          : BottomActionBarItem(
+              child: MeditoIcon(
+                assetName: Platform.isIOS
+                    ? MeditoIcons.shareIos
+                    : MeditoIcons.shareAndroid,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              onTap: Platform.isIOS
+                  ? () => _showBottomSheet(context)
+                  : () => _sharePack(context),
+              semanticLabel: l10n.share,
+            ),
       leftCenterItem: containsOnlyTracks
           ? BottomActionBarItem(
               child: MeditoIcon(
