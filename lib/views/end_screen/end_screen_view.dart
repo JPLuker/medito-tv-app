@@ -11,6 +11,7 @@ import 'package:medito/models/local_all_stats.dart';
 import 'package:medito/models/local_audio_completed.dart';
 import 'package:medito/models/models.dart';
 import 'package:medito/providers/notification/reminder_provider.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/providers/providers.dart';
 import 'package:medito/providers/review_service_provider.dart';
 import 'package:medito/providers/stats_provider.dart';
@@ -182,12 +183,12 @@ class _EndScreenViewState extends ConsumerState<EndScreenView>
   }
 
   void _loadStats() {
-    // handleStats already wrote this session's completion to local stats
-    // and pushed it through statsProvider before we got here, so there's
-    // no refresh() needed. Just gate the review prompt on the current
-    // stats being available.
-    final reviewService = ref.read(reviewServiceProvider);
-    reviewService.checkAndRequestReview();
+    // handleStats already wrote this session's completion to local stats.
+    // Play review prompts are a phone/tablet flow and are skipped on TV.
+    ref.read(deviceCapabilitiesProvider.future).then((capabilities) {
+      if (!mounted || capabilities.isAndroidTv) return;
+      ref.read(reviewServiceProvider).checkAndRequestReview();
+    });
   }
 
   void _navigateToHome() {
@@ -202,6 +203,11 @@ class _EndScreenViewState extends ConsumerState<EndScreenView>
 
   @override
   Widget build(BuildContext context) {
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
+
     return Scaffold(
       bottomNavigationBar: BottomActionBar(
         leftItem: BottomActionBarItem(
@@ -243,13 +249,14 @@ class _EndScreenViewState extends ConsumerState<EndScreenView>
                       : _buildStatsArea(),
                 ),
               ),
-              SlideTransition(
-                position: _reminderSlideAnimation,
-                child: FadeTransition(
-                  opacity: _reminderFadeAnimation,
-                  child: _buildReminderPrompt(),
+              if (!isTv)
+                SlideTransition(
+                  position: _reminderSlideAnimation,
+                  child: FadeTransition(
+                    opacity: _reminderFadeAnimation,
+                    child: _buildReminderPrompt(),
+                  ),
                 ),
-              ),
               SlideTransition(
                 position: _cardSlideAnimation,
                 child: FadeTransition(
@@ -679,6 +686,14 @@ class _EndScreenViewState extends ConsumerState<EndScreenView>
   }
 
   Future<void> _checkNotificationPermission() async {
+    try {
+      if ((await ref.read(deviceCapabilitiesProvider.future)).isAndroidTv) {
+        return;
+      }
+    } catch (_) {
+      // Fall through if capability detection fails.
+    }
+
     final status = await Permission.notification.status;
     if (mounted) {
       setState(() {
