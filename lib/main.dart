@@ -39,6 +39,7 @@ import 'package:medito/utils/stats_updater.dart';
 import 'package:medito/views/splash_view.dart';
 import 'package:medito/services/network/http_api_service.dart';
 import 'package:medito/services/deep_link_service.dart';
+import 'package:medito/services/device_capabilities_service.dart';
 // ignore: depend_on_referenced_packages
 import 'package:device_preview/device_preview.dart';
 import 'package:medito/config/debug_options.dart';
@@ -88,6 +89,8 @@ void main() async {
   }
 
   var prefs = await initializeSharedPreferences();
+  final deviceCapabilities = await DeviceCapabilitiesService().detect();
+  final isAndroidTv = deviceCapabilities.isAndroidTv;
 
   try {
     final packageInfo = await PackageInfo.fromPlatform();
@@ -120,7 +123,8 @@ void main() async {
   // SCHEDULE_EXACT_ALARM instead, which isn't needed and blocked many users).
   // We flag them here; HomeView will prompt them immediately on first render.
   const notifPermissionMigrationKey = 'notif_permission_migration_v1';
-  if (!(prefs.getBool(notifPermissionMigrationKey) ?? false)) {
+  if (!isAndroidTv &&
+      !(prefs.getBool(notifPermissionMigrationKey) ?? false)) {
     await prefs.setBool(notifPermissionMigrationKey, true);
     final remindersEnabled =
         prefs.getBool(SharedPreferenceConstants.dailyReminderEnabled) ?? false;
@@ -163,8 +167,10 @@ void main() async {
       // Continue without Firebase - app should still work offline
     }
 
-    // Initialize Stripe
-    await _configureStripe();
+    // Stripe/payment UI is intentionally not part of the Android TV surface.
+    if (!isAndroidTv) {
+      await _configureStripe();
+    }
 
     // Initialize Meta (Facebook) App Events
     // init() now checks the analyticsMetaEnabled preference internally
