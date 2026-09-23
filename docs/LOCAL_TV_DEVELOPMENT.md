@@ -195,7 +195,10 @@ Pull the latest TV branch and rerun:
 ```
 
 The setup script installs the NDK before Gradle runs. It prefers the current
-Android CLI and falls back to legacy `sdkmanager` when appropriate.
+Android CLI and falls back to legacy `sdkmanager` when appropriate. The script
+validates success from the installed NDK files rather than relying only on the
+installer process exit code, because current Android tooling can occasionally
+return a non-zero status even after a package has been unpacked successfully.
 
 If automatic installation still fails, use Android Studio:
 
