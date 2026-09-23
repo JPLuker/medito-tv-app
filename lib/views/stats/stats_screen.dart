@@ -178,9 +178,13 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
                         child: Semantics(
                           label: AppLocalizations.of(context)!.refresh,
                           button: true,
-                          child: GestureDetector(
+                          child: InkWell(
                             onTap: () =>
                                 ref.read(statsProvider.notifier).refresh(),
+                            borderRadius: BorderRadius.circular(24),
+                            focusColor: Theme.of(
+                              context,
+                            ).colorScheme.primary.withValues(alpha: 0.18),
                             child: ExcludeSemantics(
                               child: MeditoIcon(
                                 assetName: MeditoIcons.help,
