@@ -9,12 +9,14 @@ import 'package:medito/constants/http/http_constants.dart';
 import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:medito/constants/strings/shared_preference_constants.dart';
 import 'package:medito/utils/logger.dart';
+import 'package:medito/services/device_capabilities_service.dart';
 
 class MetaSdkService {
   MetaSdkService._();
 
   static final MetaSdkService instance = MetaSdkService._();
   bool _initialised = false;
+  bool _disabledForTv = false;
   FacebookAppEvents? _events;
   static const MethodChannel _channel = MethodChannel(
     'com.medito.app/facebook',
@@ -22,6 +24,17 @@ class MetaSdkService {
 
   Future<void> init() async {
     if (_initialised) {
+      return;
+    }
+
+    try {
+      _disabledForTv = (await DeviceCapabilitiesService().detect()).isAndroidTv;
+    } catch (_) {
+      _disabledForTv = false;
+    }
+    if (_disabledForTv) {
+      AppLogger.d('META', 'Android TV detected; skipping Meta SDK');
+      _initialised = true;
       return;
     }
 
@@ -56,6 +69,10 @@ class MetaSdkService {
   /// disable requires a process restart, but dropping _events prevents
   /// all Dart-side event logging immediately.
   Future<void> setEnabled(bool enabled) async {
+    if (_disabledForTv) return;
+    if (!_initialised) await init();
+    if (_disabledForTv) return;
+
     if (enabled && _events == null && facebookAppId.isNotEmpty) {
       _events = FacebookAppEvents();
       _initialised = true;
@@ -96,6 +113,7 @@ class MetaSdkService {
   }
 
   Future<void> setUserId(String? userId) async {
+    if (_disabledForTv) return;
     try {
       if (userId == null || userId.isEmpty) {
         await _events?.clearUserID();
@@ -111,6 +129,7 @@ class MetaSdkService {
   }
 
   Future<void> logEvent(String name, Map<String, Object?> params) async {
+    if (_disabledForTv) return;
     try {
       // Check if Meta Analytics is enabled by user preference
       final prefs = await SharedPreferences.getInstance();
