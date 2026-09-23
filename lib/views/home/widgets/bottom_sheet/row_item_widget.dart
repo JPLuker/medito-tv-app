@@ -9,7 +9,7 @@ class RowItemWidget extends StatefulWidget {
     required this.title,
     this.subTitle,
     required this.icon,
-    this.widget.hasUnderline = true,
+    this.hasUnderline = true,
     this.onTap,
     this.isTrailingIcon = true,
     this.isSwitch = false,
@@ -27,7 +27,7 @@ class RowItemWidget extends StatefulWidget {
   final String? subTitle;
   final Widget icon;
   final Color? iconColor;
-  final bool widget.hasUnderline;
+  final bool hasUnderline;
   final void Function()? onTap;
   final bool isTrailingIcon;
   final bool isSwitch;
@@ -51,13 +51,12 @@ class _RowItemWidgetState extends State<RowItemWidget> {
 
   @override
   Widget build(BuildContext context) {
-    var border = Border(
+    final theme = Theme.of(context);
+    final border = Border(
       bottom: widget.hasUnderline
           ? BorderSide(
               width: 0.7,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withOpacityValue(0.2),
+              color: theme.colorScheme.onSurface.withOpacityValue(0.2),
             )
           : BorderSide.none,
     );
@@ -67,18 +66,20 @@ class _RowItemWidgetState extends State<RowItemWidget> {
         onTap: widget.onTap,
         borderRadius: BorderRadius.circular(10),
         onFocusChange: (focused) {
-          if (_hasFocus != focused) setState(() => _hasFocus = focused);
+          if (_hasFocus != focused) {
+            setState(() => _hasFocus = focused);
+          }
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           decoration: BoxDecoration(
             color: _hasFocus
-                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)
+                ? theme.colorScheme.primary.withValues(alpha: 0.12)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: _hasFocus
-                  ? Theme.of(context).colorScheme.primary
+                  ? theme.colorScheme.primary
                   : Colors.transparent,
               width: 2,
             ),
@@ -87,58 +88,54 @@ class _RowItemWidgetState extends State<RowItemWidget> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Container(
               decoration: BoxDecoration(border: border),
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      _buildIconWithColor(),
-                      width16,
-                      Expanded(
-                        child: Text.rich(
-                          TextSpan(
-                            style: const TextStyle(fontSize: 18.0),
-                            children: [
-                              TextSpan(
-                                text: widget.title,
-                                style:
-                                    widget.titleStyle ??
-                                    Theme.of(
-                                      context,
-                                    ).textTheme.labelMedium?.copyWith(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface,
-                                    ),
-                              ),
-                              if (widget.subTitle != null) _subtitle(context),
-                            ],
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        _buildIconWithColor(),
+                        width16,
+                        Expanded(
+                          child: Text.rich(
+                            TextSpan(
+                              style: const TextStyle(fontSize: 18.0),
+                              children: [
+                                TextSpan(
+                                  text: widget.title,
+                                  style:
+                                      widget.titleStyle ??
+                                      theme.textTheme.labelMedium?.copyWith(
+                                        color: theme.colorScheme.onSurface,
+                                      ),
+                                ),
+                                if (widget.subTitle != null) _subtitle(context),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                if (widget.trailing != null) ...[widget.trailing!, width16],
-                if (widget.isTrailingIcon && !widget.isSwitch)
-                  Icon(
-                    widget.trailingIcon,
-                    size: widget.trailingIconSize,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                if (widget.isSwitch)
-                  Switch(
-                    value: widget.switchValue ?? false,
-                    onChanged: widget.onSwitchChanged,
-                  ),
-              ],
+                  if (widget.trailing != null) ...[widget.trailing!, width16],
+                  if (widget.isTrailingIcon && !widget.isSwitch)
+                    Icon(
+                      widget.trailingIcon,
+                      size: widget.trailingIconSize,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  if (widget.isSwitch)
+                    Switch(
+                      value: widget.switchValue ?? false,
+                      onChanged: widget.onSwitchChanged,
+                    ),
+                ],
+              ),
             ),
           ),
         ),
       ),
-    ),
     );
   }
 
