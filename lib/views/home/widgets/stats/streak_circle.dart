@@ -186,6 +186,9 @@ class StreakCircleState extends ConsumerState<StreakCircle>
             borderRadius: BorderRadius.circular(
               StreakCircleConstants.borderRadius,
             ),
+            focusColor: Theme.of(
+              context,
+            ).colorScheme.primary.withValues(alpha: 0.18),
             child: Ink(
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
@@ -313,6 +316,9 @@ class StreakCircleState extends ConsumerState<StreakCircle>
             borderRadius: BorderRadius.circular(
               StreakCircleConstants.borderRadius,
             ),
+            focusColor: Theme.of(
+              context,
+            ).colorScheme.primary.withValues(alpha: 0.18),
             child: Ink(
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
