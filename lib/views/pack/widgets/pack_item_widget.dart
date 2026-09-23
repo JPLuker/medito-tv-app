@@ -162,13 +162,18 @@ class _CompletionToggleState extends State<_CompletionToggle> {
       button: true,
       checked: _shown,
       label: _shown ? l10n.markTrackIncomplete : l10n.markTrackComplete,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: _handleTap,
-        // 48x48 hit area (platform minimum) with a left gap from the title.
-        // The circle is right-aligned within it so it stays visually where it
-        // was while the touch target extends left and vertically.
-        child: Padding(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _handleTap,
+          borderRadius: BorderRadius.circular(24),
+          focusColor: Theme.of(
+            context,
+          ).colorScheme.primary.withValues(alpha: 0.16),
+          // 48x48 hit area (platform minimum) with a left gap from the title.
+          // The circle is right-aligned within it so it stays visually where it
+          // was while the touch target extends left and vertically.
+          child: Padding(
           padding: const EdgeInsets.only(left: 8),
           child: SizedBox(
             width: 48,
@@ -206,6 +211,7 @@ class _CompletionToggleState extends State<_CompletionToggle> {
           ),
         ),
       ),
+    ),
     );
   }
 }
