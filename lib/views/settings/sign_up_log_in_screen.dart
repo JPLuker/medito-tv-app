@@ -9,6 +9,7 @@ import 'package:medito/constants/constants.dart';
 import 'package:medito/exceptions/app_error.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/providers/favorites/favorites_provider.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/providers/me/me_provider.dart';
 import 'package:medito/providers/shared_preference/shared_preference_provider.dart';
 import 'package:medito/providers/stats_provider.dart';
@@ -25,6 +26,8 @@ import 'package:medito/utils/utils.dart';
 import 'package:medito/routes/routes.dart' as routes;
 import 'package:flutter/gestures.dart';
 import 'package:medito/views/onboarding/onboarding_pager_screen.dart';
+import 'package:medito/views/bottom_navigation/bottom_navigation_bar_view.dart';
+import 'package:medito/views/root/root_page_view.dart';
 import 'package:app_links/app_links.dart';
 
 import '../../providers/device_and_app_info/device_and_app_info_provider.dart';
@@ -399,9 +402,17 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
         if (widget.fromSettings) {
           Navigator.of(context).pop();
         } else {
+          final isTv = await ref.read(deviceCapabilitiesProvider.future).then(
+                (value) => value.isAndroidTv,
+                onError: (_) => false,
+              );
+          if (!mounted) return;
+
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(
-              builder: (context) => const OnboardingPagerScreen(),
+              builder: (context) => isTv
+                  ? const RootPageView(firstChild: BottomNavigationBarView())
+                  : const OnboardingPagerScreen(),
             ),
             (route) => false,
           );
@@ -556,7 +567,11 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
                 )
               : Text(AppLocalizations.of(context)!.sendMeMyPasswordText),
         ),
-        _buildPrivacyPolicyLink(),
+        if (!ref.watch(deviceCapabilitiesProvider).maybeWhen(
+          data: (value) => value.isAndroidTv,
+          orElse: () => false,
+        ))
+          _buildPrivacyPolicyLink(),
         SizedBox.square(dimension: 100),
       ],
     );
