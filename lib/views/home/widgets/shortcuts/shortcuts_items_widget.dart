@@ -127,6 +127,9 @@ class ShortcutsItemsWidget extends ConsumerWidget {
           child: InkWell(
             onTap: () => _handleChipPress(context, ref, e),
             borderRadius: BorderRadius.circular(_kItemBorderRadius),
+            focusColor: Theme.of(
+              context,
+            ).colorScheme.primary.withValues(alpha: 0.18),
             child: Center(
               child: MeditoRemoteIcon(
                 icon: e.icon ?? '',
