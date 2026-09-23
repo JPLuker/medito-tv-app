@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/providers/stats_provider.dart';
 import 'package:medito/providers/notification/reminder_provider.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/services/reminders/smart_reminders_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -49,6 +50,14 @@ class _HomeViewState extends ConsumerState<HomeView>
   }
 
   Future<void> _fixBrokenNotificationPermission() async {
+    try {
+      if ((await ref.read(deviceCapabilitiesProvider.future)).isAndroidTv) {
+        return;
+      }
+    } catch (_) {
+      // Fall through to the existing phone/tablet behavior if detection fails.
+    }
+
     final prefs = ref.read(sharedPreferencesProvider);
     if (!(prefs.getBool(SharedPreferenceConstants.notifPermissionFixNeeded) ??
         false)) {
