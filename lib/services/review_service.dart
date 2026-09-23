@@ -1,5 +1,6 @@
 import 'package:in_app_review/in_app_review.dart';
 import 'package:medito/utils/logger.dart';
+import 'package:medito/services/device_capabilities_service.dart';
 import 'package:medito/utils/stats_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,6 +17,10 @@ class ReviewService {
 
   Future<void> checkAndRequestReview() async {
     try {
+      if ((await DeviceCapabilitiesService().detect()).isAndroidTv) {
+        AppLogger.d('REVIEW', 'Android TV detected; skipping review prompt');
+        return;
+      }
       final stats = await _statsManager.localAllStats;
 
       // 2. Check if streak is at least 2
