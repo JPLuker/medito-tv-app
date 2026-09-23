@@ -2,6 +2,7 @@ import 'package:medito/constants/constants.dart';
 import 'package:medito/utils/utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 
 class ArtistTitleWidget extends ConsumerWidget {
   const ArtistTitleWidget({
@@ -26,7 +27,11 @@ class ArtistTitleWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Column(children: [_title(context), _subtitle(context)]);
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
+    return Column(children: [_title(context), _subtitle(context, isTv: isTv)]);
   }
 
   Widget _title(BuildContext context) {
@@ -47,7 +52,7 @@ class ArtistTitleWidget extends ConsumerWidget {
     );
   }
 
-  Widget _subtitle(BuildContext context) {
+  Widget _subtitle(BuildContext context, {required bool isTv}) {
     var style = Theme.of(context).textTheme.titleMedium?.copyWith(
       fontFamily: dmMono,
       fontSize: artistNameFontSize,
@@ -58,10 +63,10 @@ class ArtistTitleWidget extends ConsumerWidget {
     return SizedBox(
       height: 30, // Fixed height for subtitle
       child: Semantics(
-        link: isPlayerScreen && artistUrlPath != null,
-        button: isPlayerScreen && artistUrlPath != null,
+        link: !isTv && isPlayerScreen && artistUrlPath != null,
+        button: !isTv && isPlayerScreen && artistUrlPath != null,
         child: InkWell(
-          onTap: () => _handleArtistNameTap(),
+          onTap: isTv ? null : () => _handleArtistNameTap(),
           child: Center(child: Text(artistName ?? '', style: style)),
         ),
       ),
