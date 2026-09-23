@@ -39,14 +39,15 @@ It will:
 3. Configure Flutter to use JDK 17 for Gradle.
 4. Set `JAVA_HOME` for the script process.
 5. Check for Android SDK command-line tools.
-6. Create the standard Android debug keystore if needed.
-7. Create a gitignored `android/keystore.properties`.
-8. Create a gitignored dummy `android/app/google-services.json` containing
+6. Verify/install the required NDK `28.2.13676358`.
+7. Create the standard Android debug keystore if needed.
+8. Create a gitignored `android/keystore.properties`.
+9. Create a gitignored dummy `android/app/google-services.json` containing
    mock entries for both the prod and dev package IDs.
-9. Run `flutter pub get`.
-10. Run build_runner to generate Riverpod / Freezed / JSON code.
-11. Run Pigeon to generate Medito's native audio bindings.
-12. Print devices visible to Flutter.
+10. Run `flutter pub get`.
+11. Run build_runner to generate Riverpod / Freezed / JSON code.
+12. Run Pigeon to generate Medito's native audio bindings.
+13. Print devices visible to Flutter.
 
 The generated signing/Firebase files are for local mock development only and
 must never be treated as production configuration.
@@ -179,6 +180,34 @@ Tools -> SDK Manager -> SDK Tools
 ```
 
 Install it, then rerun the setup script.
+
+
+### `Package ndk not found` / Gradle fails while auto-installing NDK
+
+The project currently requires NDK `28.2.13676358`. New Android command-line
+tools deprecate `sdkmanager` in favor of the Android CLI, and the compatibility
+shim can fail while Gradle tries the legacy `ndk;28.2.13676358` syntax.
+
+Pull the latest TV branch and rerun:
+
+```powershell
+.\scripts\setup-tv-dev.ps1
+```
+
+The setup script installs the NDK before Gradle runs. It prefers the current
+Android CLI and falls back to legacy `sdkmanager` when appropriate.
+
+If automatic installation still fails, use Android Studio:
+
+```text
+Tools -> SDK Manager -> SDK Tools
+-> Show Package Details
+-> NDK (Side by side)
+-> 28.2.13676358
+-> Apply
+```
+
+Then rerun the setup script.
 
 ### Emulator appears as `unsupported` in `flutter devices`
 
