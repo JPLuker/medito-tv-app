@@ -7,6 +7,7 @@ import 'package:medito/exceptions/app_error.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/models/models.dart';
 import 'package:medito/providers/providers.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/repositories/repositories.dart';
 import 'package:medito/utils/duration_extensions.dart';
 import 'package:medito/utils/utils.dart';
@@ -43,6 +44,10 @@ class _DownloadsViewState extends ConsumerState<DownloadsView>
   Widget build(BuildContext context) {
     super.build(context);
     final downloadedTracks = ref.watch(downloadedTracksProvider);
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
 
     return Scaffold(
       bottomNavigationBar: widget.isRoot
@@ -77,7 +82,7 @@ class _DownloadsViewState extends ConsumerState<DownloadsView>
             return _getEmptyWidget();
           }
 
-          return _getDownloadList(data);
+          return _getDownloadList(data, isTv: isTv);
         },
         error: (err, stack) {
           final error = err is AppError ? err : const UnknownError();
@@ -92,7 +97,14 @@ class _DownloadsViewState extends ConsumerState<DownloadsView>
     );
   }
 
-  ReorderableListView _getDownloadList(List<Track> tracks) {
+  Widget _getDownloadList(List<Track> tracks, {required bool isTv}) {
+    if (isTv) {
+      return ListView(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        children: tracks.map(_getTvDownloadItem).toList(),
+      );
+    }
+
     return ReorderableListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
       onReorderItem: (int oldIndex, int newIndex) {
@@ -103,6 +115,41 @@ class _DownloadsViewState extends ConsumerState<DownloadsView>
         });
       },
       children: tracks.map((item) => _getSlidingItem(item)).toList(),
+    );
+  }
+
+  Widget _getTvDownloadItem(Track item) {
+    final firstFile = item.voices.first.audioFiles.first;
+
+    return Padding(
+      key: ValueKey('tv-${item.id}-${firstFile.id}'),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => _openPlayer(ref, item),
+                borderRadius: BorderRadius.circular(10),
+                focusColor: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.16),
+                child: _getListItemWidget(item),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            tooltip: AppLocalizations.of(context)!.delete,
+            onPressed: () => _confirmDelete(item),
+            icon: const MeditoIcon(
+              assetName: MeditoIcons.xmark,
+              color: Colors.redAccent,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -182,6 +229,13 @@ class _DownloadsViewState extends ConsumerState<DownloadsView>
   }
 
   void _handleDismissible(DismissDirection _, Track item) async {
+    final deleted = await _confirmDelete(item);
+    if (!deleted) {
+      ref.invalidate(downloadedTracksProvider);
+    }
+  }
+
+  Future<bool> _confirmDelete(Track item) async {
     bool? confirmDelete = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
@@ -208,14 +262,17 @@ class _DownloadsViewState extends ConsumerState<DownloadsView>
       if (mounted) {
         await _deleteDownload(item);
       }
-      showSnackBar(
-        context,
-        '"${item.title}" ${AppLocalizations.of(context)!.removed.toLowerCase()}',
-        backgroundColor: ColorConstants.white,
-      );
-    } else {
-      ref.invalidate(downloadedTracksProvider);
+      if (mounted) {
+        showSnackBar(
+          context,
+          '"${item.title}" ${AppLocalizations.of(context)!.removed.toLowerCase()}',
+          backgroundColor: ColorConstants.white,
+        );
+      }
+      return true;
     }
+
+    return false;
   }
 
   Future<void> _deleteDownload(Track item) async {
