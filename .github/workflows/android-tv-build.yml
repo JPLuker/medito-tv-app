@@ -38,6 +38,9 @@ jobs:
       - name: Run pigeon
         run: flutter pub run pigeon --input pigeon_conf.dart --package_name=medito
 
+      - name: Run TV focus widget tests
+        run: flutter test test/widgets/onboarding/onboarding_option_button_test.dart
+
       - name: Create compile-only Android config
         run: |
           cat > android/keystore.properties <<'EOF'
