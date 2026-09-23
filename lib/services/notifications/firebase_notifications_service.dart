@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:medito/firebase_options.dart';
 import 'package:medito/providers/notification/reminder_provider.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/utils/utils.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -41,6 +42,18 @@ class FirebaseMessagingHandler {
   FirebaseMessagingHandler(this.ref);
 
   Future<void> initialize(BuildContext context, WidgetRef ref) async {
+    try {
+      if ((await ref.read(deviceCapabilitiesProvider.future)).isAndroidTv) {
+        AppLogger.d(
+          'FIREBASE_NOTIFICATIONS',
+          'Android TV detected; skipping Firebase Messaging init',
+        );
+        return;
+      }
+    } catch (_) {
+      // Preserve existing behavior when capability detection is unavailable.
+    }
+
     if (isMockMode) {
       AppLogger.d(
         'FIREBASE_NOTIFICATIONS',
