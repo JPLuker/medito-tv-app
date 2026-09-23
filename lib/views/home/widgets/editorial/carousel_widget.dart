@@ -8,6 +8,7 @@ import 'package:medito/constants/colors/color_constants.dart';
 import 'package:medito/constants/styles/widget_styles.dart';
 import 'package:medito/models/home/home_model.dart';
 import 'package:medito/providers/providers.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/routes/routes.dart';
 import 'package:medito/utils/utils.dart';
 
@@ -87,6 +88,17 @@ class _CarouselWidgetState extends ConsumerState<CarouselWidget> {
         MediaQuery.of(context).size.shortestSide >= 600;
 
     final flexWeights = isWide ? [4, 3, 3, 3] : [4, 3, 2];
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
+    final carouselItems = isTv
+        ? widget.carouselItems
+              .where((item) => !_isPhoneOnlyAction(item.type, item.path))
+              .toList()
+        : widget.carouselItems;
+
+    if (carouselItems.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -120,9 +132,13 @@ class _CarouselWidgetState extends ConsumerState<CarouselWidget> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(_kCardBorderRadius),
                 ),
-                onTap: (index) => _onItemTap(index),
+                onTap: (index) {
+                  if (index < carouselItems.length) {
+                    _onItemTap(carouselItems[index]);
+                  }
+                },
                 children: [
-                  ...widget.carouselItems.map((item) {
+                  ...carouselItems.map((item) {
                     return _buildCarouselItem(context, item);
                   }),
                   const SizedBox.shrink(),
@@ -190,8 +206,15 @@ class _CarouselWidgetState extends ConsumerState<CarouselWidget> {
     );
   }
 
-  void _onItemTap(int index) {
-    final item = widget.carouselItems[index];
+  bool _isPhoneOnlyAction(String? type, String? path) {
+    return type == TypeConstants.url ||
+        type == TypeConstants.link ||
+        type == TypeConstants.email ||
+        type == 'donation' ||
+        (type == TypeConstants.route && path == RouteConstants.donation);
+  }
+
+  void _onItemTap(HomeCarouselModel item) {
     unawaited(
       ref
           .read(analyticsServiceProvider)
