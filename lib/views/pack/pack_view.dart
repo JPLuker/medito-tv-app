@@ -4,6 +4,7 @@ import 'package:medito/exceptions/app_error.dart';
 import 'package:medito/models/models.dart';
 import 'package:medito/providers/favorites/favorites_provider.dart';
 import 'package:medito/providers/providers.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/routes/routes.dart';
 import 'package:medito/services/analytics/firebase_analytics_service.dart';
 import 'package:medito/views/pack/widgets/pack_item_widget.dart';
