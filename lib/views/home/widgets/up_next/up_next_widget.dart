@@ -8,6 +8,7 @@ import 'package:medito/constants/pack_sequence.dart';
 import 'package:medito/constants/strings/shared_preference_constants.dart';
 import 'package:medito/constants/styles/widget_styles.dart';
 import 'package:medito/providers/home/up_next_provider.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/routes/routes.dart';
 import 'package:medito/utils/logger.dart';
 import 'package:medito/constants/types/type_constants.dart';
@@ -371,9 +372,13 @@ class _CompletedCta extends StatelessWidget {
       label: label,
       button: true,
       enabled: !busy,
-      child: GestureDetector(
-        onTap: busy ? null : onTap,
-        child: HomeGradientBorder(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: busy ? null : onTap,
+          borderRadius: BorderRadius.circular(14),
+          focusColor: palette.buttonForeground.withValues(alpha: 0.18),
+          child: HomeGradientBorder(
           backgroundColor: palette.buttonBackground,
           borderRadius: 14,
           borderWidth: 0.5,
@@ -403,6 +408,7 @@ class _CompletedCta extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }
@@ -425,6 +431,7 @@ class _UpNextContent extends ConsumerStatefulWidget {
 
 class _UpNextContentState extends ConsumerState<_UpNextContent> {
   bool _skipping = false;
+  bool _hasFocus = false;
 
   @override
   Widget build(BuildContext context) {
@@ -434,6 +441,10 @@ class _UpNextContentState extends ConsumerState<_UpNextContent> {
     final palette = _UpNextPalette.of(context, widget.style);
     final isHero = widget.style == UpNextStyle.hero;
     final l10n = AppLocalizations.of(context)!;
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
 
     final borderRadius = BorderRadius.circular(_kCardBorderRadius);
 
@@ -460,15 +471,28 @@ class _UpNextContentState extends ConsumerState<_UpNextContent> {
               customSemanticsActions: {
                 CustomSemanticsAction(label: l10n.skip): () => _onSkip(context),
               },
-              child: GestureDetector(
-                // The hero style has no card surface behind the content, so
-                // without this only the painted text and the play circle
-                // would take taps; the space beside the title fell through
-                // to the image (smoke run 34957204808 tapped the card centre
-                // and nothing happened).
-                behavior: HitTestBehavior.opaque,
-                onTap: () => _onTap(context),
-                child: _Surface(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _onTap(context),
+                  onFocusChange: (focused) {
+                    if (_hasFocus != focused) {
+                      setState(() => _hasFocus = focused);
+                    }
+                  },
+                  borderRadius: borderRadius,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 120),
+                    decoration: BoxDecoration(
+                      borderRadius: borderRadius,
+                      border: Border.all(
+                        color: _hasFocus
+                            ? Theme.of(context).colorScheme.primary
+                            : Colors.transparent,
+                        width: 3,
+                      ),
+                    ),
+                    child: _Surface(
                   style: widget.style,
                   color: cardColor,
                   child: Column(
@@ -554,12 +578,15 @@ class _UpNextContentState extends ConsumerState<_UpNextContent> {
                             _PlayButton(
                               onTap: () => _onTap(context),
                               palette: palette,
+                              remoteNavigation: isTv,
                             ),
                           ],
                         ),
                       ),
                       if (widget.inlineStrip != null) widget.inlineStrip!,
                     ],
+                  ),
+                    ),
                   ),
                 ),
               ),
@@ -718,21 +745,27 @@ class _UpNextContentState extends ConsumerState<_UpNextContent> {
 class _PlayButton extends StatelessWidget {
   final VoidCallback onTap;
   final _UpNextPalette palette;
+  final bool remoteNavigation;
 
-  const _PlayButton({required this.onTap, required this.palette});
+  const _PlayButton({
+    required this.onTap,
+    required this.palette,
+    required this.remoteNavigation,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       label: AppLocalizations.of(context)!.play,
       button: true,
-      child: GestureDetector(
-        onTap: onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: palette.buttonBackground,
-          ),
+      child: Material(
+        color: palette.buttonBackground,
+        shape: const CircleBorder(),
+        child: InkWell(
+          onTap: onTap,
+          canRequestFocus: !remoteNavigation,
+          customBorder: const CircleBorder(),
+          focusColor: palette.buttonForeground.withValues(alpha: 0.18),
           child: SizedBox(
             width: _kPlayButtonSize,
             height: _kPlayButtonSize,
