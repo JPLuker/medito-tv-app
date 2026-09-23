@@ -163,7 +163,7 @@ jobs:
           disable-animations: true
           enable-hw-keyboard: true
           script: |
-            set -euo pipefail
+            set -eu
             APK=build/app/outputs/flutter-apk/app-prod-debug.apk
             PACKAGE=meditofoundation.medito
 
@@ -220,6 +220,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload TV AAB
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: medito-android-tv-aab
