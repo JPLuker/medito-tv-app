@@ -147,18 +147,26 @@ try {
             if ($AndroidCli) {
                 Write-Host "Installing NDK with Android CLI: $AndroidCli"
                 & $AndroidCli --sdk="$AndroidHome" sdk install "ndk/$RequiredNdkVersion"
-                if ($LASTEXITCODE -eq 0 -and (Test-Path (Join-Path $RequiredNdk "source.properties"))) {
+                $androidCliExit = $LASTEXITCODE
+                if (Test-Path (Join-Path $RequiredNdk "source.properties")) {
                     $installed = $true
+                    if ($androidCliExit -ne 0) {
+                        Write-Warning "Android CLI returned exit code $androidCliExit, but the NDK is installed correctly on disk. Continuing."
+                    }
                 } else {
-                    Write-Warning "Android CLI did not install NDK $RequiredNdkVersion successfully."
+                    Write-Warning "Android CLI did not leave a valid NDK installation at $RequiredNdk."
                 }
             }
 
             if (-not $installed -and (Test-Path $SdkManager)) {
                 Write-Host "Trying legacy sdkmanager fallback..."
                 & $SdkManager --install "ndk;$RequiredNdkVersion"
-                if ($LASTEXITCODE -eq 0 -and (Test-Path (Join-Path $RequiredNdk "source.properties"))) {
+                $sdkManagerExit = $LASTEXITCODE
+                if (Test-Path (Join-Path $RequiredNdk "source.properties")) {
                     $installed = $true
+                    if ($sdkManagerExit -ne 0) {
+                        Write-Warning "sdkmanager returned exit code $sdkManagerExit, but the NDK is installed correctly on disk. Continuing."
+                    }
                 }
             }
 
