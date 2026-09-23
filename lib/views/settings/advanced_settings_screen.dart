@@ -5,6 +5,7 @@ import 'package:medito/constants/constants.dart';
 import 'package:medito/constants/icons/medito_icons.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/providers/providers.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/routes/routes.dart';
 import 'package:medito/views/debug/debug_info_screen.dart';
 import 'package:medito/views/home/widgets/bottom_sheet/row_item_widget.dart';
@@ -46,6 +47,10 @@ class AdvancedSettingsScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final dayOffset = ref.watch(dayBoundaryOffsetProvider).value ?? 0;
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
 
     final rows = <Widget>[
       RowItemWidget(
@@ -74,22 +79,23 @@ class AdvancedSettingsScreen extends ConsumerWidget {
       ),
       // Replaying onboarding re-fires experiment exposure and paywall events
       // and resets persisted onboarding state, so it must never ship enabled.
-      if (kDebugMode)
+      if (kDebugMode && !isTv)
         RowItemWidget(
           icon: MeditoIcon(assetName: MeditoIcons.arrowRight, color: onSurface),
           title: l10n.onboarding,
           onTap: () => _push(context, const OnboardingPagerScreen()),
         ),
-      RowItemWidget(
-        icon: MeditoIcon(assetName: MeditoIcons.document, color: onSurface),
-        title: l10n.termsOfService,
-        onTap: () => handleNavigation(
-          'url',
-          ['https://meditofoundation.org/terms-of-service'],
-          context,
-          ref: ref,
+      if (!isTv)
+        RowItemWidget(
+          icon: MeditoIcon(assetName: MeditoIcons.document, color: onSurface),
+          title: l10n.termsOfService,
+          onTap: () => handleNavigation(
+            'url',
+            ['https://meditofoundation.org/terms-of-service'],
+            context,
+            ref: ref,
+          ),
         ),
-      ),
       RowItemWidget(
         icon: MeditoIcon(assetName: MeditoIcons.privacy, color: onSurface),
         title: l10n.privacyPolicy,
