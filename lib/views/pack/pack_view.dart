@@ -154,6 +154,9 @@ class _PackViewState extends ConsumerState<PackView>
             _onListItemTap(item.id, item.type, context);
           },
           splashColor: ColorConstants.charcoal,
+          focusColor: Theme.of(
+            context,
+          ).colorScheme.primary.withValues(alpha: 0.16),
           child: item.type == TypeConstants.pack
               ? PackItemWidget(item: item)
               : PackItemWidget(
