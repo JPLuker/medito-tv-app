@@ -3,8 +3,8 @@ import 'package:medito/constants/styles/widget_styles.dart';
 
 /// A full-width selectable option tile used in onboarding question screens.
 ///
-/// Animates its border and background when [selected] is true.
-class OnboardingOptionButton extends StatelessWidget {
+/// Supports touch/click input and keyboard/D-pad focus + activation.
+class OnboardingOptionButton extends StatefulWidget {
   const OnboardingOptionButton({
     super.key,
     required this.label,
@@ -17,35 +17,57 @@ class OnboardingOptionButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<OnboardingOptionButton> createState() =>
+      _OnboardingOptionButtonState();
+}
+
+class _OnboardingOptionButtonState extends State<OnboardingOptionButton> {
+  bool _hasFocus = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final highlighted = widget.selected || _hasFocus;
 
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(
-          horizontal: padding20,
-          vertical: 18,
-        ),
-        decoration: BoxDecoration(
-          color: selected ? colorScheme.primary.withAlpha(25) : theme.cardColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected
-                ? colorScheme.primary
-                : colorScheme.outline.withAlpha(80),
-            width: selected ? 1.5 : 1,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: widget.onTap,
+        onFocusChange: (hasFocus) {
+          if (_hasFocus == hasFocus) return;
+          setState(() => _hasFocus = hasFocus);
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: padding20,
+            vertical: 18,
           ),
-        ),
-        child: Text(
-          label,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-            color: selected ? colorScheme.primary : colorScheme.onSurface,
+          decoration: BoxDecoration(
+            color: widget.selected
+                ? colorScheme.primary.withAlpha(25)
+                : _hasFocus
+                    ? colorScheme.primary.withAlpha(18)
+                    : theme.cardColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: highlighted
+                  ? colorScheme.primary
+                  : colorScheme.outline.withAlpha(80),
+              width: _hasFocus ? 3 : (widget.selected ? 1.5 : 1),
+            ),
+          ),
+          child: Text(
+            widget.label,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: highlighted ? FontWeight.w600 : FontWeight.w500,
+              color: highlighted
+                  ? colorScheme.primary
+                  : colorScheme.onSurface,
+            ),
           ),
         ),
       ),
