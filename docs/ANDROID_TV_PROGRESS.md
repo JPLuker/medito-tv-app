@@ -132,28 +132,27 @@ The workflow:
 
 The CI AAB is a compile/manifest validation artifact, not a production-signed release artifact.
 
-### 7. Onboarding D-pad option controls
+### 7. TV onboarding bypass
 
 Modified:
 
-- `lib/widgets/onboarding/onboarding_option_button.dart`
+- `lib/views/splash_view.dart`
 
-Added:
+Android TV / Google TV devices now skip `OnboardingPagerScreen` completely
+after a new anonymous/guest sign-in. The TV path no longer shows the
+experience question, donation flow, notification prompt, battery optimization,
+tracking permission, or onboarding result screens.
 
-- `test/widgets/onboarding/onboarding_option_button_test.dart`
+After guest/account initialization, Leanback devices navigate directly to the
+normal root application:
 
-The onboarding option tile now uses a focusable `InkWell` instead of a
-touch-only `GestureDetector`. Focused options receive a stronger Medito-primary
-border/background treatment while preserving the selected-state styling and
-normal touch behavior.
+`RootPageView(firstChild: BottomNavigationBarView())`
 
-The TV CI workflow runs a focused widget test that verifies:
+Phone/tablet behavior is unchanged and still uses the existing onboarding flow.
 
-- focus can move from one onboarding option to the next with an arrow key
-- Enter activates the currently focused option
-- touch activation still works
-
-This resolves the first confirmed D-pad blocker in the onboarding question flow.
+The earlier focusable onboarding-option change remains harmless shared UI
+accessibility work, but onboarding is no longer part of the TV product path and
+is no longer a TV CI gate.
 
 ### 6. Reproducible Windows TV development setup
 
@@ -221,14 +220,12 @@ Still needs explicit testing/fixes for:
 - meditation/player screen
 - Favorites/downloads as applicable
 - Settings
-- authentication/onboarding screens
+- authentication/account-entry screens
 - dialogs, sheets, and confirmation prompts
 
 Confirmed current blockers found during the audit:
 
-- Onboarding experience-choice tiles were converted from `GestureDetector`
-  to focusable `InkWell` controls with a visible focus state. A widget test
-  now verifies arrow-key traversal and focused activation.
+- TV onboarding is now bypassed entirely after authentication/guest setup.
 - Home Up Next still contains touch-oriented `GestureDetector` entry points
   for the main card/play/CTA path.
 - Many other primary controls already use `InkWell`, `IconButton`, or
@@ -308,8 +305,8 @@ Resolution history:
   architecture, so CI was moved to API 36 x86_64.
 
 The current smoke test proves launch/liveness, not the full user journey. It
-still needs to be extended through onboarding -> Home/Explore -> meditation ->
-player -> play/pause -> Back with deterministic focus assertions.
+still needs to be extended through account/guest entry -> Home/Explore ->
+meditation -> player -> play/pause -> Back with deterministic focus assertions.
 
 ### Production release path
 
@@ -339,9 +336,8 @@ Re-check current Play Console UI/instructions at release time because those step
 2. **Use the local scripts for visual validation.** Run
    `./scripts/setup-tv-dev.ps1` once and `./scripts/run-tv-mock.ps1` for
    repeat testing.
-3. **Validate first-launch remote access locally.** The onboarding
-   experience-choice control is now focusable/selectable with a visible focus
-   state; verify it on the Google TV emulator with arrows + Enter.
+3. **Validate the TV onboarding bypass locally.** On a cleared app, choose
+   guest/account entry and confirm TV goes directly to the main app.
 4. **Fix Home Up Next remote access.** Remove the remaining touch-only entry
    points from the primary Home -> session path.
 5. **Standardize TV focus visibility.** Prefer a reusable focus treatment over
