@@ -70,6 +70,9 @@ class DropdownWidget<T> extends StatelessWidget {
       child: InkWell(
         onTap: _isClickable ? () => _showDropdown(context) : null,
         borderRadius: radius,
+        focusColor: Theme.of(
+          context,
+        ).colorScheme.primary.withValues(alpha: 0.16),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
