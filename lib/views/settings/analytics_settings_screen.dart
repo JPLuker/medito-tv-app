@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/constants/strings/shared_preference_constants.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/providers/shared_preference/shared_preference_provider.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/routes/routes.dart';
 import 'package:medito/services/analytics/crashlytics_service.dart';
 import 'package:medito/services/analytics/firebase_analytics_service.dart';
@@ -30,6 +31,11 @@ class AnalyticsSettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: Text(AppLocalizations.of(context)!.analyticsTrackingTitle),
@@ -87,7 +93,8 @@ class AnalyticsSettingsScreen extends ConsumerWidget {
                 Text(AppLocalizations.of(context)!.iosTrackingDialogContent),
               ],
               const SizedBox(height: 24),
-              TextButton.icon(
+              if (!isTv)
+                TextButton.icon(
                 onPressed: () {
                   handleNavigation(
                     'url',
