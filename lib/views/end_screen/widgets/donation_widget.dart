@@ -8,6 +8,7 @@ import 'package:medito/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/providers/providers.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import '../../../services/analytics/firebase_analytics_service.dart';
 import '../../../widgets/dialogs/dialogs.dart';
 import '../../../widgets/medito_icon.dart';
@@ -83,6 +84,14 @@ class DonationWidgetState extends ConsumerState<DonationWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
+    if (isTv) {
+      return const FeedbackWidget();
+    }
+
     final donationPage = ref.watch(fetchDonationPageProvider);
     final snoozeState = ref.watch(donationSnoozeProvider);
 
