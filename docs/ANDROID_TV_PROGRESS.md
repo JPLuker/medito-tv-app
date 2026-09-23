@@ -1,6 +1,6 @@
 # Android TV / Google TV progress
 
-_Last updated: 2026-09-09_
+_Last updated: 2026-09-22_
 
 ## Scope and branch
 
@@ -12,13 +12,37 @@ _Last updated: 2026-09-09_
 
 ## Current stopping point
 
-The project has moved past the initial audit and into functional Android TV implementation. The Play/launcher foundation, runtime TV capability detection, first TV navigation adaptation, and TV-specific AAB CI gate are implemented.
+The TV branch is now at the runtime-validation stage rather than the initial
+manifest/build stage.
 
-At the last code checkpoint before this documentation update, `feature/android-tv-support` was 11 commits ahead of `develop` and 0 commits behind it. The base commit was `987403182ab28a83b88ac115655a3ef48849f159`.
+Completed foundations include the Play/Leanback manifest overlays, TV banner,
+runtime Leanback detection, TV-specific top-level navigation, mock AAB
+validation, and an automated Google TV emulator smoke test.
 
-The latest code CI run at the time of this checkpoint is GitHub Actions run `34409997037` (`Android TV Build`). It had passed checkout, Java/Flutter setup, and `flutter pub get`, and was running `build_runner`. The previous CI failure was not an Android TV code failure; it stopped before compilation because the fork did not have Medito production secrets. That dependency has been removed from the TV CI workflow by generating compile-only configuration locally in the runner.
+The branch was reconciled with the newer upstream Medito navigation redesign so
+phone/tablet keeps the upstream floating navigation while Leanback devices use
+the TV rail. Re-check upstream before the final PR, but do not fork whole
+screens into TV copies.
 
-When resuming, check the newest `Android TV Build` run first. If it failed, fix that failure before adding more TV UI work.
+Local Windows setup is now reproducible through:
+
+- `scripts/setup-tv-dev.ps1`
+- `scripts/run-tv-mock.ps1`
+- `docs/LOCAL_TV_DEVELOPMENT.md`
+
+These scripts were added after local testing exposed several contributor-only
+setup blockers: Flutter using Java 25 instead of Java 17, a mandatory local
+`keystore.properties`, missing generated Riverpod/Freezed/JSON/Pigeon files,
+and dummy Firebase configuration for mock builds.
+
+The CI emulator target is now Google TV API 36 x86_64. API 34 Google TV
+x86_64 was not available to the runner; temporarily switching to 32-bit x86
+made the system image installable but was not valid for Flutter runtime testing.
+Use x86_64 locally and in CI.
+
+When resuming product work, check the newest `Android TV Build` result first.
+Then continue the D-pad/focus audit on the current upstream UI rather than the
+pre-redesign Home/Explore implementation.
 
 ## Completed work
 
@@ -100,10 +124,33 @@ The workflow:
 6. Generates compile-only Android configuration inside CI rather than requiring production secrets.
 7. Builds a release `prod` Android App Bundle in `MOCK_MODE=true`.
 8. Finds the merged Android manifest and verifies the TV declarations are present.
-9. Uploads the generated AAB as a workflow artifact.
-10. Uses workflow concurrency so newer branch pushes supersede obsolete TV builds.
+9. Builds an installable debug APK for runtime smoke testing.
+10. Boots a Google TV API 36 x86_64 emulator.
+11. Verifies the device exposes Leanback, resolves Medito through the Leanback launcher, launches the app, sends D-pad events, and fails if the app process dies/crashes.
+12. Uploads the emulator screenshot/UI hierarchy/logcat and the generated AAB as artifacts.
+13. Uses workflow concurrency so newer branch pushes supersede obsolete TV builds.
 
 The CI AAB is a compile/manifest validation artifact, not a production-signed release artifact.
+
+### 6. Reproducible Windows TV development setup
+
+Added:
+
+- `scripts/setup-tv-dev.ps1`
+- `scripts/run-tv-mock.ps1`
+- `docs/LOCAL_TV_DEVELOPMENT.md`
+
+The setup script auto-detects JDK 17, configures Flutter to use it, creates the
+gitignored local debug signing/Firebase files required by Gradle, runs
+`flutter pub get`, runs build_runner, runs Pigeon, and shows Flutter-visible
+devices.
+
+The run script selects a supported Android TV/Google TV emulator and launches
+Medito with `.mock.json` and `MOCK_MODE=true`. It does not use
+`--start-paused`, so local TV testing launches normally.
+
+This keeps contributor setup out of committed production configuration while
+making the local environment reproducible.
 
 ## Important decisions and resolutions
 
@@ -153,6 +200,16 @@ Still needs explicit testing/fixes for:
 - Settings
 - authentication/onboarding screens
 - dialogs, sheets, and confirmation prompts
+
+Confirmed current blockers found during the audit:
+
+- Onboarding experience-choice tiles use `GestureDetector`, so they are not
+  D-pad focus targets.
+- Home Up Next still contains touch-oriented `GestureDetector` entry points
+  for the main card/play/CTA path.
+- Many other primary controls already use `InkWell`, `IconButton`, or
+  standard Flutter buttons; for those, focus visibility and traversal are the
+  larger remaining issues.
 
 Requirements include:
 
@@ -205,20 +262,30 @@ Do not remove these from the Android phone application.
 
 ### Android TV emulator CI
 
-The current TV workflow validates the AAB and merged manifest but does not yet boot an Android TV / Google TV emulator.
+The workflow now includes a real Google TV emulator smoke test.
 
-A later CI job should validate at minimum:
+Current configuration:
 
-1. TV launcher can discover/start Medito.
-2. Home renders.
-3. D-pad can reach top-level navigation.
-4. User can browse to meditation content.
-5. User can enter the player.
-6. Play/pause works.
-7. Back returns to the expected screen.
-8. Focus does not become lost/trapped.
+- API 36
+- Google TV target
+- x86_64 architecture
+- mock data/configuration
+- Leanback launcher resolution check
+- launch + D-pad key injection
+- process/crash check
+- screenshot, UI hierarchy, and logcat artifacts
 
-Keep the existing Pixel 6 phone smoke test separate rather than replacing it.
+Resolution history:
+
+- API 34 Google TV x86_64 was not available to the GitHub runner.
+- API 34 Google TV x86 was available, but 32-bit Android x86 is not a valid
+  Flutter runtime target.
+- Local Android Studio testing confirmed a Google TV x86_64 AVD is the correct
+  architecture, so CI was moved to API 36 x86_64.
+
+The current smoke test proves launch/liveness, not the full user journey. It
+still needs to be extended through onboarding -> Home/Explore -> meditation ->
+player -> play/pause -> Back with deterministic focus assertions.
 
 ### Production release path
 
@@ -243,13 +310,24 @@ Re-check current Play Console UI/instructions at release time because those step
 
 ## Recommended next steps when resuming
 
-1. **Check the latest `Android TV Build` result.** Fix CI until the AAB and merged-manifest checks are green.
-2. **Add Android TV / Google TV emulator smoke testing.** This gives us a real remote/focus feedback loop.
-3. **Audit Home and Explore first.** They are the first screens needed for the primary browse flow.
-4. **Audit pack/path -> player.** Establish the complete `Home/Explore -> meditation -> player` route with D-pad only.
-5. **Fix player remote/media-key behavior.** This is the core functional TV experience.
-6. **Then address secondary settings/features and 10-foot layout polish.**
-7. **Only after the app is functionally usable, integrate production AAB release/Play Console work and open the PR.**
+1. **Check the newest `Android TV Build` run.** Confirm the API 36 x86_64
+   Google TV emulator boots and launches Medito.
+2. **Use the local scripts for visual validation.** Run
+   `./scripts/setup-tv-dev.ps1` once and `./scripts/run-tv-mock.ps1` for
+   repeat testing.
+3. **Fix first-launch remote access.** Make the onboarding experience-choice
+   control focusable/selectable with a visible focus state.
+4. **Fix Home Up Next remote access.** Remove the remaining touch-only entry
+   points from the primary Home -> session path.
+5. **Standardize TV focus visibility.** Prefer a reusable focus treatment over
+   per-screen ad-hoc styling.
+6. **Validate pack/path -> player with only D-pad/select/back.**
+7. **Gate phone-only runtime behavior on Leanback.** Review Health Connect,
+   DND, notifications/reminders, widgets, dynamic icons, sharing, and donation
+   webview behavior.
+8. **Extend CI from launch smoke to a deterministic TV journey.**
+9. **Only after the core flow is functional, finish production AAB/Play Console
+   work and open the PR.**
 
 ## Definition of the next functional milestone
 
