@@ -4,6 +4,7 @@ import 'package:health/health.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../src/audio_pigeon.g.dart';
+import '../services/device_capabilities_service.dart';
 
 class HealthKitManager {
   static const _authRequestedKey = 'healthAuthRequested';
@@ -20,6 +21,15 @@ class HealthKitManager {
 
   HealthKitManager._internal();
 
+  Future<bool> _isAndroidTv() async {
+    if (!Platform.isAndroid) return false;
+    try {
+      return (await DeviceCapabilitiesService().detect()).isAndroidTv;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _ensureConfigured() async {
     if (_configured) return;
     if (Platform.isIOS) {
@@ -30,6 +40,7 @@ class HealthKitManager {
 
   Future<bool> isHealthConnectAvailable() async {
     if (!Platform.isAndroid) return true;
+    if (await _isAndroidTv()) return false;
     try {
       final status = await _androidBridge.getStatus();
       return status == HealthConnectStatus.available;
@@ -39,13 +50,14 @@ class HealthKitManager {
   }
 
   Future<void> installHealthConnect() async {
-    if (!Platform.isAndroid) return;
+    if (!Platform.isAndroid || await _isAndroidTv()) return;
     try {
       await _androidBridge.openHealthConnectInstall();
     } catch (_) {}
   }
 
   Future<bool?> isHealthSyncPermitted() async {
+    if (await _isAndroidTv()) return false;
     try {
       await _ensureConfigured();
       if (Platform.isAndroid) {
@@ -74,11 +86,13 @@ class HealthKitManager {
   /// Explicit user actions (the Settings tile) should call
   /// [requestAuthorization] directly so they can always re-prompt.
   Future<bool> maybeRequestAuthorization() async {
+    if (await _isAndroidTv()) return false;
     if (await hasRequestedAuthorization()) return false;
     return requestAuthorization();
   }
 
   Future<bool> requestAuthorization() async {
+    if (await _isAndroidTv()) return false;
     try {
       await _ensureConfigured();
       final prefs = await SharedPreferences.getInstance();
@@ -111,6 +125,7 @@ class HealthKitManager {
   }
 
   Future<bool> writeMindfulnessData(DateTime start, DateTime end) async {
+    if (await _isAndroidTv()) return false;
     try {
       await _ensureConfigured();
 
