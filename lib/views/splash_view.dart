@@ -560,9 +560,16 @@ class SplashViewState extends ConsumerState<SplashView>
       await headerService.initialise();
       AppLogger.i('SPLASH', 'Header service initialized');
 
-      // Kick off payment config fetch in the background so it is ready before
-      // the donation screen opens. Errors are handled inside the provider.
-      ref.read(paymentConfigProvider.future).ignore();
+      // Payment/donation UI is intentionally excluded from Android TV.
+      final isTv = await ref.read(deviceCapabilitiesProvider.future).then(
+            (value) => value.isAndroidTv,
+            onError: (_) => false,
+          );
+      if (!isTv) {
+        // Kick off payment config fetch in the background so it is ready before
+        // the donation screen opens. Errors are handled inside the provider.
+        ref.read(paymentConfigProvider.future).ignore();
+      }
 
       // Initialize user data (don't fail if network is unavailable)
       try {
