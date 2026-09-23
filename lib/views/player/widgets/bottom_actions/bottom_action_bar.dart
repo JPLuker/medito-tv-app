@@ -40,6 +40,13 @@ class BottomActionBar extends StatelessWidget {
       return const SizedBox(width: 48);
     }
 
+    if (item.onTap == null) {
+      return ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        child: Center(child: item.child),
+      );
+    }
+
     return IconButton(
       onPressed: item.onTap,
       tooltip: item.semanticLabel,
