@@ -2,9 +2,11 @@ import 'package:medito/constants/constants.dart';
 import 'package:medito/routes/routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/utils/utils.dart';
 
-class MarkdownWidget extends StatelessWidget {
+class MarkdownWidget extends ConsumerWidget {
   const MarkdownWidget({
     super.key,
     required this.body,
@@ -26,13 +28,19 @@ class MarkdownWidget extends StatelessWidget {
   final bool selectable;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
     var titleMedium = Theme.of(context).textTheme.titleMedium;
     var walterWhite = ColorConstants.white.withOpacityValue(0.9);
 
     return Markdown(
       data: body,
-      onTapLink: onTapLink ?? (text, href, title) => _linkTap(context, href),
+      onTapLink: isTv
+          ? null
+          : onTapLink ?? (text, href, title) => _linkTap(context, href),
       shrinkWrap: true,
       padding: const EdgeInsets.all(0),
       physics: const NeverScrollableScrollPhysics(),
@@ -47,14 +55,22 @@ class MarkdownWidget extends StatelessWidget {
               color: walterWhite,
             ),
         textAlign: textAlign ?? WrapAlignment.center,
-        a:
-            a ??
-            titleMedium?.copyWith(
-              fontFamily: dmMono,
-              color: walterWhite,
-              fontSize: aFontSize,
-              fontWeight: FontWeight.w600,
-            ),
+        a: isTv
+            ? (p ??
+                  titleMedium?.copyWith(
+                    fontFamily: dmMono,
+                    fontSize: pFontSize,
+                    letterSpacing: 0,
+                    color: walterWhite,
+                    decoration: TextDecoration.none,
+                  ))
+            : a ??
+                  titleMedium?.copyWith(
+                    fontFamily: dmMono,
+                    color: walterWhite,
+                    fontSize: aFontSize,
+                    fontWeight: FontWeight.w600,
+                  ),
       ),
     );
   }
