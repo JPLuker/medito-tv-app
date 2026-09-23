@@ -6,6 +6,7 @@ import 'package:medito/exceptions/app_error.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/models/models.dart';
 import 'package:medito/providers/duration_preference_provider.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/providers/guide_name_preference_provider.dart';
 import 'package:medito/providers/meditation/track_provider.dart';
 import 'package:medito/providers/providers.dart';
@@ -358,6 +359,11 @@ class _TrackViewState extends ConsumerState<TrackView>
 
   Widget _getSubTitle(BuildContext context, String? subTitle) {
     if (subTitle != null) {
+      final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+        data: (value) => value.isAndroidTv,
+        orElse: () => false,
+      );
+
       return MarkdownWidget(
         body: subTitle,
         selectable: true,
@@ -370,14 +376,21 @@ class _TrackViewState extends ConsumerState<TrackView>
         ),
         a: Theme.of(context).textTheme.headlineMedium?.copyWith(
           fontFamily: dmSans,
-          decoration: TextDecoration.underline,
+          decoration: isTv ? TextDecoration.none : TextDecoration.underline,
           fontSize: 16,
           fontWeight: FontWeight.normal,
           color: Theme.of(context).colorScheme.onSurface,
         ),
-        onTapLink: (text, href, title) {
-          handleNavigation(TypeConstants.url, [href], context);
-        },
+        onTapLink: isTv
+            ? null
+            : (text, href, title) {
+                handleNavigation(
+                  TypeConstants.url,
+                  [href],
+                  context,
+                  ref: ref,
+                );
+              },
       );
     }
 
