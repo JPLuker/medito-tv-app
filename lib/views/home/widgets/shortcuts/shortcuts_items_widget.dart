@@ -8,6 +8,7 @@ import 'package:medito/constants/constants.dart';
 import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:medito/models/models.dart';
 import 'package:medito/providers/providers.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/routes/routes.dart';
 import 'package:medito/utils/utils.dart';
 
@@ -62,6 +63,15 @@ class ShortcutsItemsWidget extends ConsumerWidget {
     final totalSpacing = (columns - 1) * spacing;
     final totalPadding = horizontalPadding * 2;
     final containerSize = (size.width - totalPadding - totalSpacing) / columns;
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
+    final visibleData = isTv
+        ? data.where((item) => !_isPhoneOnlyAction(item.type, item.path)).toList()
+        : data;
+
+    if (visibleData.isEmpty) return const SizedBox.shrink();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: padding16),
@@ -69,7 +79,7 @@ class ShortcutsItemsWidget extends ConsumerWidget {
         spacing: spacing,
         runSpacing: runSpacing,
         alignment: WrapAlignment.start,
-        children: data
+        children: visibleData
             .map(
               (e) => _buildShortcutItem(
                 context,
@@ -82,6 +92,14 @@ class ShortcutsItemsWidget extends ConsumerWidget {
             .toList(),
       ),
     );
+  }
+
+  bool _isPhoneOnlyAction(String? type, String? path) {
+    return type == TypeConstants.url ||
+        type == TypeConstants.link ||
+        type == TypeConstants.email ||
+        type == 'donation' ||
+        (type == TypeConstants.route && path == RouteConstants.donation);
   }
 
   Widget _buildShortcutItem(
