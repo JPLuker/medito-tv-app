@@ -380,7 +380,18 @@ class _ParentWidgetState extends ConsumerState<ParentWidget>
   }
 
   void _onAppForegrounded() async {
-    ref.read(firebaseMessagingProvider).ref.read(reminderProvider).clearBadge();
+    try {
+      final isTv = (await DeviceCapabilitiesService().detect()).isAndroidTv;
+      if (!isTv) {
+        ref
+            .read(firebaseMessagingProvider)
+            .ref
+            .read(reminderProvider)
+            .clearBadge();
+      }
+    } catch (_) {
+      // Badge clearing is best-effort and must never block resume.
+    }
     ref.read(statsProvider.notifier).refresh();
 
     // Diagnose token state for debug purposes
