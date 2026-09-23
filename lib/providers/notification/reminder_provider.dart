@@ -101,6 +101,7 @@ class ReminderProvider {
     List<ScheduledReminder> items,
   ) async {
     await _initFuture;
+    if (!_supported) return;
     AppLogger.d(
       'XXXX',
       'scheduleSmartReminderSeries called with ${items.length} items',
