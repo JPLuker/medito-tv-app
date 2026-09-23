@@ -23,6 +23,9 @@ class SoundListTileWidget extends ConsumerWidget {
 
     return InkWell(
       onTap: () => _handleItemTap(ref, context, hasFailed: hasFailed),
+      focusColor: Theme.of(
+        context,
+      ).colorScheme.primary.withValues(alpha: 0.16),
       child: Container(
         decoration: const BoxDecoration(
           border: Border(
