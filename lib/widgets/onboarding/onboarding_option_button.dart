@@ -10,11 +10,13 @@ class OnboardingOptionButton extends StatefulWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.focusNode,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final FocusNode? focusNode;
 
   @override
   State<OnboardingOptionButton> createState() =>
@@ -33,6 +35,7 @@ class _OnboardingOptionButtonState extends State<OnboardingOptionButton> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
+        focusNode: widget.focusNode,
         onTap: widget.onTap,
         onFocusChange: (hasFocus) {
           if (_hasFocus == hasFocus) return;
