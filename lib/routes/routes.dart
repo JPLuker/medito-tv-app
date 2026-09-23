@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/constants/constants.dart';
 import 'package:medito/providers/providers.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
+import 'package:medito/services/device_capabilities_service.dart';
 import 'package:medito/providers/stats_provider.dart';
 import 'package:medito/utils/logger.dart';
 import 'package:medito/utils/utils.dart';
@@ -41,6 +43,20 @@ Future<void> handleNavigation(
   ids.removeWhere((element) => element == null);
 
   if (type == null) return;
+
+  final isTv = await _isAndroidTv(ref);
+  final isExternalOrPhoneOnly =
+      type == TypeConstants.url ||
+      type == TypeConstants.link ||
+      type == TypeConstants.email ||
+      _isDonationRoute(type, ids);
+  if (isTv && isExternalOrPhoneOnly) {
+    AppLogger.d(
+      'ROUTES',
+      'Ignoring phone/browser-only navigation on Android TV: type=$type ids=$ids',
+    );
+    return;
+  }
 
   if (type.contains('tracks') || type.contains('track')) {
     await _handleTrackNavigation(ids, ref);
@@ -111,6 +127,17 @@ Future<void> handleNavigation(
     await _pushRoute(const AnalyticsSettingsScreen(), ref);
   } else if (type == '/debug_info') {
     await _pushRoute(const DebugInfoScreen(), ref);
+  }
+}
+
+Future<bool> _isAndroidTv(WidgetRef? ref) async {
+  try {
+    if (ref != null) {
+      return (await ref.read(deviceCapabilitiesProvider.future)).isAndroidTv;
+    }
+    return (await DeviceCapabilitiesService().detect()).isAndroidTv;
+  } catch (_) {
+    return false;
   }
 }
 
