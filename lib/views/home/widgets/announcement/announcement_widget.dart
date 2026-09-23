@@ -3,6 +3,7 @@ import 'package:medito/models/home/announcement/announcement_model.dart';
 import 'package:medito/views/home/home_styles.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/routes/routes.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/services/analytics/firebase_analytics_service.dart';
 import 'package:medito/utils/utils.dart';
 import 'package:medito/widgets/widgets.dart';
@@ -133,7 +134,20 @@ class _AnnouncementWidgetState extends ConsumerState<AnnouncementWidget>
       width4,
     ];
 
-    if (widget.announcement.ctaPath != null) {
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
+    final ctaType = widget.announcement.ctaType;
+    final ctaPath = widget.announcement.ctaPath;
+    final isPhoneOnlyCta =
+        ctaType == TypeConstants.url ||
+        ctaType == TypeConstants.link ||
+        ctaType == TypeConstants.email ||
+        ctaType == 'donation' ||
+        (ctaType == TypeConstants.route && ctaPath == RouteConstants.donation);
+
+    if (ctaPath != null && !(isTv && isPhoneOnlyCta)) {
       actionWidgets.add(
         ElevatedButton(
           onPressed: () => _handleCtaTitlePress(context),
