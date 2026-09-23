@@ -28,6 +28,7 @@ class PlayPauseButtonWidget extends ConsumerWidget {
       child: InkWell(
         onTap: onPlayPause,
         borderRadius: BorderRadius.circular(iconSize / 2),
+        focusColor: Colors.white.withValues(alpha: 0.18),
         child: ExcludeSemantics(
           child: AnimatedCrossFade(
             firstChild: MeditoIcon(
