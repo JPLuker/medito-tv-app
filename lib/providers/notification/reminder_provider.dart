@@ -5,6 +5,7 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:medito/utils/logger.dart';
 import 'package:medito/services/analytics/crashlytics_service.dart';
+import 'package:medito/services/device_capabilities_service.dart';
 
 final reminderProvider = Provider<ReminderProvider>((ref) {
   return ReminderProvider();
@@ -14,12 +15,23 @@ class ReminderProvider {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
   late final Future<void> _initFuture;
+  bool _supported = true;
 
   ReminderProvider() {
     _initFuture = _initializeNotifications();
   }
 
   Future<void> _initializeNotifications() async {
+    try {
+      if ((await DeviceCapabilitiesService().detect()).isAndroidTv) {
+        _supported = false;
+        AppLogger.d('REMINDER', 'Android TV detected; notifications disabled');
+        return;
+      }
+    } catch (_) {
+      // Preserve existing behavior when capability detection is unavailable.
+    }
+
     tz.initializeTimeZones();
     const initializationSettingsAndroid = AndroidInitializationSettings('logo');
     const initializationSettingsIOS = DarwinInitializationSettings(
@@ -38,6 +50,7 @@ class ReminderProvider {
 
   Future<void> clearBadge() async {
     await _initFuture;
+    if (!_supported) return;
     if (Platform.isIOS) {
       const iOSPlatformChannelSpecifics = DarwinNotificationDetails(
         badgeNumber: 0,
@@ -58,6 +71,7 @@ class ReminderProvider {
 
   Future<void> cancelDailyNotification() async {
     await _initFuture;
+    if (!_supported) return;
     try {
       await _flutterLocalNotificationsPlugin.cancel(id: dailyNotificationId);
       AppLogger.d(
@@ -176,6 +190,7 @@ class ReminderProvider {
 
   Future<void> cancelSmartReminderSeries() async {
     await _initFuture;
+    if (!_supported) return;
     try {
       var cancelledCount = 0;
       for (var i = 0; i < smartSeriesCount; i++) {
@@ -230,6 +245,7 @@ class ReminderProvider {
 
   Future<List<PendingNotificationRequest>> getPendingNotifications() async {
     await _initFuture;
+    if (!_supported) return [];
     AppLogger.d('REMINDER', 'Getting pending notifications...');
     try {
       final pendingNotifications = await _flutterLocalNotificationsPlugin
