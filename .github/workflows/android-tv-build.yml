@@ -38,6 +38,9 @@ jobs:
       - name: Run pigeon
         run: flutter pub run pigeon --input pigeon_conf.dart --package_name=medito
 
+      - name: Analyze Dart
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
       - name: Create compile-only Android config
         run: |
           cat > android/keystore.properties <<'EOF'
