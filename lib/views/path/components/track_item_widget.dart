@@ -91,12 +91,18 @@ class _TrackItemWidgetState extends ConsumerState<TrackItemWidget> {
         label: locked ? l10n.lockedContent : widget.item.title,
         button: !locked,
         enabled: !locked,
-        child: GestureDetector(
-          onTap: locked ? null : () => handleItemTap(context, ref),
-          onTapDown: locked ? null : (_) => setState(() => _isPressed = true),
-          onTapUp: locked ? null : (_) => setState(() => _isPressed = false),
-          onTapCancel: locked ? null : () => setState(() => _isPressed = false),
-          child: Container(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: locked ? null : () => handleItemTap(context, ref),
+            onHighlightChanged: locked
+                ? null
+                : (highlighted) => setState(() => _isPressed = highlighted),
+            onFocusChange: locked
+                ? null
+                : (focused) => setState(() => _isPressed = focused),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
             width: locked ? 64 : 200,
             height: 64,
             decoration: BoxDecoration(
@@ -143,6 +149,7 @@ class _TrackItemWidgetState extends ConsumerState<TrackItemWidget> {
                     ),
                   ),
               ],
+            ),
             ),
           ),
         ),
