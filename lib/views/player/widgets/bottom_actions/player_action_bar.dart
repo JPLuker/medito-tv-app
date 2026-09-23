@@ -36,18 +36,18 @@ class PlayerActionBar extends StatelessWidget {
       ),
       leftCenterItem: BottomActionBarItem(
         child: AudioDownloadWidget(request: request),
-        onTap: () {}, // The AudioDownloadWidget handles its own tap
+        onTap: null,
       ),
       rightCenterItem: BottomActionBarItem(
         child: _buildBackgroundSoundWidget(),
         onTap: request.hasBackgroundSound
-            ? () {}
+            ? null
             : () => _showBackgroundSoundDisabledMessage(context),
         semanticLabel: l10n.backgroundSounds,
       ),
       rightItem: BottomActionBarItem(
         child: AudioSpeedWidget(onSpeedChanged: onSpeedChanged),
-        onTap: () {}, // The AudioSpeedWidget handles its own tap
+        onTap: null,
         semanticLabel: l10n.playbackSpeed,
       ),
     );
