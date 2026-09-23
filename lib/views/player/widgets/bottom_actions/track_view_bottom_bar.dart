@@ -9,6 +9,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../../models/favorites/favorite_item.dart';
 import '../../../../models/track/track.dart';
 import '../../../../providers/favorites/favorites_provider.dart';
+import '../../../../providers/device_capabilities_provider.dart';
 import '../../../../providers/meditation/track_provider.dart';
 import '../../../../widgets/add_to_siri_util.dart';
 import '../../../../widgets/medito_icon.dart';
@@ -137,6 +138,10 @@ class _TrackViewBottomBarState extends ConsumerState<TrackViewBottomBar> {
   Widget build(BuildContext context) {
     final trackState = ref.watch(tracksProvider(trackId: widget.trackId));
     final favoritesState = ref.watch(favoritesNotifierProvider);
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
 
     const dailyMeditationId = 'BmTFAyYt8jVMievZ'; // from back end :(
     final isDailyMeditation = widget.trackId == dailyMeditationId;
@@ -153,12 +158,13 @@ class _TrackViewBottomBarState extends ConsumerState<TrackViewBottomBar> {
               track,
               isFavorite,
               isDailyMeditation,
+              isTv,
             );
           },
           loading: () =>
-              _buildBottomBar(context, track, false, isDailyMeditation),
+              _buildBottomBar(context, track, false, isDailyMeditation, isTv),
           error: (error, stack) =>
-              _buildBottomBar(context, track, false, isDailyMeditation),
+              _buildBottomBar(context, track, false, isDailyMeditation, isTv),
         );
       },
       loading: () => const SizedBox.shrink(),
@@ -171,6 +177,7 @@ class _TrackViewBottomBarState extends ConsumerState<TrackViewBottomBar> {
     Track track,
     bool isFavorite,
     bool isDailyMeditation,
+    bool isTv,
   ) {
     final colour = isFavorite
         ? context.brandPurple
@@ -188,18 +195,20 @@ class _TrackViewBottomBarState extends ConsumerState<TrackViewBottomBar> {
         onTap: widget.onBackPressed,
         semanticLabel: l10n.goBack,
       ),
-      rightCenterItem: BottomActionBarItem(
-        child: MeditoIcon(
-          assetName: Platform.isIOS
-              ? MeditoIcons.shareIos
-              : MeditoIcons.shareAndroid,
-          color: Theme.of(context).colorScheme.onSurface,
-        ),
-        onTap: Platform.isIOS
-            ? () => _showBottomSheet(context)
-            : () => _shareTrack(context),
-        semanticLabel: l10n.shareTrack,
-      ),
+      rightCenterItem: isTv
+          ? null
+          : BottomActionBarItem(
+              child: MeditoIcon(
+                assetName: Platform.isIOS
+                    ? MeditoIcons.shareIos
+                    : MeditoIcons.shareAndroid,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              onTap: Platform.isIOS
+                  ? () => _showBottomSheet(context)
+                  : () => _shareTrack(context),
+              semanticLabel: l10n.shareTrack,
+            ),
       rightItem: isDailyMeditation
           ? null
           : BottomActionBarItem(
