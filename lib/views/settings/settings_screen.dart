@@ -304,15 +304,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           pinned: false,
           floating: false,
           elevation: 0.0,
-          title: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onLongPress: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const DebugInfoScreen()),
-            ),
-            child: HomeHeaderWidget(
-              greeting: AppLocalizations.of(context)!.settings,
-            ),
-          ),
+          title: isTv
+              ? HomeHeaderWidget(
+                  greeting: AppLocalizations.of(context)!.settings,
+                )
+              : GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onLongPress: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const DebugInfoScreen(),
+                    ),
+                  ),
+                  child: HomeHeaderWidget(
+                    greeting: AppLocalizations.of(context)!.settings,
+                  ),
+                ),
         ),
         _buildSettingsListSlivers(
           context,
