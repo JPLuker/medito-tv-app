@@ -10,8 +10,20 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/strings/shared_preference_constants.dart';
 import '../utils/logger.dart';
+import 'device_capabilities_service.dart';
 
 class HomeWidgetService {
+  static Future<bool> _supportsHomeWidgets() async {
+    if (!Platform.isAndroid && !Platform.isIOS) return false;
+    if (!Platform.isAndroid) return true;
+
+    try {
+      return !(await DeviceCapabilitiesService().detect()).isAndroidTv;
+    } catch (_) {
+      return true;
+    }
+  }
+
   static const String _appGroupId = 'group.org.medito.widget';
   static const String _widgetName = 'MeditationWidgetReceiver';
   static const String _consistencyWidgetName = 'ConsistencyWidgetReceiver';
@@ -46,7 +58,7 @@ class HomeWidgetService {
 
   /// Saves the theme preference to the widget
   static Future<void> saveThemePreference(String themePreference) async {
-    if (!Platform.isAndroid) {
+    if (!Platform.isAndroid || !await _supportsHomeWidgets()) {
       return;
     }
 
@@ -69,7 +81,7 @@ class HomeWidgetService {
     required LocalAllStats stats,
     BuildContext? context,
   }) async {
-    if (!Platform.isAndroid && !Platform.isIOS) {
+    if (!await _supportsHomeWidgets()) {
       return;
     }
 
@@ -127,7 +139,7 @@ class HomeWidgetService {
 
   /// Updates the widget using stats from a provider/notifier (no BuildContext needed)
   static Future<void> updateWidgetFromStats(LocalAllStats stats) async {
-    if (!Platform.isAndroid && !Platform.isIOS) {
+    if (!await _supportsHomeWidgets()) {
       return;
     }
 
@@ -257,7 +269,7 @@ class HomeWidgetService {
     required int completed,
     required int total,
   }) async {
-    if (!Platform.isAndroid && !Platform.isIOS) {
+    if (!await _supportsHomeWidgets()) {
       return;
     }
 
@@ -283,7 +295,7 @@ class HomeWidgetService {
 
   /// Requests to pin a widget to the home screen (Android only)
   static Future<bool> pinWidget({String widgetType = 'consistency'}) async {
-    if (!Platform.isAndroid) {
+    if (!Platform.isAndroid || !await _supportsHomeWidgets()) {
       return false;
     }
 
