@@ -24,11 +24,17 @@ class TrackCardWidget extends StatelessWidget {
       backgroundColor: Theme.of(context).cardColor,
       borderRadius: 14,
       borderWidth: 0.5,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+      child: Material(
+        color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          child: Row(
+          borderRadius: BorderRadius.circular(14),
+          focusColor: Theme.of(
+            context,
+          ).colorScheme.primary.withValues(alpha: 0.16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
@@ -50,6 +56,7 @@ class TrackCardWidget extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 
