@@ -157,6 +157,10 @@ class _PlayerViewState extends ConsumerState<PlayerView> {
     }
 
     final currentlyPlayingTrack = ref.watch(playerProvider);
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
 
     ref.listen(playerProvider.select((p) => p?.coverUrl), (_, next) {
       if (next != null) {
@@ -253,13 +257,14 @@ class _PlayerViewState extends ConsumerState<PlayerView> {
                             ),
                           ),
                         ),
-                        Positioned(
-                          top: 16,
-                          right: 16,
-                          child: ReportButtonWidget(
-                            request: currentlyPlayingTrack,
+                        if (!isTv)
+                          Positioned(
+                            top: 16,
+                            right: 16,
+                            child: ReportButtonWidget(
+                              request: currentlyPlayingTrack,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
