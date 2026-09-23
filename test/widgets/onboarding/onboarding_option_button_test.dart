@@ -4,35 +4,53 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:medito/widgets/onboarding/onboarding_option_button.dart';
 
 void main() {
-  testWidgets('supports focus and keyboard/D-pad style activation',
+  testWidgets('moves focus with arrow keys and activates the focused option',
       (tester) async {
-    final focusNode = FocusNode();
-    addTearDown(focusNode.dispose);
+    final firstFocus = FocusNode();
+    final secondFocus = FocusNode();
+    addTearDown(firstFocus.dispose);
+    addTearDown(secondFocus.dispose);
 
-    var tapCount = 0;
+    var selected = '';
 
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: OnboardingOptionButton(
-            label: 'A little experience',
-            selected: false,
-            focusNode: focusNode,
-            onTap: () => tapCount++,
+          body: Column(
+            children: [
+              OnboardingOptionButton(
+                label: 'New to meditation',
+                selected: false,
+                focusNode: firstFocus,
+                onTap: () => selected = 'first',
+              ),
+              const SizedBox(height: 12),
+              OnboardingOptionButton(
+                label: 'A little experience',
+                selected: false,
+                focusNode: secondFocus,
+                onTap: () => selected = 'second',
+              ),
+            ],
           ),
         ),
       ),
     );
 
-    focusNode.requestFocus();
+    firstFocus.requestFocus();
     await tester.pump();
 
-    expect(focusNode.hasFocus, isTrue);
+    expect(firstFocus.hasFocus, isTrue);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
+
+    expect(secondFocus.hasFocus, isTrue);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
 
-    expect(tapCount, 1);
+    expect(selected, 'second');
   });
 
   testWidgets('keeps touch activation working', (tester) async {
