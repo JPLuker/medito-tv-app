@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:medito/constants/constants.dart';
 import 'package:medito/utils/logger.dart';
+import 'package:medito/services/device_capabilities_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 Color parseColor(String? color) {
@@ -16,6 +17,10 @@ Color parseColor(String? color) {
 
 Future<void> launchURLInBrowser(String url) async {
   try {
+    if ((await DeviceCapabilitiesService().detect()).isAndroidTv) {
+      AppLogger.d('URL', 'Ignoring browser launch on Android TV: $url');
+      return;
+    }
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       var launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -34,6 +39,11 @@ Future<void> launchEmailSubmission(
   String? subject,
   String? body,
 }) async {
+  if ((await DeviceCapabilitiesService().detect()).isAndroidTv) {
+    AppLogger.d('URL', 'Ignoring email launch on Android TV: $href');
+    return;
+  }
+
   var query = '';
   if (subject != null) {
     query = 'subject=$subject';
