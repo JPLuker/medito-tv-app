@@ -123,15 +123,26 @@ class _PackViewState extends ConsumerState<PackView>
   }
 
   List<Widget> _listItems(PackModel pack, WidgetRef ref) {
-    return pack.items
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
+    final items = isTv
+        ? pack.items.where((item) => !_isPhoneOnlyItem(item.type)).toList()
+        : pack.items;
+
+    return items
         .map(
-          (packItem) => GestureDetector(
-            onTap: () =>
-                _onListItemTap(packItem.id, packItem.type, ref.context),
-            child: _buildListTile(packItem, pack.items.last == packItem),
-          ),
+          (packItem) => _buildListTile(packItem, items.last == packItem),
         )
         .toList();
+  }
+
+  bool _isPhoneOnlyItem(String type) {
+    return type == TypeConstants.url ||
+        type == TypeConstants.link ||
+        type == TypeConstants.email ||
+        type == 'donation';
   }
 
   Widget _buildListTile(PackItemsModel item, bool isLast) {
