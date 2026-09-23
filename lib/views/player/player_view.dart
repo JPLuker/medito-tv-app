@@ -12,6 +12,7 @@ import 'package:medito/utils/audio_session_tracker.dart';
 import 'package:medito/utils/logger.dart';
 import 'package:medito/utils/utils.dart';
 import 'package:medito/providers/providers.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/providers/stats_provider.dart';
 import 'package:medito/services/analytics/firebase_analytics_service.dart';
 import 'package:medito/src/audio_pigeon.g.dart' as pigeon;
@@ -123,19 +124,22 @@ class _PlayerViewState extends ConsumerState<PlayerView> {
       ref.read(backgroundSoundsNotifierProvider.notifier).stopBackgroundSound();
     }
 
-    var healthKitManager = HealthKitManager();
-    if (await healthKitManager.isHealthSyncPermitted() != true) {
-      // Only auto-prompt once; after that the user can opt in via Settings.
-      // Avoids re-asking every session when they've declined.
-      await healthKitManager.maybeRequestAuthorization();
-    }
+    final isTv = await _isAndroidTv();
+    if (!isTv) {
+      var healthKitManager = HealthKitManager();
+      if (await healthKitManager.isHealthSyncPermitted() != true) {
+        // Only auto-prompt once; after that the user can opt in via Settings.
+        // Avoids re-asking every session when they've declined.
+        await healthKitManager.maybeRequestAuthorization();
+      }
 
-    // Only enable DND if permission is already granted and toggle is on
-    if (Platform.isAndroid) {
-      final dndNotifier = ref.read(dndProvider.notifier);
-      final hasAccess = await dndNotifier.hasAccess();
-      if (hasAccess) {
-        await dndNotifier.setDndMode(true);
+      // Only enable DND if permission is already granted and toggle is on.
+      if (Platform.isAndroid) {
+        final dndNotifier = ref.read(dndProvider.notifier);
+        final hasAccess = await dndNotifier.hasAccess();
+        if (hasAccess) {
+          await dndNotifier.setDndMode(true);
+        }
       }
     }
   }
@@ -310,7 +314,7 @@ class _PlayerViewState extends ConsumerState<PlayerView> {
       _resetState();
       _stopAudio();
 
-      await ref.read(dndProvider.notifier).setDndMode(false);
+      await _disableDndIfSupported();
       _endScreenOpened = false;
 
       if (shouldPop && Navigator.canPop(context)) {
@@ -319,6 +323,19 @@ class _PlayerViewState extends ConsumerState<PlayerView> {
 
       _isClosing = false;
     });
+  }
+
+  Future<bool> _isAndroidTv() async {
+    try {
+      return (await ref.read(deviceCapabilitiesProvider.future)).isAndroidTv;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _disableDndIfSupported() async {
+    if (await _isAndroidTv()) return;
+    await ref.read(dndProvider.notifier).setDndMode(false);
   }
 
   void _stopAudio() {
@@ -345,7 +362,7 @@ class _PlayerViewState extends ConsumerState<PlayerView> {
         // statsProvider via refreshFromLocal — so no refresh() is needed
         // here. We pass the pre-session snapshot so EndScreenView can
         // animate from the old streak to the current one.
-        unawaited(ref.read(dndProvider.notifier).setDndMode(false));
+        unawaited(_disableDndIfSupported());
 
         Navigator.pushReplacement(
           context,
