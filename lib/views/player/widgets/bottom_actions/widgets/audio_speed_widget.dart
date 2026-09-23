@@ -26,8 +26,12 @@ class _AudioSpeedComponentState extends ConsumerState<AudioSpeedWidget> {
     return Semantics(
       label: '${l10n.playbackSpeed}: ${_currentSpeed.toStringAsFixed(1)}×',
       button: true,
-      child: GestureDetector(
-        onTap: () {
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(6),
+          focusColor: Colors.white.withValues(alpha: 0.18),
+          onTap: () {
           setState(() {
             _currentIndex = (_currentIndex + 1) % _speedOptions.length;
           });
@@ -58,6 +62,7 @@ class _AudioSpeedComponentState extends ConsumerState<AudioSpeedWidget> {
           ),
         ),
       ),
+    ),
     );
   }
 }
