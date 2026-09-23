@@ -19,6 +19,7 @@ import 'stats_manager.dart';
 import '../models/local_audio_completed.dart';
 import 'logger.dart';
 import '../services/home_widget_service.dart';
+import '../services/device_capabilities_service.dart';
 import '../services/analytics/firebase_analytics_service.dart';
 import '../constants/strings/analytics_event_constants.dart';
 
@@ -78,11 +79,24 @@ smartReminderReschedulerOverride;
 /// consistency values baked into each day's copy reflect the latest session
 /// state. Safe to call from any stats-mutating path (real completions, manual
 /// adds, deletes); no-ops when Smart Reminders are disabled.
+Future<bool> _isAndroidTv() async {
+  try {
+    return (await DeviceCapabilitiesService().detect()).isAndroidTv;
+  } catch (_) {
+    return false;
+  }
+}
+
 Future<void> _rescheduleSmartReminders({
   required int endMs,
   required int durationMs,
 }) async {
   try {
+    if (await _isAndroidTv()) {
+      AppLogger.d('STATS', 'Android TV: skipping Smart Reminder scheduling');
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final hasSaved =
         prefs.getInt(SharedPreferenceConstants.savedHours) != null &&
@@ -290,6 +304,11 @@ Future<void> storeTrackCompletion(
 }
 
 Future<void> _syncHealthKit(Map<String, dynamic> payload) async {
+  if (await _isAndroidTv()) {
+    AppLogger.d('STATS', 'Android TV: skipping health sync');
+    return;
+  }
+
   var healthKitManager = HealthKitManager();
 
   if (!await healthKitManager.isSessionSynced(
