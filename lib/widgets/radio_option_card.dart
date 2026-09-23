@@ -2,31 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:medito/constants/colors/color_constants.dart';
 import 'package:medito/constants/styles/widget_styles.dart';
 
-/// A tappable card with a radio indicator, widget.title and widget.description, for picking
-/// one option from a short list (settings sheets). The widget.selected card gets a
-/// brand-purple border; the rest keep a hairline so the layout never shifts.
+/// A tappable card with a radio indicator, title and description, for picking
+/// one option from a short list (settings sheets). Focus receives the same
+/// brand treatment as selection so remote users always know where they are.
 class RadioOptionCard extends StatefulWidget {
   const RadioOptionCard({
     super.key,
-    required this.widget.title,
-    required this.widget.selected,
+    required this.title,
+    required this.selected,
     required this.onTap,
-    this.widget.description,
-    this.widget.trailing,
+    this.description,
+    this.trailing,
   });
 
-  final String widget.title;
-  final String? widget.description;
-  final bool widget.selected;
+  final String title;
+  final String? description;
+  final bool selected;
   final VoidCallback onTap;
 
   /// Shown after the text, vertically centred: a theme icon, an app-icon
   /// preview.
-  final Widget? widget.trailing;
+  final Widget? trailing;
 
-  static const RadioOptionCard._radius = 14.0;
-  static const RadioOptionCard._borderWidth = 1.5;
-  static const RadioOptionCard._duration = Duration(milliseconds: 200);
+  static const radius = 14.0;
+  static const borderWidth = 1.5;
+  static const duration = Duration(milliseconds: 200);
 
   @override
   State<RadioOptionCard> createState() => _RadioOptionCardState();
@@ -40,7 +40,8 @@ class _RadioOptionCardState extends State<RadioOptionCard> {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
     final accent = context.brandPurple;
-    final border = _hasFocus || widget.selected
+    final highlighted = _hasFocus || widget.selected;
+    final border = highlighted
         ? accent
         : onSurface.withValues(alpha: 0.10);
 
@@ -53,19 +54,24 @@ class _RadioOptionCardState extends State<RadioOptionCard> {
         child: InkWell(
           onTap: widget.onTap,
           onFocusChange: (focused) {
-            if (_hasFocus != focused) setState(() => _hasFocus = focused);
+            if (_hasFocus != focused) {
+              setState(() => _hasFocus = focused);
+            }
           },
-          borderRadius: BorderRadius.circular(RadioOptionCard.RadioOptionCard._radius),
+          borderRadius: BorderRadius.circular(RadioOptionCard.radius),
           child: AnimatedContainer(
-            duration: RadioOptionCard._duration,
+            duration: RadioOptionCard.duration,
             curve: Curves.easeOut,
             padding: const EdgeInsets.all(padding16),
             decoration: BoxDecoration(
               color: _hasFocus
                   ? accent.withValues(alpha: 0.12)
                   : theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(RadioOptionCard._radius),
-              border: Border.all(color: border, width: RadioOptionCard._borderWidth),
+              borderRadius: BorderRadius.circular(RadioOptionCard.radius),
+              border: Border.all(
+                color: border,
+                width: _hasFocus ? 3 : RadioOptionCard.borderWidth,
+              ),
             ),
             child: ExcludeSemantics(
               child: Row(
@@ -74,8 +80,13 @@ class _RadioOptionCardState extends State<RadioOptionCard> {
                     : CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    padding: EdgeInsets.only(top: widget.description == null ? 0 : 1),
-                    child: _RadioDot(widget.selected: widget.selected, accent: accent),
+                    padding: EdgeInsets.only(
+                      top: widget.description == null ? 0 : 1,
+                    ),
+                    child: _RadioDot(
+                      selected: widget.selected,
+                      accent: accent,
+                    ),
                   ),
                   const SizedBox(width: padding12),
                   Expanded(
@@ -118,9 +129,9 @@ class _RadioOptionCardState extends State<RadioOptionCard> {
 }
 
 class _RadioDot extends StatelessWidget {
-  const _RadioDot({required this.widget.selected, required this.accent});
+  const _RadioDot({required this.selected, required this.accent});
 
-  final bool widget.selected;
+  final bool selected;
   final Color accent;
 
   @override
@@ -128,23 +139,23 @@ class _RadioDot extends StatelessWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
 
     return AnimatedContainer(
-      duration: RadioOptionCard.RadioOptionCard._duration,
+      duration: RadioOptionCard.duration,
       curve: Curves.easeOut,
       width: 20,
       height: 20,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: widget.selected ? accent : onSurface.withValues(alpha: 0.35),
-          width: widget.selected ? 2 : 1.5,
+          color: selected ? accent : onSurface.withValues(alpha: 0.35),
+          width: selected ? 2 : 1.5,
         ),
       ),
       child: Center(
         child: AnimatedContainer(
-          duration: RadioOptionCard.RadioOptionCard._duration,
+          duration: RadioOptionCard.duration,
           curve: Curves.easeOut,
-          width: widget.selected ? 10 : 0,
-          height: widget.selected ? 10 : 0,
+          width: selected ? 10 : 0,
+          height: selected ? 10 : 0,
           decoration: BoxDecoration(shape: BoxShape.circle, color: accent),
         ),
       ),
