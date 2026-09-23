@@ -170,48 +170,43 @@ class _CompletionToggleState extends State<_CompletionToggle> {
           focusColor: Theme.of(
             context,
           ).colorScheme.primary.withValues(alpha: 0.16),
-          // 48x48 hit area (platform minimum) with a left gap from the title.
-          // The circle is right-aligned within it so it stays visually where it
-          // was while the touch target extends left and vertically.
           child: Padding(
-          padding: const EdgeInsets.only(left: 8),
-          child: SizedBox(
-            width: 48,
-            height: 48,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: SizedBox(
-                width: 24,
-                height: 24,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _shown ? context.brandPurple : Colors.transparent,
-                    border: Border.all(
-                      color: _shown
-                          ? context.brandPurple
-                          : Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.4),
-                      width: 2,
+            padding: const EdgeInsets.only(left: 8),
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _shown ? context.brandPurple : Colors.transparent,
+                      border: Border.all(
+                        color: _shown
+                            ? context.brandPurple
+                            : Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.4),
+                        width: 2,
+                      ),
                     ),
+                    child: _shown
+                        ? Icon(
+                            Icons.check,
+                            size: 16,
+                            color: context.onBrandPurple,
+                          )
+                        : null,
                   ),
-                  // Glyph in the accent's own foreground: the accent is
-                  // near-white in dark mode, so plain white disappeared.
-                  child: _shown
-                      ? Icon(
-                          Icons.check,
-                          size: 16,
-                          color: context.onBrandPurple,
-                        )
-                      : null,
                 ),
               ),
             ),
           ),
         ),
       ),
-    ),
     );
   }
 }
