@@ -11,6 +11,7 @@ import 'package:medito/constants/constants.dart';
 import 'package:medito/constants/icons/medito_icons.dart';
 import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:medito/providers/providers.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/repositories/auth/auth_repository.dart';
 import 'package:medito/routes/routes.dart';
 import 'package:medito/services/analytics/firebase_analytics_service.dart';
@@ -83,6 +84,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
+
     final List<SettingsItem> settingsItems = [
       SettingsItem(
         section: AppLocalizations.of(context)!.helpLegalSection,
@@ -222,13 +228,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
     ];
 
+    final visibleSettingsItems = isTv
+        ? settingsItems.where(_isTvSafeSetting).toList()
+        : settingsItems;
+
     return Scaffold(
       // No bottom inset: the floating nav pill sits over the content, which
       // scrolls underneath it. The list's trailing padding keeps the last
       // card clear of the pill.
       body: SafeArea(
         bottom: false,
-        child: _buildMain(context, ref, settingsItems),
+        child: _buildMain(context, ref, visibleSettingsItems, isTv: isTv),
       ),
     );
   }
@@ -266,11 +276,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  bool _isTvSafeSetting(SettingsItem item) {
+    if (item.type == TypeConstants.url || item.type == TypeConstants.link) {
+      return false;
+    }
+
+    return item.path != RouteConstants.donation &&
+        item.path != TypeConstants.appIcon &&
+        item.path != TypeConstants.toggleDnd &&
+        item.path != TypeConstants.addWidget &&
+        item.path != TypeConstants.customiseHomeLayout;
+  }
+
   Widget _buildMain(
     BuildContext context,
     WidgetRef ref,
-    List<SettingsItem> settingsItems,
-  ) {
+    List<SettingsItem> settingsItems, {
+    required bool isTv,
+  }) {
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
@@ -291,7 +314,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
         ),
-        _buildSettingsListSlivers(context, ref, settingsItems),
+        _buildSettingsListSlivers(
+          context,
+          ref,
+          settingsItems,
+          isTv: isTv,
+        ),
       ],
     );
   }
@@ -389,8 +417,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget _buildSettingsListSlivers(
     BuildContext context,
     WidgetRef ref,
-    List<SettingsItem> settingsItems,
-  ) {
+    List<SettingsItem> settingsItems, {
+    required bool isTv,
+  }) {
     final authRepository = ref.watch(authRepositorySyncProvider);
     final user = authRepository.currentUser;
     final isEffectivelySignedIn =
@@ -430,13 +459,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
 
     // Other customization card children
+    final showHealthSync = _isHealthSyncAvailable && !isTv;
+
     final otherCustomizationChildren = <Widget>[
       if (widgetItem != null)
         _buildMenuItemTile(
           context,
           ref,
           widgetItem,
-          isLast: otherCustomizationItems.isEmpty && !_isHealthSyncAvailable,
+          isLast: otherCustomizationItems.isEmpty && !showHealthSync,
         ),
       for (var i = 0; i < otherCustomizationItems.length; i++)
         _buildMenuItemTile(
@@ -445,33 +476,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           otherCustomizationItems[i],
           isLast:
               i == otherCustomizationItems.length - 1 &&
-              !_isHealthSyncAvailable,
+              !showHealthSync,
         ),
-      if (_isHealthSyncAvailable) const HealthSyncTile(hasUnderline: false),
+      if (showHealthSync) const HealthSyncTile(hasUnderline: false),
     ];
 
     return SliverPadding(
       padding: const EdgeInsets.only(top: padding16),
       sliver: SliverList(
         delegate: SliverChildListDelegate([
-          const ReminderTile(),
+          if (!isTv) const ReminderTile(),
           if (!isEffectivelySignedIn) ...[
             _buildSectionTitle(context, AppLocalizations.of(context)!.account),
             _buildSectionCard([const AccountSectionWidget(inCard: true)]),
           ],
-          _buildSectionTitle(
-            context,
-            AppLocalizations.of(context)!.supportCommunity,
-          ),
-          _buildSectionCard([
-            for (var i = 0; i < communityItems.length; i++)
-              _buildMenuItemTile(
-                context,
-                ref,
-                communityItems[i],
-                isLast: i == communityItems.length - 1,
-              ),
-          ]),
+          if (communityItems.isNotEmpty) ...[
+            _buildSectionTitle(
+              context,
+              AppLocalizations.of(context)!.supportCommunity,
+            ),
+            _buildSectionCard([
+              for (var i = 0; i < communityItems.length; i++)
+                _buildMenuItemTile(
+                  context,
+                  ref,
+                  communityItems[i],
+                  isLast: i == communityItems.length - 1,
+                ),
+            ]),
+          ],
           _buildSectionTitle(
             context,
             AppLocalizations.of(context)!.customization,
