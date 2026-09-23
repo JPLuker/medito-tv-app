@@ -139,6 +139,9 @@ class FeedbackWidgetState extends State<FeedbackWidget> {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
+      focusColor: Theme.of(
+        context,
+      ).colorScheme.primary.withValues(alpha: 0.18),
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
