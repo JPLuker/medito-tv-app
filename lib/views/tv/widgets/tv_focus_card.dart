@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class TvFocusCard extends StatefulWidget {
   const TvFocusCard({
@@ -46,6 +47,11 @@ class _TvFocusCardState extends State<TvFocusCard> {
     return FocusableActionDetector(
       autofocus: widget.autofocus,
       onShowFocusHighlight: _handleFocus,
+      shortcuts: const <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+        SingleActivator(LogicalKeyboardKey.select): ActivateIntent(),
+        SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+      },
       actions: <Type, Action<Intent>>{
         ActivateIntent: CallbackAction<ActivateIntent>(
           onInvoke: (_) {
