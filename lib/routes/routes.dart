@@ -16,6 +16,8 @@ import 'package:medito/views/path/journal_entry_view.dart';
 import 'package:medito/views/settings/settings_screen.dart';
 import 'package:medito/views/track/track_view.dart';
 import 'package:medito/views/settings/sign_up_log_in_screen.dart';
+import 'package:medito/views/tv/tv_pack_view.dart';
+import 'package:medito/views/tv/tv_track_view.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:medito/views/home/customise_home_layout_screen.dart';
 
@@ -59,7 +61,7 @@ Future<void> handleNavigation(
   }
 
   if (type.contains('tracks') || type.contains('track')) {
-    await _handleTrackNavigation(ids, ref);
+    await _handleTrackNavigation(ids, ref, isTv);
   } else if (type.contains('pack')) {
     var packId = type.contains('pack3')
         ? ids[2]!
@@ -70,7 +72,10 @@ Future<void> handleNavigation(
     if (packId == 'favorites') {
       await _pushRoute(const FavoritesView(), ref);
     } else {
-      await _pushRoute(PackView(id: packId), ref);
+      await _pushRoute(
+        isTv ? TvPackView(id: packId) : PackView(id: packId),
+        ref,
+      );
     }
   } else if (type == TypeConstants.url || type == TypeConstants.link) {
     final url = ids.last ?? 'https://meditofoundation.org/';
@@ -153,10 +158,17 @@ bool _isDonationRoute(String? type, List<String?> ids) {
       (type == TypeConstants.route && ids.contains(RouteConstants.donation));
 }
 
-Future<void> _handleTrackNavigation(List<String?> ids, WidgetRef? ref) async {
+Future<void> _handleTrackNavigation(
+  List<String?> ids,
+  WidgetRef? ref,
+  bool isTv,
+) async {
   try {
     var trackId = ids.first!;
-    await _pushRoute(TrackView(trackId: trackId), ref);
+    await _pushRoute(
+      isTv ? TvTrackView(trackId: trackId) : TrackView(trackId: trackId),
+      ref,
+    );
     ref?.read(statsProvider.notifier).refresh();
   } catch (e, s) {
     AppLogger.d('ROUTES', s.toString());
