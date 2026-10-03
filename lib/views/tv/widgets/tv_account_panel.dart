@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/providers/providers.dart';
 import 'package:medito/providers/stats_provider.dart';
 import 'package:medito/repositories/auth/auth_repository.dart';
+import 'package:medito/views/settings/sign_up_log_in_screen.dart';
 import 'package:medito/views/splash_view.dart';
-import 'package:medito/views/tv/tv_sign_up_log_in_page.dart';
 import 'package:medito/views/tv/widgets/tv_focus_card.dart';
 
 class TvAccountPanel extends ConsumerWidget {
@@ -20,7 +20,7 @@ class TvAccountPanel extends ConsumerWidget {
       return TvFocusCard(
         onPressed: () => Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => const TvSignUpLogInPage(fromSettings: true),
+            builder: (_) => const SignUpLogInPage(fromSettings: true),
           ),
         ),
         padding: const EdgeInsets.all(26),
