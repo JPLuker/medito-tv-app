@@ -5,7 +5,9 @@ Prepares a Windows checkout of Medito for local Android TV / Google TV developme
 
 .DESCRIPTION
 Creates only local, gitignored development files. It does not use production
-secrets and does not modify committed Android signing configuration.
+secrets and does not modify committed Android signing configuration. Existing
+local signing/Firebase configuration is preserved unless -ForceMockConfig is
+explicitly supplied.
 
 Run from anywhere:
   .\scripts\setup-tv-dev.ps1
@@ -15,7 +17,8 @@ Run from anywhere:
 param(
     [string]$FlutterSdk = "C:\src\flutter",
     [string]$JdkDir,
-    [switch]$Clean
+    [switch]$Clean,
+    [switch]$ForceMockConfig
 )
 
 $ErrorActionPreference = "Stop"
@@ -221,8 +224,9 @@ Then rerun:
     }
 
     $KeystoreProperties = Join-Path $AndroidDir "keystore.properties"
-    $DebugKeystoreForGradle = $DebugKeystore.Replace("\", "/")
-    @"
+    if (-not (Test-Path $KeystoreProperties) -or $ForceMockConfig) {
+        $DebugKeystoreForGradle = $DebugKeystore.Replace("\", "/")
+        @"
 storePassword=android
 keyPassword=android
 keyAlias=androiddebugkey
@@ -231,11 +235,15 @@ appId=meditofoundation.medito
 versionCode=1
 versionName=1.0.0
 "@ | Set-Content -Path $KeystoreProperties -Encoding UTF8
-    Write-Host "Wrote gitignored local config: android/keystore.properties"
+        Write-Host "Wrote gitignored local config: android/keystore.properties"
+    } else {
+        Write-Host "Preserving existing android/keystore.properties"
+    }
 
-    Write-Step "Preparing dummy Firebase config for mock mode"
+    Write-Step "Preparing Firebase config for mock mode"
     $GoogleServices = Join-Path $AndroidDir "app\google-services.json"
-    @'
+    if (-not (Test-Path $GoogleServices) -or $ForceMockConfig) {
+        @'
 {
   "project_info": {
     "project_number": "123456789",
@@ -269,7 +277,11 @@ versionName=1.0.0
   "configuration_version": "1"
 }
 '@ | Set-Content -Path $GoogleServices -Encoding UTF8
-    Write-Host "Wrote gitignored mock config: android/app/google-services.json"
+        Write-Host "Wrote gitignored mock config: android/app/google-services.json"
+    } else {
+        Write-Host "Preserving existing android/app/google-services.json"
+        Write-Host "Use -ForceMockConfig only if you intentionally want to replace local config with the mock placeholder." -ForegroundColor Yellow
+    }
 
     if ($Clean) {
         Write-Step "Cleaning Flutter build outputs"
@@ -302,7 +314,8 @@ versionName=1.0.0
 
     Write-Host ""
     Write-Host "TV development setup is ready." -ForegroundColor Green
-    Write-Host "Next: .\scripts\run-tv-mock.ps1"
+    Write-Host "Mock mode: .\scripts\run-tv-mock.ps1"
+    Write-Host "Live mode: .\scripts\run-tv-live.ps1 -Environment staging"
 }
 finally {
     Pop-Location
