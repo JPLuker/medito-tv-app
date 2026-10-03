@@ -74,7 +74,10 @@ class SignUpLogInPage extends ConsumerWidget {
     return capabilities.when(
       data: (value) => value.isAndroidTv
           ? TvSignUpLogInFrame(
-              child: SignUpLogInForm(fromSettings: fromSettings),
+              child: SignUpLogInForm(
+                fromSettings: fromSettings,
+                tvEmbedded: true,
+              ),
             )
           : SignUpLogInForm(fromSettings: fromSettings),
       loading: () => Scaffold(
@@ -89,9 +92,14 @@ class SignUpLogInPage extends ConsumerWidget {
 }
 
 class SignUpLogInForm extends ConsumerStatefulWidget {
-  const SignUpLogInForm({super.key, required this.fromSettings});
+  const SignUpLogInForm({
+    super.key,
+    required this.fromSettings,
+    this.tvEmbedded = false,
+  });
 
   final bool fromSettings;
+  final bool tvEmbedded;
 
   @override
   ConsumerState<SignUpLogInForm> createState() => SignUpLogInFormState();
@@ -456,7 +464,43 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
   Widget build(BuildContext context) {
     final inputTextStyle = TextStyle(
       color: Theme.of(context).colorScheme.onSurface,
+      fontSize: widget.tvEmbedded ? 20 : null,
     );
+
+    if (widget.tvEmbedded) {
+      return Material(
+        color: Colors.transparent,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(36, 28, 36, 36),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_hasRequestedOtp) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            setState(() {
+                              _hasRequestedOtp = false;
+                              _otpController.clear();
+                            });
+                          },
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    label: const Text('Change email'),
+                  ),
+                ),
+                const SizedBox(height: 18),
+              ],
+              _hasRequestedOtp
+                  ? _buildOtpVerificationView(inputTextStyle)
+                  : _buildInitialView(inputTextStyle),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -507,15 +551,17 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
   Widget _buildInitialView(TextStyle inputTextStyle) {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: widget.tvEmbedded
+          ? CrossAxisAlignment.stretch
+          : CrossAxisAlignment.center,
       children: [
         _buildBenefitsText(AppLocalizations.of(context)!.createAccountBenefits),
-        height64,
+        widget.tvEmbedded ? height32 : height64,
         Text(
           AppLocalizations.of(context)!.emailVerificationText,
-          textAlign: TextAlign.center,
+          textAlign: widget.tvEmbedded ? TextAlign.left : TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            fontSize: 13,
+            fontSize: widget.tvEmbedded ? 18 : 13,
             height: 1.5,
             fontWeight: FontWeight.normal,
           ),
@@ -547,12 +593,13 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
                 )
               : Text(AppLocalizations.of(context)!.sendMeMyPasswordText),
         ),
-        if (!ref.watch(deviceCapabilitiesProvider).maybeWhen(
-          data: (value) => value.isAndroidTv,
-          orElse: () => false,
-        ))
+        if (!widget.tvEmbedded &&
+            !ref.watch(deviceCapabilitiesProvider).maybeWhen(
+              data: (value) => value.isAndroidTv,
+              orElse: () => false,
+            ))
           _buildPrivacyPolicyLink(),
-        SizedBox.square(dimension: 100),
+        if (!widget.tvEmbedded) SizedBox.square(dimension: 100),
       ],
     );
   }
@@ -560,7 +607,9 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
   Widget _buildOtpVerificationView(TextStyle inputTextStyle) {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: widget.tvEmbedded
+          ? CrossAxisAlignment.stretch
+          : CrossAxisAlignment.center,
       children: [
         Text.rich(
           TextSpan(
@@ -568,7 +617,7 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
               TextSpan(
                 text: '${AppLocalizations.of(context)!.otpInstructions}\n',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontSize: 18,
+                  fontSize: widget.tvEmbedded ? 22 : 18,
                   height: 1.5,
                   fontWeight: FontWeight.normal,
                   color: Theme.of(context).colorScheme.onSurface,
@@ -577,7 +626,7 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
               TextSpan(
                 text: _emailController.text,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontSize: 18,
+                  fontSize: widget.tvEmbedded ? 22 : 18,
                   height: 1.5,
                   fontWeight: FontWeight.bold,
                   color: Theme.of(context).colorScheme.onSurface,
@@ -585,7 +634,7 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
               ),
             ],
           ),
-          textAlign: TextAlign.center,
+          textAlign: widget.tvEmbedded ? TextAlign.left : TextAlign.center,
         ),
         height32,
         _buildOtpField(inputTextStyle),
@@ -610,9 +659,10 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
         TextButton(
           onPressed: _isLoading || _isRateLimited ? null : _requestOtp,
           style: TextButton.styleFrom(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(0, 32),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            minimumSize: Size(0, widget.tvEmbedded ? 52 : 32),
+            tapTargetSize: widget.tvEmbedded
+                ? MaterialTapTargetSize.padded
+                : MaterialTapTargetSize.shrinkWrap,
           ),
           child: Text(
             _isRateLimited
@@ -626,7 +676,7 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
                       context,
                     ).textTheme.bodySmall?.color?.withOpacityValue(0.38)
                   : ColorConstants.brightSky,
-              fontSize: 14,
+              fontSize: widget.tvEmbedded ? 18 : 14,
             ),
           ),
         ),
@@ -662,7 +712,7 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
                 : null,
           ),
       onChanged: (_) => setState(() {}),
-      style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+      style: inputTextStyle,
       keyboardType: TextInputType.emailAddress,
       inputFormatters: [
         TextInputFormatter.withFunction(
@@ -687,7 +737,7 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
             fillColor: Theme.of(context).colorScheme.surface,
             filled: true,
           ),
-      style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+      style: inputTextStyle,
       keyboardType: TextInputType.number,
       maxLength: 6,
     );
@@ -750,7 +800,12 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
       backgroundColor: context.brandPurple,
       disabledForegroundColor: context.onBrandPurple.withValues(alpha: 0.6),
       disabledBackgroundColor: context.brandPurple.withOpacityValue(0.5),
-      minimumSize: const Size(double.infinity, 48),
+      minimumSize: Size(double.infinity, widget.tvEmbedded ? 62 : 48),
+      textStyle: widget.tvEmbedded
+          ? Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            )
+          : null,
     );
   }
 
@@ -759,34 +814,43 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
     bool isValid,
     String? errorText,
   ) {
-    const borderRadius = BorderRadius.all(Radius.circular(4));
+    final borderRadius = BorderRadius.all(
+      Radius.circular(widget.tvEmbedded ? 12 : 4),
+    );
 
     return InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(
         color: Theme.of(context).colorScheme.onSurface.withOpacityValue(0.6),
+        fontSize: widget.tvEmbedded ? 19 : null,
       ),
+      contentPadding: widget.tvEmbedded
+          ? const EdgeInsets.symmetric(horizontal: 22, vertical: 21)
+          : null,
       filled: true,
       fillColor: Theme.of(context).colorScheme.surface,
-      enabledBorder: const OutlineInputBorder(
+      enabledBorder: OutlineInputBorder(
         borderRadius: borderRadius,
-        borderSide: BorderSide(color: ColorConstants.softGrey),
+        borderSide: const BorderSide(color: ColorConstants.softGrey),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: borderRadius,
-        borderSide: BorderSide(color: context.brandPurple),
+        borderSide: BorderSide(
+          color: context.brandPurple,
+          width: widget.tvEmbedded ? 3 : 1,
+        ),
       ),
-      disabledBorder: const OutlineInputBorder(
+      disabledBorder: OutlineInputBorder(
         borderRadius: borderRadius,
-        borderSide: BorderSide(color: ColorConstants.softGrey),
+        borderSide: const BorderSide(color: ColorConstants.softGrey),
       ),
-      errorBorder: const OutlineInputBorder(
+      errorBorder: OutlineInputBorder(
         borderRadius: borderRadius,
-        borderSide: BorderSide(color: Colors.red),
+        borderSide: const BorderSide(color: Colors.red),
       ),
-      focusedErrorBorder: const OutlineInputBorder(
+      focusedErrorBorder: OutlineInputBorder(
         borderRadius: borderRadius,
-        borderSide: BorderSide(color: Colors.red),
+        borderSide: const BorderSide(color: Colors.red),
       ),
       errorText: !isValid && errorText != null ? errorText : null,
       errorStyle: const TextStyle(color: Colors.red),
@@ -798,9 +862,9 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
       text,
       textAlign: TextAlign.start,
       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-        fontSize: 20,
-        height: 1.5,
-        fontWeight: FontWeight.w500,
+        fontSize: widget.tvEmbedded ? 28 : 20,
+        height: 1.4,
+        fontWeight: FontWeight.w600,
       ),
     );
   }
