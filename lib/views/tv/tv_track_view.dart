@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/l10n/app_localizations.dart';
+import 'package:medito/models/favorites/favorite_item.dart';
 import 'package:medito/models/models.dart';
 import 'package:medito/providers/duration_preference_provider.dart';
+import 'package:medito/providers/favorites/favorites_provider.dart';
 import 'package:medito/providers/guide_name_preference_provider.dart';
 import 'package:medito/providers/meditation/track_provider.dart';
 import 'package:medito/providers/providers.dart';
 import 'package:medito/utils/logger.dart';
 import 'package:medito/utils/track_variant_selector.dart';
-import 'package:medito/views/player/player_view.dart';
+import 'package:medito/views/tv/tv_player_view.dart';
 import 'package:medito/views/tv/widgets/tv_focus_card.dart';
 import 'package:medito/views/tv/widgets/tv_submenu_scaffold.dart';
 import 'package:medito/widgets/markdown_widget.dart';
@@ -16,9 +18,9 @@ import 'package:medito/widgets/network_image_widget.dart';
 
 /// TV-first meditation detail screen.
 ///
-/// Guide and duration choices are rendered as large D-pad cards instead of
-/// phone dropdowns, keeping the entire Home -> pack -> session -> player route
-/// usable and readable from couch distance.
+/// The TV surface relies on the remote's Back button instead of duplicating a
+/// distant Back target on screen. Save/favorite is promoted next to Play so it
+/// remains part of the normal D-pad path rather than living in a screen corner.
 class TvTrackView extends ConsumerWidget {
   const TvTrackView({super.key, required this.trackId});
 
@@ -33,6 +35,7 @@ class TvTrackView extends ConsumerWidget {
     return track.when(
       loading: () => const TvSubmenuScaffold(
         title: 'Meditation',
+        showBackButton: false,
         child: SizedBox(
           height: 240,
           child: Center(child: CircularProgressIndicator()),
@@ -41,6 +44,7 @@ class TvTrackView extends ConsumerWidget {
       error: (_, _) => TvSubmenuScaffold(
         title: 'Meditation',
         subtitle: 'This meditation could not be loaded.',
+        showBackButton: false,
         child: SizedBox(
           width: 240,
           child: TvFocusCard(
@@ -94,9 +98,18 @@ class _TrackSurface extends ConsumerWidget {
     final guideOptions = track.voices
         .where((voice) => voice.guideName?.trim().isNotEmpty == true)
         .toList();
+    final favorites = ref.watch(favoritesNotifierProvider);
+    final isFavorite = favorites.maybeWhen(
+      data: (items) => items.any((item) => item.id == track.id),
+      orElse: () => false,
+    );
+
+    const dailyMeditationId = 'BmTFAyYt8jVMievZ';
+    final canFavorite = track.id != dailyMeditationId;
 
     return TvSubmenuScaffold(
       title: track.title,
+      showBackButton: false,
       maxContentWidth: 1360,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -154,6 +167,15 @@ class _TrackSurface extends ConsumerWidget {
                           ),
                         ),
                       ),
+                    const SizedBox(height: 22),
+                    Text(
+                      'Press Back on your remote to return.',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.5,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -215,29 +237,70 @@ class _TrackSurface extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 36),
-          SizedBox(
-            width: 300,
-            child: TvFocusCard(
-              onPressed: () => _play(context, ref),
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 22),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.play_arrow_rounded,
-                    size: 38,
-                    color: theme.colorScheme.primary,
+          Row(
+            children: [
+              SizedBox(
+                width: 300,
+                child: TvFocusCard(
+                  onPressed: () => _play(context, ref),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 30,
+                    vertical: 22,
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Play',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.play_arrow_rounded,
+                        size: 38,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Play',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (canFavorite) ...[
+                const SizedBox(width: 18),
+                SizedBox(
+                  width: 280,
+                  child: TvFocusCard(
+                    onPressed: () => _toggleFavorite(ref, isFavorite),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 26,
+                      vertical: 22,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          isFavorite
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          size: 34,
+                          color: isFavorite
+                              ? theme.colorScheme.primary
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          isFavorite ? 'Saved' : 'Save to favorites',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
+                ),
+              ],
+            ],
           ),
         ],
       ),
@@ -261,13 +324,32 @@ class _TrackSurface extends ConsumerWidget {
         .setDuration(bestFile.duration);
   }
 
+  void _toggleFavorite(WidgetRef ref, bool isFavorite) {
+    final notifier = ref.read(favoritesNotifierProvider.notifier);
+    if (isFavorite) {
+      notifier.removeFromFavorites(track.id);
+      return;
+    }
+
+    notifier.addToFavorites(
+      FavoriteItem(
+        id: track.id,
+        title: track.title,
+        coverUrl: track.coverUrl,
+        subtitle: track.subtitle,
+        type: FavoriteItemType.track,
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
+
   Future<void> _play(BuildContext context, WidgetRef ref) async {
     try {
       final request = PlaybackRequest.fromTrack(track, activeVoice, activeFile);
       await ref.read(playerProvider.notifier).play(request);
       if (!context.mounted) return;
       await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const PlayerView()),
+        MaterialPageRoute(builder: (_) => const TvPlayerView()),
       );
     } catch (error, stackTrace) {
       AppLogger.e('TV_TRACK', 'Failed to start playback', error, stackTrace);
