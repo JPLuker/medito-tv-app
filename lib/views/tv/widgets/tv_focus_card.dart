@@ -23,6 +23,21 @@ class TvFocusCard extends StatefulWidget {
 class _TvFocusCardState extends State<TvFocusCard> {
   bool _focused = false;
 
+  void _handleFocus(bool focused) {
+    if (_focused != focused) setState(() => _focused = focused);
+    if (!focused) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        alignment: 0.5,
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -30,9 +45,7 @@ class _TvFocusCardState extends State<TvFocusCard> {
 
     return FocusableActionDetector(
       autofocus: widget.autofocus,
-      onShowFocusHighlight: (focused) {
-        if (_focused != focused) setState(() => _focused = focused);
-      },
+      onShowFocusHighlight: _handleFocus,
       actions: <Type, Action<Intent>>{
         ActivateIntent: CallbackAction<ActivateIntent>(
           onInvoke: (_) {
