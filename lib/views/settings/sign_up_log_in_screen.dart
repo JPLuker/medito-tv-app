@@ -28,6 +28,7 @@ import 'package:flutter/gestures.dart';
 import 'package:medito/views/onboarding/onboarding_pager_screen.dart';
 import 'package:medito/views/bottom_navigation/bottom_navigation_bar_view.dart';
 import 'package:medito/views/root/root_page_view.dart';
+import 'package:medito/views/tv/tv_sign_up_log_in_page.dart';
 import 'package:app_links/app_links.dart';
 
 import '../../providers/device_and_app_info/device_and_app_info_provider.dart';
@@ -55,9 +56,6 @@ class SignUpLogInPage extends ConsumerWidget {
         '[SIGN_UP] User has email, navigating back or to home',
         level: 1000,
       );
-      // If opened from settings and user is already logged in, just pop.
-      // Otherwise, this case might not be reachable if auth guards are in place before this screen.
-      // However, to be safe, popping is a sensible default.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (Navigator.canPop(context)) {
           Navigator.pop(context);
@@ -68,11 +66,23 @@ class SignUpLogInPage extends ConsumerWidget {
         body: Center(
           child: CircularProgressIndicator(color: context.brandPurple),
         ),
-      ); // Show loading while popping
-    } else {
-      dev.log('[SIGN_UP] User has no email, showing sign-up form', level: 1000);
-      return SignUpLogInForm(fromSettings: fromSettings);
+      );
     }
+
+    dev.log('[SIGN_UP] User has no email, showing sign-up form', level: 1000);
+    final capabilities = ref.watch(deviceCapabilitiesProvider);
+    return capabilities.when(
+      data: (value) => value.isAndroidTv
+          ? TvSignUpLogInPage(fromSettings: fromSettings)
+          : SignUpLogInForm(fromSettings: fromSettings),
+      loading: () => Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: Center(
+          child: CircularProgressIndicator(color: context.brandPurple),
+        ),
+      ),
+      error: (_, _) => SignUpLogInForm(fromSettings: fromSettings),
+    );
   }
 }
 
@@ -194,9 +204,6 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
     await _sendOtp();
   }
 
-  /// Requests an OTP for the entered email. If the device's stored client ID is
-  /// linked to a different email, asks whether to start a new account on this
-  /// device (clearing the stored ID) and retries once if the user agrees.
   Future<void> _sendOtp({bool allowNewAccount = true}) async {
     setState(() {
       _isLoading = true;
@@ -219,9 +226,6 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
     } on InactiveEmailError {
       showSnackBar(context, AppLocalizations.of(context)!.accountInactiveError);
     } on EmailMismatchError catch (e) {
-      // The stored client ID belongs to an account with a different email and
-      // the entered email is not registered. Never mint a new client ID
-      // silently: ask first, and only then forget the old ID and retry.
       if (!mounted) return;
       if (!allowNewAccount) {
         showSnackBar(context, e.message);
@@ -252,11 +256,6 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
           false;
       if (!startNew || !mounted) return;
 
-      // Leave the device clean: the old account's local stats must not be
-      // merged into the new account (they stay on the server under the old
-      // email), and with no stored client ID both requestOtp and verifyOtp
-      // generate a fresh one. If the person abandons the flow here, splash
-      // "Continue" then creates a plain new anonymous account.
       final statsManager = ref.read(statsManagerProvider);
       await statsManager.initialize();
       await statsManager.clearAllStats();
@@ -309,10 +308,6 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
         level: 1000,
       );
 
-      // Remember which account this device was on, so we only wipe local
-      // stats when the server actually switches us to a different one. Read
-      // SharedPreferences directly: userIdProvider is a plain Provider whose
-      // dependencies never change, so it would return a stale cached value.
       final previousUserId = ref
           .read(sharedPreferencesProvider)
           .getString(SharedPreferenceConstants.userId);
@@ -332,11 +327,8 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
           level: 1000,
         );
         await _refreshUserInfo();
-        // userIdProvider caches its value; refresh it now that the server may
-        // have switched us to a different client ID.
         ref.invalidate(userIdProvider);
 
-        // Log the state of the auth repository after successful login
         final authRepo = ref.read(authRepositorySyncProvider);
         dev.log(
           '[SIGN_UP] User after successful login: ${authRepo.currentUser}',
@@ -347,8 +339,6 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
           level: 1000,
         );
 
-        // Set user ID for analytics immediately after successful sign-in
-        // This ensures user ID is set before any events are logged
         try {
           final userId = ref.read(userIdProvider);
           if (userId != null && userId.isNotEmpty) {
@@ -366,29 +356,20 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
           );
         }
 
-        // Log analytics event for completed signup
         await FirebaseAnalyticsService().logEvent(
           name: FirebaseAnalyticsService.eventOnboardingSignupCompleted,
         );
 
-        // Initialize first — clearAllStats touches SharedPreferences and
-        // will throw LateInitializationError if the singleton hasn't been
-        // initialized yet (e.g. user signs in straight from onboarding
-        // without ever loading the home screen).
         final statsManager = ref.read(statsManagerProvider);
         await statsManager.initialize();
         final newUserId = authRepo.currentUser?.id;
         if (newUserId != previousUserId) {
-          // Server moved us onto a different account: drop the local copy of
-          // the old one before pulling the new account's stats.
           await statsManager.clearAllStats();
         }
-        // Force sync to fetch the (possibly different) account's stats
         await statsManager.sync(force: true);
         ref.read(statsProvider.notifier).refresh();
         ref.invalidate(packProvider);
 
-        // Initialize favorites after successful login
         unawaited(
           ref.read(favoritesNotifierProvider.notifier).syncWithServer(),
         );
@@ -451,18 +432,15 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
   Future<void> _refreshUserInfo() async {
     dev.log('[SIGN_UP] Starting user info refresh', level: 1000);
 
-    // First invalidate the providers to clear their state
     ref.invalidate(meProvider);
     ref.invalidate(deviceAppAndUserInfoProvider);
 
-    // Log current auth state before header initialization
     final authRepo = ref.read(authRepositorySyncProvider);
     dev.log(
       '[SIGN_UP] Auth state before header init: ${authRepo.currentUser}',
       level: 1000,
     );
 
-    // Then initialize headers with device info (which now includes user's language preference)
     final deviceInfo = await ref.read(deviceAndAppInfoProvider.future);
     await HeaderService(deviceInfo).initialise();
 
