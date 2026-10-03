@@ -73,7 +73,9 @@ class SignUpLogInPage extends ConsumerWidget {
     final capabilities = ref.watch(deviceCapabilitiesProvider);
     return capabilities.when(
       data: (value) => value.isAndroidTv
-          ? TvSignUpLogInPage(fromSettings: fromSettings)
+          ? TvSignUpLogInFrame(
+              child: SignUpLogInForm(fromSettings: fromSettings),
+            )
           : SignUpLogInForm(fromSettings: fromSettings),
       loading: () => Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
