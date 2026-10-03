@@ -14,7 +14,11 @@ import 'package:medito/models/background_sounds/background_sounds_model.dart';
 import 'package:medito/models/events/donation/donation_page_model.dart';
 import 'package:medito/models/maintenance/maintenance_model.dart';
 
+// The sample file is genuinely ~15 seconds long. TrackAudioFile.duration is in
+// milliseconds, so keeping the metadata at 15,000 makes mock playback useful
+// for progress, seek, completion and end-state testing instead of showing 0 min.
 const _trackAudioUrl = 'https://download.samplelib.com/mp3/sample-15s.mp3';
+const _trackAudioDurationMs = 15000;
 const _bgSoundAudioUrl = 'https://download.samplelib.com/mp3/sample-9s.mp3';
 
 // ---------------------------------------------------------------------------
@@ -73,18 +77,18 @@ final mockPacks = [
   const PackModel(
     id: 'pack-1',
     title: "Beginner's Guide to Meditation",
-    subtitle: '7 sessions',
+    subtitle: '3 quick TV test sessions',
     coverUrl: 'https://picsum.photos/seed/pack1/400/400',
     path: 'packs/pack-1',
     description:
-        'Learn the fundamentals of meditation with this guided introduction course.',
+        'Short mock sessions for testing TV navigation, playback, favorites, ambient sound and completion.',
     isPublished: true,
     items: [
       PackItemsModel(
         type: 'track',
         id: 'track-1',
         title: 'Introduction to Meditation',
-        subtitle: '10 min',
+        subtitle: '15 sec test',
         coverUrl: 'https://picsum.photos/seed/track1/400/400',
         path: 'tracks/track-1',
       ),
@@ -92,7 +96,7 @@ final mockPacks = [
         type: 'track',
         id: 'track-2',
         title: 'Breath Awareness',
-        subtitle: '12 min',
+        subtitle: '15 sec test',
         coverUrl: 'https://picsum.photos/seed/track2/400/400',
         path: 'tracks/track-2',
       ),
@@ -100,7 +104,7 @@ final mockPacks = [
         type: 'track',
         id: 'track-3',
         title: 'Body Scan',
-        subtitle: '15 min',
+        subtitle: '15 sec · two guide options',
         coverUrl: 'https://picsum.photos/seed/track3/400/400',
         path: 'tracks/track-3',
       ),
@@ -109,24 +113,24 @@ final mockPacks = [
   const PackModel(
     id: 'pack-2',
     title: 'Sleep Stories',
-    subtitle: '5 sessions',
+    subtitle: '2 quick TV test sessions',
     coverUrl: 'https://picsum.photos/seed/pack2/400/400',
     path: 'packs/pack-2',
-    description: 'Calming stories to help you drift off to a peaceful sleep.',
+    description: 'Short mock sessions for testing the television experience.',
     isPublished: true,
     items: [
       PackItemsModel(
         type: 'track',
         id: 'track-4',
         title: 'Rainy Night',
-        subtitle: '20 min',
+        subtitle: '15 sec test · no ambient sound',
         path: 'tracks/track-4',
       ),
       PackItemsModel(
         type: 'track',
         id: 'track-5',
         title: 'Ocean Waves',
-        subtitle: '25 min',
+        subtitle: '15 sec test · no ambient sound',
         path: 'tracks/track-5',
       ),
     ],
@@ -134,7 +138,7 @@ final mockPacks = [
   const PackModel(
     id: 'pack-3',
     title: 'Stress & Anxiety',
-    subtitle: '6 sessions',
+    subtitle: 'Layout test collection',
     coverUrl: 'https://picsum.photos/seed/pack3/400/400',
     path: 'packs/pack-3',
     description: 'Techniques to manage stress and find calm in daily life.',
@@ -152,7 +156,7 @@ final mockTracks = <String, Track>{
     title: 'Introduction to Meditation',
     subtitle: 'A gentle start to your practice',
     description:
-        'This session introduces the basics of meditation, including posture, breathing, and mindset.',
+        'This short mock session is designed to test TV playback, seeking, ambient sound and completion without waiting several minutes.',
     coverUrl: 'https://picsum.photos/seed/track1/400/400',
     isPublished: true,
     hasBackgroundSound: true,
@@ -161,7 +165,11 @@ final mockTracks = <String, Track>{
       TrackVoice(
         guideName: 'Default',
         audioFiles: [
-          TrackAudioFile(id: 'file-1', path: _trackAudioUrl, duration: 600),
+          TrackAudioFile(
+            id: 'file-1',
+            path: _trackAudioUrl,
+            duration: _trackAudioDurationMs,
+          ),
         ],
       ),
     ],
@@ -171,7 +179,7 @@ final mockTracks = <String, Track>{
     title: 'Breath Awareness',
     subtitle: 'Focus on your natural breath',
     description:
-        'Learn to anchor your attention on the breath as a foundation for deeper meditation.',
+        'A short mock playback item for testing remote controls and the player progress state.',
     coverUrl: 'https://picsum.photos/seed/track2/400/400',
     isPublished: true,
     hasBackgroundSound: true,
@@ -180,7 +188,11 @@ final mockTracks = <String, Track>{
       TrackVoice(
         guideName: 'Default',
         audioFiles: [
-          TrackAudioFile(id: 'file-2', path: _trackAudioUrl, duration: 720),
+          TrackAudioFile(
+            id: 'file-2',
+            path: _trackAudioUrl,
+            duration: _trackAudioDurationMs,
+          ),
         ],
       ),
     ],
@@ -190,16 +202,30 @@ final mockTracks = <String, Track>{
     title: 'Body Scan',
     subtitle: 'Relax from head to toe',
     description:
-        'A guided body scan meditation to release tension and cultivate body awareness.',
+        'TV test session with two guide choices, favorites, ambient sound, seeking and a fast completion path.',
     coverUrl: 'https://picsum.photos/seed/track3/400/400',
     isPublished: true,
     hasBackgroundSound: true,
     artist: TrackArtist(name: 'Medito Team', path: ''),
     voices: [
       TrackVoice(
-        guideName: 'Default',
+        guideName: 'Alex',
         audioFiles: [
-          TrackAudioFile(id: 'file-3', path: _trackAudioUrl, duration: 900),
+          TrackAudioFile(
+            id: 'file-3-alex',
+            path: _trackAudioUrl,
+            duration: _trackAudioDurationMs,
+          ),
+        ],
+      ),
+      TrackVoice(
+        guideName: 'Sam',
+        audioFiles: [
+          TrackAudioFile(
+            id: 'file-3-sam',
+            path: _trackAudioUrl,
+            duration: _trackAudioDurationMs,
+          ),
         ],
       ),
     ],
@@ -209,7 +235,7 @@ final mockTracks = <String, Track>{
     title: 'Rainy Night',
     subtitle: 'A calming sleep story',
     description:
-        'Listen to the gentle sounds of rain as you drift off to sleep.',
+        'A short mock session with ambient sound disabled so the TV player can test that alternate state.',
     coverUrl: 'https://picsum.photos/seed/track4/400/400',
     isPublished: true,
     hasBackgroundSound: false,
@@ -218,7 +244,11 @@ final mockTracks = <String, Track>{
       TrackVoice(
         guideName: 'Default',
         audioFiles: [
-          TrackAudioFile(id: 'file-4', path: _trackAudioUrl, duration: 1200),
+          TrackAudioFile(
+            id: 'file-4',
+            path: _trackAudioUrl,
+            duration: _trackAudioDurationMs,
+          ),
         ],
       ),
     ],
@@ -228,7 +258,7 @@ final mockTracks = <String, Track>{
     title: 'Ocean Waves',
     subtitle: 'Let the waves carry you to sleep',
     description:
-        'A soothing story set by the ocean, accompanied by gentle wave sounds.',
+        'Another short mock session for player, focus restoration and completion testing.',
     coverUrl: 'https://picsum.photos/seed/track5/400/400',
     isPublished: true,
     hasBackgroundSound: false,
@@ -237,7 +267,11 @@ final mockTracks = <String, Track>{
       TrackVoice(
         guideName: 'Default',
         audioFiles: [
-          TrackAudioFile(id: 'file-5', path: _trackAudioUrl, duration: 1500),
+          TrackAudioFile(
+            id: 'file-5',
+            path: _trackAudioUrl,
+            duration: _trackAudioDurationMs,
+          ),
         ],
       ),
     ],
