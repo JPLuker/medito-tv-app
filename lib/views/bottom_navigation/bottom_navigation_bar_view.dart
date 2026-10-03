@@ -17,7 +17,7 @@ import 'package:medito/views/home/home_view.dart';
 import 'package:medito/views/path/path_view.dart';
 import 'package:medito/views/search/search_results.dart';
 import 'package:medito/views/settings/settings_screen.dart';
-import 'package:medito/widgets/medito_icon.dart';
+import 'package:medito/views/tv/tv_navigation_shell.dart';
 
 class BottomNavigationBarView extends ConsumerStatefulWidget {
   const BottomNavigationBarView({super.key});
@@ -29,7 +29,6 @@ class BottomNavigationBarView extends ConsumerStatefulWidget {
 
 class _BottomNavigationBarViewState
     extends ConsumerState<BottomNavigationBarView> {
-  // Maps nav destination index -> page index in _pages.
   static const _pageIndexForDestination = [0, 1, 3];
   static const _searchDebounce = Duration(milliseconds: 500);
 
@@ -37,9 +36,6 @@ class _BottomNavigationBarViewState
   final _exploreViewKey = GlobalKey<ExploreViewState>();
   late final List<Widget> _pages;
 
-  // Search expands in place: the nav capsule holds the field and results
-  // overlay the current tab. On TV, the same search state is presented in a
-  // dedicated top field because the phone nav capsule is intentionally hidden.
   bool _searchOpen = false;
   String _searchQuery = '';
   final _searchController = TextEditingController();
@@ -76,20 +72,22 @@ class _BottomNavigationBarViewState
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final selectedDestination = _pageIndexForDestination.indexOf(
-      _currentPageIndex,
-    );
     final capabilities = ref.watch(deviceCapabilitiesProvider);
     final isTv = capabilities.maybeWhen(
       data: (value) => value.isAndroidTv,
       orElse: () => false,
     );
-    final unselectedColor = colorScheme.onSurfaceVariant;
-    final selectedColor = context.brandPurple;
+
+    if (isTv) {
+      return const TvNavigationShell();
+    }
+
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final selectedDestination = _pageIndexForDestination.indexOf(
+      _currentPageIndex,
+    );
 
     final pageBody = Stack(
       children: [
@@ -102,55 +100,10 @@ class _BottomNavigationBarViewState
                   color: theme.scaffoldBackgroundColor,
                   child: SafeArea(
                     bottom: false,
-                    child: isTv
-                        ? Column(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  24,
-                                  16,
-                                  24,
-                                  8,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Container(
-                                        height: 56,
-                                        decoration: BoxDecoration(
-                                          color: theme.cardColor,
-                                          borderRadius: BorderRadius.circular(
-                                            28,
-                                          ),
-                                        ),
-                                        child: FloatingSearchField(
-                                          controller: _searchController,
-                                          focusNode: _searchFocusNode,
-                                          onChanged: _onSearchChanged,
-                                          onClear: _clearSearch,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    TextButton(
-                                      onPressed: _closeSearch,
-                                      child: Text(l10n.cancel),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Expanded(
-                                child: SearchResults(
-                                  query: _searchQuery,
-                                  onBeforeNavigate: _searchFocusNode.unfocus,
-                                ),
-                              ),
-                            ],
-                          )
-                        : SearchResults(
-                            query: _searchQuery,
-                            onBeforeNavigate: _searchFocusNode.unfocus,
-                          ),
+                    child: SearchResults(
+                      query: _searchQuery,
+                      onBeforeNavigate: _searchFocusNode.unfocus,
+                    ),
                   ),
                 )
               : const SizedBox.shrink(key: ValueKey('tabs')),
@@ -183,116 +136,38 @@ class _BottomNavigationBarViewState
           child: Scaffold(
             floatingActionButtonLocation:
                 FloatingActionButtonLocation.centerFloat,
-            extendBody: !isTv,
-            bottomNavigationBar: isTv
-                ? null
-                : FloatingNavBar(
-                    selectedIndex: selectedDestination >= 0
-                        ? selectedDestination
-                        : 0,
-                    onSelected: (index) => _onDestinationSelected(
-                      _pageIndexForDestination[index],
-                    ),
-                    items: [
-                      FloatingNavItem(
-                        icon: MeditoIcons.home,
-                        label: l10n.home,
-                      ),
-                      FloatingNavItem(
-                        icon: MeditoIcons.book,
-                        label: l10n.explore,
-                      ),
-                      FloatingNavItem(
-                        icon: MeditoIcons.settings,
-                        label: l10n.settings,
-                      ),
-                    ],
-                    action: FloatingNavAction(
-                      icon: MeditoIcons.search,
-                      label: l10n.search,
-                      onTap: _openSearch,
-                    ),
-                    expanded: _searchOpen,
-                    expandedChild: FloatingSearchField(
-                      controller: _searchController,
-                      focusNode: _searchFocusNode,
-                      onChanged: _onSearchChanged,
-                      onClear: _clearSearch,
-                    ),
-                    cancelLabel: l10n.cancel,
-                    onCancel: _closeSearch,
-                  ),
-            body: isTv
-                ? Row(
-                    children: [
-                      SafeArea(
-                        right: false,
-                        child: NavigationRail(
-                          minWidth: 112,
-                          labelType: NavigationRailLabelType.all,
-                          groupAlignment: -1,
-                          selectedIndex: selectedDestination >= 0
-                              ? selectedDestination
-                              : 0,
-                          onDestinationSelected: (index) =>
-                              _onDestinationSelected(
-                                _pageIndexForDestination[index],
-                              ),
-                          trailing: Padding(
-                            padding: const EdgeInsets.only(top: 16),
-                            child: IconButton(
-                              tooltip: l10n.search,
-                              onPressed: _openSearch,
-                              icon: MeditoIcon(
-                                assetName: MeditoIcons.search,
-                                color: _searchOpen
-                                    ? selectedColor
-                                    : unselectedColor,
-                              ),
-                            ),
-                          ),
-                          destinations: [
-                            NavigationRailDestination(
-                              icon: MeditoIcon(
-                                assetName: MeditoIcons.home,
-                                color: unselectedColor,
-                              ),
-                              selectedIcon: MeditoIcon(
-                                assetName: MeditoIcons.home,
-                                color: selectedColor,
-                              ),
-                              label: Text(l10n.home),
-                            ),
-                            NavigationRailDestination(
-                              icon: MeditoIcon(
-                                assetName: MeditoIcons.book,
-                                color: unselectedColor,
-                              ),
-                              selectedIcon: MeditoIcon(
-                                assetName: MeditoIcons.book,
-                                color: selectedColor,
-                              ),
-                              label: Text(l10n.explore),
-                            ),
-                            NavigationRailDestination(
-                              icon: MeditoIcon(
-                                assetName: MeditoIcons.settings,
-                                color: unselectedColor,
-                              ),
-                              selectedIcon: MeditoIcon(
-                                assetName: MeditoIcons.settings,
-                                color: selectedColor,
-                              ),
-                              label: Text(l10n.settings),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const VerticalDivider(width: 1),
-                      Expanded(child: pageBody),
-                    ],
-                  )
-                : pageBody,
+            extendBody: true,
+            bottomNavigationBar: FloatingNavBar(
+              selectedIndex: selectedDestination >= 0
+                  ? selectedDestination
+                  : 0,
+              onSelected: (index) => _onDestinationSelected(
+                _pageIndexForDestination[index],
+              ),
+              items: [
+                FloatingNavItem(icon: MeditoIcons.home, label: l10n.home),
+                FloatingNavItem(icon: MeditoIcons.book, label: l10n.explore),
+                FloatingNavItem(
+                  icon: MeditoIcons.settings,
+                  label: l10n.settings,
+                ),
+              ],
+              action: FloatingNavAction(
+                icon: MeditoIcons.search,
+                label: l10n.search,
+                onTap: _openSearch,
+              ),
+              expanded: _searchOpen,
+              expandedChild: FloatingSearchField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                onChanged: _onSearchChanged,
+                onClear: _clearSearch,
+              ),
+              cancelLabel: l10n.cancel,
+              onCancel: _closeSearch,
+            ),
+            body: pageBody,
           ),
         ),
       ),
@@ -310,7 +185,6 @@ class _BottomNavigationBarViewState
     setState(() => _searchOpen = true);
   }
 
-  /// Empties the field but stays in search.
   void _clearSearch() {
     _searchDebounceTimer?.cancel();
     _searchController.clear();
@@ -332,7 +206,6 @@ class _BottomNavigationBarViewState
     _searchDebounceTimer?.cancel();
     _searchDebounceTimer = Timer(_searchDebounce, () {
       if (!mounted) return;
-      // The search backend is ASCII-only.
       final asciiQuery = value.replaceAll(RegExp(r'[^\x00-\x7F]'), '');
       setState(() => _searchQuery = asciiQuery);
     });
@@ -361,7 +234,6 @@ class _BottomNavigationBarViewState
           .setInt(SharedPreferenceConstants.lastMainTabIndex, index);
     }
 
-    // Load explore data only on the first visit to the explore tab
     if (index == 1) {
       _exploreViewKey.currentState?.loadData();
     }
