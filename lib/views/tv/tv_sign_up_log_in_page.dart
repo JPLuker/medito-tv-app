@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:medito/views/settings/sign_up_log_in_screen.dart';
 import 'package:medito/views/tv/widgets/tv_focus_card.dart';
 
-/// TV-first wrapper around the existing OTP authentication flow.
+/// TV-first frame for the shared OTP authentication form.
 ///
-/// The authentication logic stays shared with mobile, but the presentation is
-/// widened, enlarged and given a 10-foot composition so it does not look like
-/// a phone form floating in the middle of a television.
-class TvSignUpLogInPage extends StatelessWidget {
-  const TvSignUpLogInPage({super.key, this.fromSettings = false});
+/// Authentication state and API calls remain in the shared mobile/TV form;
+/// this widget only provides a 10-foot composition around that form.
+class TvSignUpLogInFrame extends StatelessWidget {
+  const TvSignUpLogInFrame({super.key, required this.child});
 
-  final bool fromSettings;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +70,7 @@ class TvSignUpLogInPage extends StatelessWidget {
                       Text(
                         'Sign in with your email to keep your favorites and '
                         'account in sync. We will send a six-digit verification '
-                        'code to your phone or inbox.',
+                        'code to your inbox.',
                         style: theme.textTheme.titleLarge?.copyWith(
                           color: theme.colorScheme.onSurface.withValues(
                             alpha: 0.72,
@@ -81,12 +79,12 @@ class TvSignUpLogInPage extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 28),
-                      _InfoLine(
+                      const _InfoLine(
                         icon: Icons.mail_outline_rounded,
                         text: 'Enter your email with the TV keyboard',
                       ),
                       const SizedBox(height: 14),
-                      _InfoLine(
+                      const _InfoLine(
                         icon: Icons.password_rounded,
                         text: 'Enter the six-digit code Medito sends you',
                       ),
@@ -148,9 +146,7 @@ class TvSignUpLogInPage extends StatelessWidget {
                               ),
                             ),
                           ),
-                          child: SignUpLogInForm(
-                            fromSettings: fromSettings,
-                          ),
+                          child: child,
                         ),
                       ),
                     ),
