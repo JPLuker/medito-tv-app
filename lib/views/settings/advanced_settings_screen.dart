@@ -58,17 +58,22 @@ class AdvancedSettingsScreen extends ConsumerWidget {
         title: l10n.manageDefaults,
         onTap: () => _push(context, const ManageDefaultsScreen()),
       ),
-      RowItemWidget(
-        icon: Icon(Icons.restore_outlined, color: onSurface),
-        title: l10n.restorePreviousStats,
-        onTap: () => _push(context, const RestoreStatsScreen()),
-      ),
-      RowItemWidget(
-        icon: Icon(Icons.bedtime_outlined, color: onSurface),
-        title: 'When my day starts',
-        subTitle: dayOffset == 0 ? 'Midnight (default)' : '$dayOffset:00 AM',
-        onTap: () => _showDayBoundaryOffsetDialog(context, ref),
-      ),
+      // TV runs as a permanent Zen experience. Stats-management and day-
+      // boundary controls only support the mobile streak/history workflow and
+      // are intentionally omitted from the television UI.
+      if (!isTv)
+        RowItemWidget(
+          icon: Icon(Icons.restore_outlined, color: onSurface),
+          title: l10n.restorePreviousStats,
+          onTap: () => _push(context, const RestoreStatsScreen()),
+        ),
+      if (!isTv)
+        RowItemWidget(
+          icon: Icon(Icons.bedtime_outlined, color: onSurface),
+          title: 'When my day starts',
+          subTitle: dayOffset == 0 ? 'Midnight (default)' : '$dayOffset:00 AM',
+          onTap: () => _showDayBoundaryOffsetDialog(context, ref),
+        ),
       RowItemWidget(
         icon: Icon(Icons.bug_report_outlined, color: onSurface),
         title: l10n.debugInfo,
