@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:medito/views/downloads/downloads_view.dart';
-import 'package:medito/views/favorites/favorites_view.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:medito/constants/constants.dart';
+import 'package:medito/models/favorites/favorite_item.dart';
+import 'package:medito/providers/favorites/favorites_provider.dart';
+import 'package:medito/routes/routes.dart';
 import 'package:medito/views/tv/widgets/tv_focus_card.dart';
+import 'package:medito/widgets/network_image_widget.dart';
 
-class TvLibraryView extends StatelessWidget {
+class TvLibraryView extends ConsumerWidget {
   const TvLibraryView({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final favorites = ref.watch(favoritesNotifierProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -25,40 +30,87 @@ class TvLibraryView extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Your saved meditation content.',
+                'Your favorite meditations and packs.',
                 style: theme.textTheme.titleMedium?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
               ),
               const SizedBox(height: 28),
-              Row(
-                children: [
-                  Expanded(
-                    child: _LibraryCard(
-                      icon: Icons.favorite_rounded,
-                      title: 'Favorites',
-                      subtitle: 'Tracks and packs you saved',
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const FavoritesView(),
-                        ),
-                      ),
+              Expanded(
+                child: favorites.when(
+                  loading: () => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                  error: (_, _) => Center(
+                    child: ElevatedButton.icon(
+                      onPressed: () => ref
+                          .read(favoritesNotifierProvider.notifier)
+                          .refreshFromServer(),
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Retry'),
                     ),
                   ),
-                  const SizedBox(width: 22),
-                  Expanded(
-                    child: _LibraryCard(
-                      icon: Icons.download_rounded,
-                      title: 'Downloads',
-                      subtitle: 'Meditations available offline',
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const DownloadsView(),
+                  data: (items) {
+                    if (items.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.favorite_border_rounded,
+                              size: 54,
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.45,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No favorites yet',
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Favorite a meditation or pack and it will appear here.',
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.65,
+                                ),
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ),
-                      ),
-                    ),
-                  ),
-                ],
+                      );
+                    }
+
+                    return LayoutBuilder(
+                      builder: (context, constraints) {
+                        final columns = constraints.maxWidth >= 1180 ? 4 : 3;
+                        return GridView.builder(
+                          padding: const EdgeInsets.fromLTRB(4, 4, 4, 24),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: columns,
+                                crossAxisSpacing: 18,
+                                mainAxisSpacing: 18,
+                                childAspectRatio: 1.55,
+                              ),
+                          itemCount: items.length,
+                          itemBuilder: (context, index) => _FavoriteCard(
+                            item: items[index],
+                            onPressed: () => _openFavorite(
+                              context,
+                              ref,
+                              items[index],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ],
           ),
@@ -66,50 +118,129 @@ class TvLibraryView extends StatelessWidget {
       ),
     );
   }
+
+  void _openFavorite(
+    BuildContext context,
+    WidgetRef ref,
+    FavoriteItem item,
+  ) {
+    handleNavigation(
+      item.type == FavoriteItemType.track
+          ? TypeConstants.track
+          : TypeConstants.pack,
+      [item.id, item.path],
+      context,
+      ref: ref,
+    );
+  }
 }
 
-class _LibraryCard extends StatelessWidget {
-  const _LibraryCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onPressed,
-  });
+class _FavoriteCard extends StatelessWidget {
+  const _FavoriteCard({required this.item, required this.onPressed});
 
-  final IconData icon;
-  final String title;
-  final String subtitle;
+  final FavoriteItem item;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cover = item.coverUrl;
+    final isTrack = item.type == FavoriteItemType.track;
 
     return TvFocusCard(
       onPressed: onPressed,
-      padding: const EdgeInsets.all(28),
-      child: SizedBox(
-        height: 155,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 42, color: theme.colorScheme.primary),
-            const SizedBox(height: 18),
-            Text(
-              title,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (cover != null && cover.isNotEmpty)
+            NetworkImageWidget(
+              url: cover,
+              shouldCache: true,
+              errorWidget: _FallbackCover(isTrack: isTrack),
+            )
+          else
+            _FallbackCover(isTrack: isTrack),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.transparent, Color(0xE6000000)],
+                stops: [0.28, 1],
               ),
             ),
-            const SizedBox(height: 5),
-            Text(
-              subtitle,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-              ),
+          ),
+          Positioned(
+            left: 18,
+            right: 18,
+            bottom: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      isTrack
+                          ? Icons.play_circle_outline_rounded
+                          : Icons.collections_bookmark_outlined,
+                      size: 18,
+                      color: Colors.white70,
+                    ),
+                    const SizedBox(width: 7),
+                    Text(
+                      isTrack ? 'Meditation' : 'Pack',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  item.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (item.subtitle?.trim().isNotEmpty == true) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    item.subtitle!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FallbackCover extends StatelessWidget {
+  const _FallbackCover({required this.isTrack});
+
+  final bool isTrack;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      ),
+      child: Center(
+        child: Icon(
+          isTrack ? Icons.spa_rounded : Icons.menu_book_rounded,
+          size: 52,
+          color: Theme.of(context).colorScheme.primary,
         ),
       ),
     );
