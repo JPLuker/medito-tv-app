@@ -12,6 +12,7 @@ class TvSubmenuScaffold extends StatelessWidget {
     required this.child,
     this.subtitle,
     this.onBack,
+    this.showBackButton = true,
     this.maxContentWidth = 1180,
   });
 
@@ -19,6 +20,7 @@ class TvSubmenuScaffold extends StatelessWidget {
   final String? subtitle;
   final Widget child;
   final VoidCallback? onBack;
+  final bool showBackButton;
   final double maxContentWidth;
 
   @override
@@ -36,31 +38,33 @@ class TvSubmenuScaffold extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(
-                    width: 150,
-                    child: TvFocusCard(
-                      onPressed: onBack ?? () => Navigator.of(context).pop(),
-                      borderRadius: 14,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 13,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.arrow_back_rounded, size: 26),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Back',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
+                  if (showBackButton) ...[
+                    SizedBox(
+                      width: 150,
+                      child: TvFocusCard(
+                        onPressed: onBack ?? () => Navigator.of(context).pop(),
+                        borderRadius: 14,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 13,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.arrow_back_rounded, size: 26),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Back',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 34),
+                    const SizedBox(height: 34),
+                  ],
                   Text(
                     title,
                     style: theme.textTheme.displaySmall?.copyWith(
