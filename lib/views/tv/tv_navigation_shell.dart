@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:medito/views/explore/widgets/explore_view.dart';
+import 'package:medito/views/tv/tv_explore_view.dart';
 import 'package:medito/views/tv/tv_home_view.dart';
 import 'package:medito/views/tv/tv_library_view.dart';
 import 'package:medito/views/tv/tv_search_view.dart';
@@ -14,26 +14,19 @@ class TvNavigationShell extends StatefulWidget {
 }
 
 class _TvNavigationShellState extends State<TvNavigationShell> {
-  final _exploreKey = GlobalKey<ExploreViewState>();
   int _selectedIndex = 0;
-  late final List<Widget> _pages;
 
-  @override
-  void initState() {
-    super.initState();
-    _pages = [
-      const TvHomeView(),
-      ExploreView(key: _exploreKey),
-      const TvSearchView(),
-      const TvLibraryView(),
-      const TvSettingsView(),
-    ];
-  }
+  final List<Widget> _pages = const [
+    TvHomeView(),
+    TvExploreView(),
+    TvSearchView(),
+    TvLibraryView(),
+    TvSettingsView(),
+  ];
 
   void _select(int index) {
     if (_selectedIndex == index) return;
     setState(() => _selectedIndex = index);
-    if (index == 1) _exploreKey.currentState?.loadData();
   }
 
   @override
