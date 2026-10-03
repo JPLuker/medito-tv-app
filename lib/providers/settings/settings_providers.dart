@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/constants/constants.dart';
+import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/providers/providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -57,11 +58,26 @@ final reminderEnabledProvider = NotifierProvider<ReminderEnabledNotifier, bool>(
 class ZenModeNotifier extends Notifier<bool> {
   @override
   bool build() {
+    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
+      data: (value) => value.isAndroidTv,
+      orElse: () => false,
+    );
+    if (isTv) return true;
+
     final prefs = ref.read(sharedPreferencesProvider);
     return prefs.getBool(SharedPreferenceConstants.zenModeEnabled) ?? false;
   }
 
   Future<void> setEnabled(bool value) async {
+    final isTv = await ref.read(deviceCapabilitiesProvider.future).then(
+          (capabilities) => capabilities.isAndroidTv,
+          onError: (_) => false,
+        );
+    if (isTv) {
+      state = true;
+      return;
+    }
+
     final prefs = ref.read(sharedPreferencesProvider);
     await prefs.setBool(SharedPreferenceConstants.zenModeEnabled, value);
     state = value;
