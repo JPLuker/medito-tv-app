@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:medito/views/explore/widgets/explore_view.dart';
-import 'package:medito/views/settings/settings_screen.dart';
 import 'package:medito/views/tv/tv_home_view.dart';
 import 'package:medito/views/tv/tv_library_view.dart';
 import 'package:medito/views/tv/tv_search_view.dart';
+import 'package:medito/views/tv/tv_settings_view.dart';
 
 class TvNavigationShell extends StatefulWidget {
   const TvNavigationShell({super.key});
@@ -26,7 +26,7 @@ class _TvNavigationShellState extends State<TvNavigationShell> {
       ExploreView(key: _exploreKey),
       const TvSearchView(),
       const TvLibraryView(),
-      const SettingsScreen(),
+      const TvSettingsView(),
     ];
   }
 
