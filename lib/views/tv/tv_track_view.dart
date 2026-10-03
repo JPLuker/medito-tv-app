@@ -363,6 +363,10 @@ class _TrackSurface extends ConsumerWidget {
   }
 
   String _durationLabel(int durationMs) {
+    if (durationMs < Duration.millisecondsPerMinute) {
+      final seconds = (durationMs / Duration.millisecondsPerSecond).round();
+      return '$seconds sec';
+    }
     final minutes = (durationMs / Duration.millisecondsPerMinute).round();
     return '$minutes min';
   }
