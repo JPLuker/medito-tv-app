@@ -125,7 +125,6 @@ class _UpNextHero extends ConsumerWidget {
         final cover = session.coverUrl ?? data.pack.coverUrl;
 
         return TvFocusCard(
-          autofocus: true,
           borderRadius: 20,
           onPressed: () => handleNavigation(
             session.type,
