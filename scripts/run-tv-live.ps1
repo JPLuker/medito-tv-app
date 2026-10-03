@@ -62,7 +62,7 @@ that file local / uncommitted.
     }
 
     $googleServicesText = Get-Content $googleServices -Raw
-    if ($googleServicesText -match '000000000000|medito-tv-ci|dummy-api-key') {
+    if ($googleServicesText -match '000000000000|123456789|medito-tv-local|medito-tv-ci|mock-api-key|dummy-api-key') {
         throw @"
 android/app/google-services.json is still the mock/CI placeholder.
 Live mode needs the real Medito Firebase Android configuration.
@@ -74,6 +74,15 @@ has first been updated not to overwrite existing local config.
     $firebaseOptions = Join-Path $RepoRoot "lib\firebase_options.dart"
     if (-not (Test-Path $firebaseOptions)) {
         throw "lib/firebase_options.dart is missing. Live mode needs Medito's real Firebase options file."
+    }
+
+    $firebaseOptionsText = Get-Content $firebaseOptions -Raw
+    if ($firebaseOptionsText -match 'Dummy firebase_options|mock-api-key|mock-app-id|mock-project-id') {
+        throw @"
+lib/firebase_options.dart is still the contributor/mock placeholder.
+Live mode needs Medito's real Firebase options file.
+Obtain it from a Medito maintainer and keep production credentials out of git.
+"@
     }
 
     foreach ($generatedFile in @(
