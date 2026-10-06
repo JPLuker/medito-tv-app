@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:medito/constants/constants.dart';
 
 /// TV-first frame for the shared OTP authentication form.
 ///
@@ -67,6 +68,24 @@ class TvSignUpLogInFrame extends StatelessWidget {
                             icon: Icons.password_rounded,
                             text: 'Enter the six-digit code Medito sends you',
                           ),
+                          if (isMockMode) ...[
+                            const SizedBox(height: 20),
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: onSurface.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: onSurface.withValues(alpha: 0.18),
+                                ),
+                              ),
+                              child: const _InfoLine(
+                                icon: Icons.science_outlined,
+                                text:
+                                    'Mock mode: no email is sent. Enter any six-digit code, for example 123456.',
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 28),
                           Text(
                             'Press Back on your remote to return.',

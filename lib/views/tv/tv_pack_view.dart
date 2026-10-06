@@ -11,10 +11,9 @@ import 'package:medito/widgets/network_image_widget.dart';
 
 /// Android TV / Google TV presentation for a meditation pack.
 ///
-/// The mobile pack screen is intentionally left untouched. This surface uses
-/// large remote-focusable rows, couch-distance typography and the shared TV
-/// submenu frame so navigating deeper from Home does not fall back to a phone
-/// layout.
+/// The content width and hierarchy mirror Medito's adaptive pack page, while
+/// rows are enlarged into remote-focusable TV targets. Back navigation is left
+/// to the remote rather than inserted into the focus graph.
 class TvPackView extends ConsumerStatefulWidget {
   const TvPackView({super.key, required this.id});
 
@@ -36,6 +35,8 @@ class _TvPackViewState extends ConsumerState<TvPackView> {
       skipLoadingOnReload: false,
       loading: () => const TvSubmenuScaffold(
         title: 'Meditations',
+        showBackButton: false,
+        maxContentWidth: 960,
         child: SizedBox(
           height: 240,
           child: Center(child: CircularProgressIndicator()),
@@ -44,6 +45,8 @@ class _TvPackViewState extends ConsumerState<TvPackView> {
       error: (_, _) => TvSubmenuScaffold(
         title: 'Meditations',
         subtitle: 'This collection could not be loaded.',
+        showBackButton: false,
+        maxContentWidth: 960,
         child: SizedBox(
           width: 240,
           child: TvFocusCard(
@@ -70,11 +73,13 @@ class _TvPackViewState extends ConsumerState<TvPackView> {
 
   Widget _buildPack(PackModel pack) {
     final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
     final items = pack.items.where((item) => !_isPhoneOnly(item.type)).toList();
 
     return TvSubmenuScaffold(
       title: pack.title,
-      maxContentWidth: 1320,
+      showBackButton: false,
+      maxContentWidth: 960,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -85,12 +90,12 @@ class _TvPackViewState extends ConsumerState<TvPackView> {
               children: [
                 if (pack.coverUrl?.isNotEmpty == true) ...[
                   Container(
-                    width: 260,
-                    height: 260,
+                    width: 250,
+                    height: 250,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: theme.colorScheme.outline.withValues(alpha: 0.25),
+                        color: theme.colorScheme.outline.withValues(alpha: 0.22),
                       ),
                     ),
                     child: ClipRRect(
@@ -101,7 +106,7 @@ class _TvPackViewState extends ConsumerState<TvPackView> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 32),
+                  const SizedBox(width: 30),
                 ],
                 if (pack.description?.trim().isNotEmpty == true)
                   Expanded(
@@ -112,15 +117,11 @@ class _TvPackViewState extends ConsumerState<TvPackView> {
                         selectable: false,
                         p: theme.textTheme.titleLarge?.copyWith(
                           height: 1.45,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.76,
-                          ),
+                          color: onSurface.withValues(alpha: 0.76),
                         ),
                         a: theme.textTheme.titleLarge?.copyWith(
                           height: 1.45,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.76,
-                          ),
+                          color: onSurface.withValues(alpha: 0.76),
                           decoration: TextDecoration.none,
                         ),
                         onTapLink: null,
@@ -129,7 +130,7 @@ class _TvPackViewState extends ConsumerState<TvPackView> {
                   ),
               ],
             ),
-            const SizedBox(height: 36),
+            const SizedBox(height: 34),
           ],
           Text(
             'Sessions',
@@ -137,7 +138,7 @@ class _TvPackViewState extends ConsumerState<TvPackView> {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           if (items.isEmpty)
             Text(
               'There are no TV-compatible sessions in this collection.',
@@ -156,11 +157,18 @@ class _TvPackViewState extends ConsumerState<TvPackView> {
                     ref: ref,
                   ),
                 ),
-                if (index != items.length - 1) const SizedBox(height: 14),
+                if (index != items.length - 1) const SizedBox(height: 12),
               ],
             ],
-          const SizedBox(height: 28),
+          const SizedBox(height: 26),
           _buildMarkAll(pack),
+          const SizedBox(height: 22),
+          Text(
+            'Press Back on your remote to return.',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: onSurface.withValues(alpha: 0.5),
+            ),
+          ),
         ],
       ),
     );
@@ -235,21 +243,22 @@ class _TvPackItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
     final isTrack = item.type == TypeConstants.track;
     final isComplete = item.isCompleted == true;
 
     return TvFocusCard(
       autofocus: autofocus,
       onPressed: onPressed,
-      padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 22),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       child: Row(
         children: [
           Icon(
             isTrack ? Icons.self_improvement_rounded : Icons.folder_rounded,
-            size: 38,
-            color: theme.colorScheme.primary,
+            size: 36,
+            color: onSurface.withValues(alpha: 0.76),
           ),
-          const SizedBox(width: 22),
+          const SizedBox(width: 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -267,7 +276,7 @@ class _TvPackItemCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.68),
+                      color: onSurface.withValues(alpha: 0.68),
                     ),
                   ),
                 ],
@@ -275,14 +284,14 @@ class _TvPackItemCard extends StatelessWidget {
             ),
           ),
           if (isTrack && isComplete) ...[
-            Icon(
-              Icons.check_circle_rounded,
-              size: 30,
-              color: theme.colorScheme.primary,
-            ),
+            Icon(Icons.check_circle_rounded, size: 30, color: onSurface),
             const SizedBox(width: 16),
           ],
-          const Icon(Icons.chevron_right_rounded, size: 34),
+          Icon(
+            Icons.chevron_right_rounded,
+            size: 34,
+            color: onSurface.withValues(alpha: 0.72),
+          ),
         ],
       ),
     );

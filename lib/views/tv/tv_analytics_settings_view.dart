@@ -21,53 +21,66 @@ class TvAnalyticsSettingsView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final enabled = ref.watch(_tvFirebaseAnalyticsEnabledProvider);
     final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
 
     return TvSubmenuScaffold(
       title: 'Analytics & privacy',
       subtitle:
           'Medito can collect optional anonymous app analytics. Meta/Facebook '
           'tracking is disabled on TV.',
-      child: SizedBox(
-        width: 760,
-        child: TvFocusCard(
-          onPressed: () => _changeAnalytics(context, ref, !enabled),
-          padding: const EdgeInsets.all(26),
-          child: Row(
-            children: [
-              Icon(
-                Icons.analytics_outlined,
-                size: 42,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Firebase Analytics',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      enabled
-                          ? 'Optional analytics are enabled.'
-                          : 'Optional analytics are disabled.',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.68,
+      showBackButton: false,
+      maxContentWidth: 960,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 760,
+            child: TvFocusCard(
+              onPressed: () => _changeAnalytics(context, ref, !enabled),
+              padding: const EdgeInsets.all(26),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.analytics_outlined,
+                    size: 42,
+                    color: onSurface.withValues(alpha: 0.76),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Firebase Analytics',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 6),
+                        Text(
+                          enabled
+                              ? 'Optional analytics are enabled.'
+                              : 'Optional analytics are disabled.',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: onSurface.withValues(alpha: 0.68),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  Switch(value: enabled, onChanged: null),
+                ],
               ),
-              Switch(value: enabled, onChanged: null),
-            ],
+            ),
           ),
-        ),
+          const SizedBox(height: 28),
+          Text(
+            'Press Back on your remote to return.',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: onSurface.withValues(alpha: 0.5),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -80,25 +93,71 @@ class TvAnalyticsSettingsView extends ConsumerWidget {
     if (!enabled) {
       final confirmed = await showDialog<bool>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Disable analytics?'),
-          content: const SizedBox(
-            width: 560,
-            child: Text(
-              'This disables optional Firebase Analytics and Crashlytics '
-              'collection on this device.',
+        builder: (dialogContext) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: Padding(
+              padding: const EdgeInsets.all(30),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Disable analytics?',
+                    style: Theme.of(dialogContext).textTheme.headlineSmall
+                        ?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'This disables optional Firebase Analytics and Crashlytics '
+                    'collection on this device.',
+                    style: Theme.of(dialogContext).textTheme.titleMedium
+                        ?.copyWith(height: 1.4),
+                  ),
+                  const SizedBox(height: 26),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TvFocusCard(
+                          autofocus: true,
+                          onPressed: () => Navigator.pop(dialogContext, false),
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          child: const Center(
+                            child: Text(
+                              'Cancel',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: TvFocusCard(
+                          onPressed: () => Navigator.pop(dialogContext, true),
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          child: const Center(
+                            child: Text(
+                              'Disable',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Disable'),
-            ),
-          ],
         ),
       );
       if (confirmed != true) return;

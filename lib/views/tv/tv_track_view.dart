@@ -18,9 +18,9 @@ import 'package:medito/widgets/network_image_widget.dart';
 
 /// TV-first meditation detail screen.
 ///
-/// The TV surface relies on the remote's Back button instead of duplicating a
-/// distant Back target on screen. Save/favorite is promoted next to Play so it
-/// remains part of the normal D-pad path rather than living in a screen corner.
+/// The content order deliberately mirrors Medito's adaptive tablet track page:
+/// artwork first, then title/description, pickers and the primary action. TV
+/// enlarges those controls for D-pad use and relies on the remote Back button.
 class TvTrackView extends ConsumerWidget {
   const TvTrackView({super.key, required this.trackId});
 
@@ -36,8 +36,9 @@ class TvTrackView extends ConsumerWidget {
       loading: () => const TvSubmenuScaffold(
         title: 'Meditation',
         showBackButton: false,
+        maxContentWidth: 840,
         child: SizedBox(
-          height: 240,
+          height: 300,
           child: Center(child: CircularProgressIndicator()),
         ),
       ),
@@ -45,6 +46,7 @@ class TvTrackView extends ConsumerWidget {
         title: 'Meditation',
         subtitle: 'This meditation could not be loaded.',
         showBackButton: false,
+        maxContentWidth: 840,
         child: SizedBox(
           width: 240,
           child: TvFocusCard(
@@ -95,6 +97,7 @@ class _TrackSurface extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
     final guideOptions = track.voices
         .where((voice) => voice.guideName?.trim().isNotEmpty == true)
         .toList();
@@ -107,202 +110,182 @@ class _TrackSurface extends ConsumerWidget {
     const dailyMeditationId = 'BmTFAyYt8jVMievZ';
     final canFavorite = track.id != dailyMeditationId;
 
-    return TvSubmenuScaffold(
-      title: track.title,
-      showBackButton: false,
-      maxContentWidth: 1360,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 360,
-                height: 360,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.25),
+    return Scaffold(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(40, 32, 40, 52),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 840),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: theme.cardColor,
+                          border: Border.all(
+                            color: theme.colorScheme.outline.withValues(
+                              alpha: 0.22,
+                            ),
+                          ),
+                        ),
+                        child: NetworkImageWidget(
+                          url: track.coverUrl,
+                          shouldCache: true,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(22),
-                  child: NetworkImageWidget(
-                    url: track.coverUrl,
-                    shouldCache: true,
+                  const SizedBox(height: 26),
+                  Text(
+                    track.title,
+                    style: theme.textTheme.displaySmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 38),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (track.description?.trim().isNotEmpty == true)
-                      MarkdownWidget(
-                        body: track.description!,
-                        selectable: false,
-                        p: theme.textTheme.titleLarge?.copyWith(
-                          height: 1.45,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.78,
-                          ),
-                        ),
-                        a: theme.textTheme.titleLarge?.copyWith(
-                          height: 1.45,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.78,
-                          ),
-                          decoration: TextDecoration.none,
-                        ),
-                        onTapLink: null,
+                  if (track.description.trim().isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    MarkdownWidget(
+                      body: track.description,
+                      selectable: false,
+                      p: theme.textTheme.titleLarge?.copyWith(
+                        height: 1.45,
+                        color: onSurface.withValues(alpha: 0.78),
                       ),
-                    if (track.description?.trim().isNotEmpty != true)
-                      Text(
-                        'Choose your meditation options, then press Play.',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.72,
-                          ),
-                        ),
+                      a: theme.textTheme.titleLarge?.copyWith(
+                        height: 1.45,
+                        color: onSurface.withValues(alpha: 0.78),
+                        decoration: TextDecoration.none,
                       ),
-                    const SizedBox(height: 22),
-                    Text(
-                      'Press Back on your remote to return.',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.5,
-                        ),
-                      ),
+                      onTapLink: null,
                     ),
                   ],
-                ),
-              ),
-            ],
-          ),
-          if (guideOptions.isNotEmpty) ...[
-            const SizedBox(height: 38),
-            Text(
-              'Guide',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 14,
-              runSpacing: 14,
-              children: [
-                for (var index = 0; index < guideOptions.length; index++)
-                  SizedBox(
-                    width: 250,
-                    child: _ChoiceCard(
-                      label: guideOptions[index].guideName!,
-                      selected:
-                          guideOptions[index].guideName == activeVoice.guideName,
-                      autofocus: index == 0,
-                      onPressed: () => _setGuide(ref, guideOptions[index]),
+                  const SizedBox(height: 30),
+                  if (guideOptions.isNotEmpty) ...[
+                    _SectionLabel(label: 'Guide'),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 14,
+                      runSpacing: 14,
+                      children: [
+                        for (var index = 0;
+                            index < guideOptions.length;
+                            index++)
+                          SizedBox(
+                            width: 250,
+                            child: _ChoiceCard(
+                              label: guideOptions[index].guideName!,
+                              selected: guideOptions[index].guideName ==
+                                  activeVoice.guideName,
+                              autofocus: index == 0,
+                              onPressed: () =>
+                                  _setGuide(ref, guideOptions[index]),
+                            ),
+                          ),
+                      ],
                     ),
-                  ),
-              ],
-            ),
-          ],
-          const SizedBox(height: 34),
-          Text(
-            'Duration',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 14,
-            runSpacing: 14,
-            children: [
-              for (var index = 0; index < activeVoice.audioFiles.length; index++)
-                SizedBox(
-                  width: 180,
-                  child: _ChoiceCard(
-                    label: _durationLabel(activeVoice.audioFiles[index].duration),
-                    selected:
-                        activeVoice.audioFiles[index].duration ==
-                        activeFile.duration,
-                    autofocus: guideOptions.isEmpty && index == 0,
-                    onPressed: () => ref
-                        .read(durationPreferenceProvider.notifier)
-                        .setDuration(activeVoice.audioFiles[index].duration),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 36),
-          Row(
-            children: [
-              SizedBox(
-                width: 300,
-                child: TvFocusCard(
-                  onPressed: () => _play(context, ref),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 22,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    const SizedBox(height: 26),
+                  ],
+                  const _SectionLabel(label: 'Duration'),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 14,
+                    runSpacing: 14,
                     children: [
-                      Icon(
-                        Icons.play_arrow_rounded,
-                        size: 38,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Play',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
+                      for (var index = 0;
+                          index < activeVoice.audioFiles.length;
+                          index++)
+                        SizedBox(
+                          width: 190,
+                          child: _ChoiceCard(
+                            label: _durationLabel(
+                              activeVoice.audioFiles[index].duration,
+                            ),
+                            selected: activeVoice.audioFiles[index].duration ==
+                                activeFile.duration,
+                            autofocus: guideOptions.isEmpty && index == 0,
+                            onPressed: () => ref
+                                .read(durationPreferenceProvider.notifier)
+                                .setDuration(
+                                  activeVoice.audioFiles[index].duration,
+                                ),
+                          ),
                         ),
-                      ),
                     ],
                   ),
-                ),
-              ),
-              if (canFavorite) ...[
-                const SizedBox(width: 18),
-                SizedBox(
-                  width: 280,
-                  child: TvFocusCard(
-                    onPressed: () => _toggleFavorite(ref, isFavorite),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 26,
-                      vertical: 22,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          isFavorite
-                              ? Icons.star_rounded
-                              : Icons.star_border_rounded,
-                          size: 34,
-                          color: isFavorite
-                              ? theme.colorScheme.primary
-                              : null,
+                  const SizedBox(height: 30),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TvFocusCard(
+                          onPressed: () => _play(context, ref),
+                          borderRadius: 16,
+                          child: Container(
+                            height: 72,
+                            alignment: Alignment.center,
+                            color: theme.brightness == Brightness.dark
+                                ? Colors.white
+                                : onSurface,
+                            child: Icon(
+                              Icons.play_arrow_rounded,
+                              size: 42,
+                              color: theme.brightness == Brightness.dark
+                                  ? Colors.black
+                                  : theme.colorScheme.surface,
+                            ),
+                          ),
                         ),
-                        const SizedBox(width: 12),
-                        Text(
-                          isFavorite ? 'Saved' : 'Save to favorites',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
+                      ),
+                      if (canFavorite) ...[
+                        const SizedBox(width: 16),
+                        SizedBox(
+                          width: 280,
+                          child: TvFocusCard(
+                            onPressed: () => _toggleFavorite(ref, isFavorite),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 22,
+                              vertical: 20,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  isFavorite
+                                      ? Icons.star_rounded
+                                      : Icons.star_border_rounded,
+                                  size: 32,
+                                  color: onSurface,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  isFavorite ? 'Saved' : 'Save to favorites',
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
+                    ],
+                  ),
+                  const SizedBox(height: 22),
+                  Text(
+                    'Press Back on your remote to return.',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: onSurface.withValues(alpha: 0.5),
                     ),
                   ),
-                ),
-              ],
-            ],
+                ],
+              ),
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -372,6 +355,21 @@ class _TrackSurface extends ConsumerWidget {
   }
 }
 
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+        fontWeight: FontWeight.w800,
+      ),
+    );
+  }
+}
+
 class _ChoiceCard extends StatelessWidget {
   const _ChoiceCard({
     required this.label,
@@ -388,6 +386,7 @@ class _ChoiceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
 
     return TvFocusCard(
       autofocus: autofocus,
@@ -397,11 +396,7 @@ class _ChoiceCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           if (selected) ...[
-            Icon(
-              Icons.check_circle_rounded,
-              size: 26,
-              color: theme.colorScheme.primary,
-            ),
+            Icon(Icons.check_circle_rounded, size: 26, color: onSurface),
             const SizedBox(width: 9),
           ],
           Flexible(

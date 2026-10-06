@@ -13,6 +13,7 @@ class TvManageDefaultsView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
     final guide = ref.watch(guideNamePreferenceProvider);
     final durationMs = ref.watch(durationPreferenceProvider);
     final durationMinutes = durationMs == null ? null : durationMs ~/ 60000;
@@ -21,6 +22,8 @@ class TvManageDefaultsView extends ConsumerWidget {
       title: 'Playback defaults',
       subtitle:
           'Choose defaults that make starting a meditation faster with a remote.',
+      showBackButton: false,
+      maxContentWidth: 960,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -48,7 +51,7 @@ class TvManageDefaultsView extends ConsumerWidget {
                       Icon(
                         Icons.record_voice_over_rounded,
                         size: 36,
-                        color: theme.colorScheme.primary,
+                        color: onSurface.withValues(alpha: 0.76),
                       ),
                       const SizedBox(width: 18),
                       Expanded(
@@ -58,9 +61,7 @@ class TvManageDefaultsView extends ConsumerWidget {
                             Text(
                               'Default guide',
                               style: theme.textTheme.titleMedium?.copyWith(
-                                color: theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.65,
-                                ),
+                                color: onSurface.withValues(alpha: 0.65),
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -121,7 +122,7 @@ class TvManageDefaultsView extends ConsumerWidget {
                 ? 'No default duration selected'
                 : 'Current default: $durationMinutes minutes',
             style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.68),
+              color: onSurface.withValues(alpha: 0.68),
             ),
           ),
           const SizedBox(height: 18),
@@ -144,7 +145,7 @@ class TvManageDefaultsView extends ConsumerWidget {
                           if (durationMinutes == minutes) ...[
                             Icon(
                               Icons.check_circle_rounded,
-                              color: theme.colorScheme.primary,
+                              color: onSurface,
                             ),
                             const SizedBox(width: 8),
                           ],
@@ -178,6 +179,13 @@ class TvManageDefaultsView extends ConsumerWidget {
                   ),
                 ),
             ],
+          ),
+          const SizedBox(height: 28),
+          Text(
+            'Press Back on your remote to return.',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: onSurface.withValues(alpha: 0.5),
+            ),
           ),
         ],
       ),
