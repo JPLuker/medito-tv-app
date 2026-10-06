@@ -17,85 +17,99 @@ class TvLibraryView extends ConsumerWidget {
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(40, 28, 40, 56),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Library',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Your favorite meditations and packs.',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                ),
-              ),
-              const SizedBox(height: 28),
-              Expanded(
-                child: favorites.when(
-                  loading: () => const Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                  error: (_, _) => Center(
-                    child: ElevatedButton.icon(
-                      onPressed: () => ref
-                          .read(favoritesNotifierProvider.notifier)
-                          .refreshFromServer(),
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('Retry'),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(40, 28, 40, 28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Library',
+                    style: theme.textTheme.displaySmall?.copyWith(
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  data: (items) {
-                    if (items.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.favorite_border_rounded,
-                              size: 54,
-                              color: theme.colorScheme.onSurface.withValues(
-                                alpha: 0.45,
-                              ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Your favorite meditations and packs',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Expanded(
+                    child: favorites.when(
+                      loading: () => const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                      error: (_, _) => Center(
+                        child: SizedBox(
+                          width: 220,
+                          child: TvFocusCard(
+                            autofocus: true,
+                            onPressed: () => ref
+                                .read(favoritesNotifierProvider.notifier)
+                                .refreshFromServer(),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 22,
+                              vertical: 18,
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No favorites yet',
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.refresh_rounded, size: 28),
+                                SizedBox(width: 10),
+                                Text('Retry', style: TextStyle(fontSize: 20)),
+                              ],
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Favorite a meditation or pack and it will appear here.',
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                color: theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.65,
-                                ),
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
+                          ),
                         ),
-                      );
-                    }
+                      ),
+                      data: (items) {
+                        if (items.isEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.favorite_border_rounded,
+                                  size: 58,
+                                  color: theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.45,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No favorites yet',
+                                  style: theme.textTheme.headlineSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Save a meditation or pack and it will appear here.',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    color: theme.colorScheme.onSurface.withValues(
+                                      alpha: 0.65,
+                                    ),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          );
+                        }
 
-                    return LayoutBuilder(
-                      builder: (context, constraints) {
-                        final columns = constraints.maxWidth >= 1180 ? 4 : 3;
                         return GridView.builder(
-                          padding: const EdgeInsets.fromLTRB(4, 4, 4, 24),
+                          padding: const EdgeInsets.fromLTRB(4, 4, 4, 32),
                           gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: columns,
+                              const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 340,
+                                mainAxisExtent: 215,
                                 crossAxisSpacing: 18,
                                 mainAxisSpacing: 18,
-                                childAspectRatio: 1.55,
                               ),
                           itemCount: items.length,
                           itemBuilder: (context, index) => _FavoriteCard(
@@ -108,11 +122,11 @@ class TvLibraryView extends ConsumerWidget {
                           ),
                         );
                       },
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -232,6 +246,7 @@ class _FallbackCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -240,7 +255,7 @@ class _FallbackCover extends StatelessWidget {
         child: Icon(
           isTrack ? Icons.spa_rounded : Icons.menu_book_rounded,
           size: 52,
-          color: Theme.of(context).colorScheme.primary,
+          color: onSurface.withValues(alpha: 0.62),
         ),
       ),
     );

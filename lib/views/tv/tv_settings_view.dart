@@ -18,98 +18,103 @@ class TvSettingsView extends ConsumerWidget {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(40, 28, 40, 56),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Settings',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'TV uses Zen Mode automatically.',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
-                ),
-              ),
-              const SizedBox(height: 28),
-              const _Section(title: 'Account', child: TvAccountPanel()),
-              const SizedBox(height: 30),
-              _Section(
-                title: 'Appearance',
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _ThemeCard(
-                        icon: Icons.dark_mode_rounded,
-                        title: 'Dark',
-                        selected: selectedTheme == ThemeMode.dark,
-                        onPressed: () => ref
-                            .read(themeProvider.notifier)
-                            .setTheme(ThemeMode.dark),
-                      ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Settings',
+                    style: theme.textTheme.displaySmall?.copyWith(
+                      fontWeight: FontWeight.w800,
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _ThemeCard(
-                        icon: Icons.light_mode_rounded,
-                        title: 'Light',
-                        selected: selectedTheme == ThemeMode.light,
-                        onPressed: () => ref
-                            .read(themeProvider.notifier)
-                            .setTheme(ThemeMode.light),
-                      ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'TV uses Zen Mode automatically',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _ThemeCard(
-                        icon: Icons.settings_brightness_rounded,
-                        title: 'System',
-                        selected: selectedTheme == ThemeMode.system,
-                        onPressed: () => ref
-                            .read(themeProvider.notifier)
-                            .setTheme(ThemeMode.system),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 30),
-              _Section(
-                title: 'App',
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _SettingsCard(
-                        icon: Icons.tune_rounded,
-                        title: 'Playback defaults',
-                        subtitle: 'Guide and duration preferences',
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const TvManageDefaultsView(),
+                  ),
+                  const SizedBox(height: 30),
+                  const _Section(title: 'Account', child: TvAccountPanel()),
+                  const SizedBox(height: 34),
+                  _Section(
+                    title: 'Appearance',
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _ThemeCard(
+                            icon: Icons.dark_mode_rounded,
+                            title: 'Dark',
+                            selected: selectedTheme == ThemeMode.dark,
+                            onPressed: () => ref
+                                .read(themeProvider.notifier)
+                                .setTheme(ThemeMode.dark),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 18),
-                    Expanded(
-                      child: _SettingsCard(
-                        icon: Icons.privacy_tip_rounded,
-                        title: 'Analytics & privacy',
-                        subtitle: 'Control optional analytics',
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const TvAnalyticsSettingsView(),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _ThemeCard(
+                            icon: Icons.light_mode_rounded,
+                            title: 'Light',
+                            selected: selectedTheme == ThemeMode.light,
+                            onPressed: () => ref
+                                .read(themeProvider.notifier)
+                                .setTheme(ThemeMode.light),
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _ThemeCard(
+                            icon: Icons.settings_brightness_rounded,
+                            title: 'System',
+                            selected: selectedTheme == ThemeMode.system,
+                            onPressed: () => ref
+                                .read(themeProvider.notifier)
+                                .setTheme(ThemeMode.system),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 34),
+                  _Section(
+                    title: 'App',
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _SettingsCard(
+                            icon: Icons.tune_rounded,
+                            title: 'Playback defaults',
+                            subtitle: 'Guide and duration preferences',
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const TvManageDefaultsView(),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 18),
+                        Expanded(
+                          child: _SettingsCard(
+                            icon: Icons.privacy_tip_outlined,
+                            title: 'Analytics & privacy',
+                            subtitle: 'Control optional analytics',
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const TvAnalyticsSettingsView(),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -134,7 +139,7 @@ class _Section extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         child,
       ],
     );
@@ -157,13 +162,14 @@ class _ThemeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
 
     return TvFocusCard(
       onPressed: onPressed,
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
       child: Row(
         children: [
-          Icon(icon, size: 34, color: theme.colorScheme.primary),
+          Icon(icon, size: 34, color: onSurface.withValues(alpha: 0.78)),
           const SizedBox(width: 16),
           Expanded(
             child: Text(
@@ -174,11 +180,7 @@ class _ThemeCard extends StatelessWidget {
             ),
           ),
           if (selected)
-            Icon(
-              Icons.check_circle_rounded,
-              color: theme.colorScheme.primary,
-              size: 30,
-            ),
+            Icon(Icons.check_circle_rounded, color: onSurface, size: 30),
         ],
       ),
     );
@@ -201,6 +203,7 @@ class _SettingsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
 
     return TvFocusCard(
       onPressed: onPressed,
@@ -209,7 +212,7 @@ class _SettingsCard extends StatelessWidget {
         height: 110,
         child: Row(
           children: [
-            Icon(icon, size: 36, color: theme.colorScheme.primary),
+            Icon(icon, size: 36, color: onSurface.withValues(alpha: 0.78)),
             const SizedBox(width: 18),
             Expanded(
               child: Column(
@@ -226,13 +229,17 @@ class _SettingsCard extends StatelessWidget {
                   Text(
                     subtitle,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.68),
+                      color: onSurface.withValues(alpha: 0.68),
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, size: 30),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 30,
+              color: onSurface.withValues(alpha: 0.72),
+            ),
           ],
         ),
       ),

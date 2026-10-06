@@ -12,6 +12,8 @@ class TvAccountPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
     final auth = ref.watch(authRepositorySyncProvider);
     final user = auth.currentUser;
     final email = user?.email;
@@ -27,9 +29,9 @@ class TvAccountPanel extends ConsumerWidget {
         child: Row(
           children: [
             Icon(
-              Icons.account_circle_rounded,
+              Icons.account_circle_outlined,
               size: 48,
-              color: Theme.of(context).colorScheme.primary,
+              color: onSurface.withValues(alpha: 0.76),
             ),
             const SizedBox(width: 20),
             Expanded(
@@ -38,24 +40,25 @@ class TvAccountPanel extends ConsumerWidget {
                 children: [
                   Text(
                     'Sign in or create an account',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     'Sync favorites and your Medito account across devices.',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.68),
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: onSurface.withValues(alpha: 0.68),
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, size: 32),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 32,
+              color: onSurface.withValues(alpha: 0.72),
+            ),
           ],
         ),
       );
@@ -68,21 +71,18 @@ class TvAccountPanel extends ConsumerWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
+            color: theme.cardColor,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: Theme.of(context)
-                  .colorScheme
-                  .outline
-                  .withValues(alpha: 0.22),
+              color: theme.colorScheme.outline.withValues(alpha: 0.22),
             ),
           ),
           child: Row(
             children: [
               Icon(
-                Icons.account_circle_rounded,
+                Icons.account_circle_outlined,
                 size: 46,
-                color: Theme.of(context).colorScheme.primary,
+                color: onSurface.withValues(alpha: 0.76),
               ),
               const SizedBox(width: 18),
               Expanded(
@@ -91,17 +91,14 @@ class TvAccountPanel extends ConsumerWidget {
                   children: [
                     Text(
                       'Signed in',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.65),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: onSurface.withValues(alpha: 0.65),
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       email,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
