@@ -9,13 +9,16 @@ import 'package:medito/utils/logger.dart';
 /// Used in mock mode so contributors can run the app without real API keys.
 class MockHttpApiService extends HttpApiService {
   MockHttpApiService() : super.internal() {
-    // Set a fake auth header so repositories don't complain
+    // Set a fake auth header so repositories don't complain.
     setAuthHeader('mock-access-token');
   }
 
   Map<String, dynamic> _toJsonMap(Map<String, dynamic> raw) {
     return jsonDecode(jsonEncode(raw)) as Map<String, dynamic>;
   }
+
+  String _cleanPath(String path) =>
+      path.startsWith('/') ? path.substring(1) : path;
 
   @override
   Future<Map<String, dynamic>> getRequest(
@@ -31,6 +34,37 @@ class MockHttpApiService extends HttpApiService {
   Future<Map<String, dynamic>> postRequest(String path, {dynamic body}) async {
     await Future.delayed(const Duration(milliseconds: 100));
     AppLogger.d('MOCK_HTTP', 'POST $path');
+
+    final cleanPath = _cleanPath(path);
+    if (cleanPath.startsWith(HTTPConstants.searchTracks)) {
+      final query = body is Map
+          ? (body['query']?.toString() ?? '').trim().toLowerCase()
+          : '';
+      final matches = query.isEmpty
+          ? const <dynamic>[]
+          : mockTracks.values.where((track) {
+              return track.title.toLowerCase().contains(query) ||
+                  (track.subtitle?.toLowerCase().contains(query) ?? false) ||
+                  track.description.toLowerCase().contains(query) ||
+                  (track.artist?.name.toLowerCase().contains(query) ?? false);
+            }).toList();
+
+      return _toJsonMap({
+        'results': matches
+            .map(
+              (track) => <String, dynamic>{
+                'id': track.id,
+                'title': track.title,
+                'subtitle': track.subtitle ?? '',
+                'description': track.description,
+                'coverUrl': track.coverUrl,
+                'path': 'tracks/${track.id}',
+              },
+            )
+            .toList(),
+      });
+    }
+
     return _toJsonMap(_matchResponse(path));
   }
 
@@ -48,8 +82,7 @@ class MockHttpApiService extends HttpApiService {
   }
 
   Map<String, dynamic> _matchResponse(String path) {
-    // Strip leading slash if present
-    final cleanPath = path.startsWith('/') ? path.substring(1) : path;
+    final cleanPath = _cleanPath(path);
 
     // Home
     if (cleanPath == HTTPConstants.home) {
@@ -100,7 +133,7 @@ class MockHttpApiService extends HttpApiService {
       return {'results': mockBackgroundSounds.map((s) => s.toJson()).toList()};
     }
 
-    // Search tracks
+    // Search has request-body semantics and is handled in postRequest.
     if (cleanPath.startsWith(HTTPConstants.searchTracks)) {
       return {'results': <Map<String, dynamic>>[]};
     }
@@ -115,7 +148,7 @@ class MockHttpApiService extends HttpApiService {
       return mockDonation.toJson();
     }
 
-    // Default: return empty map for unmatched paths
+    // Default: return empty map for unmatched paths.
     AppLogger.w('MOCK_HTTP', 'No mock data for path: $cleanPath');
     return {};
   }
