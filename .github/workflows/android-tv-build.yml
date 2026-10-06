@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   tv-build:
-    name: Android TV AAB + Google TV Smoke Test
+    name: Android TV Build + Validation
     runs-on: ubuntu-latest
 
     steps:
