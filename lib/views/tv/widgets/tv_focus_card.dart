@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+/// Focusable surface used across the Android TV UI.
+///
+/// The styling intentionally mirrors Medito's current monochrome tablet/foldable
+/// surfaces: selection is expressed with the on-surface colour, while TV adds a
+/// stronger outline and a small scale lift so focus remains unambiguous at ten
+/// feet.
 class TvFocusCard extends StatefulWidget {
   const TvFocusCard({
     super.key,
@@ -43,6 +49,7 @@ class _TvFocusCardState extends State<TvFocusCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final radius = BorderRadius.circular(widget.borderRadius);
+    final onSurface = theme.colorScheme.onSurface;
 
     return FocusableActionDetector(
       autofocus: widget.autofocus,
@@ -62,25 +69,27 @@ class _TvFocusCardState extends State<TvFocusCard> {
       },
       child: AnimatedScale(
         duration: const Duration(milliseconds: 120),
-        scale: _focused ? 1.035 : 1,
+        curve: Curves.easeOut,
+        scale: _focused ? 1.025 : 1,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
           decoration: BoxDecoration(
             color: _focused
-                ? theme.colorScheme.primary.withValues(alpha: 0.12)
+                ? onSurface.withValues(alpha: 0.11)
                 : theme.cardColor,
             borderRadius: radius,
             border: Border.all(
               color: _focused
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.outline.withValues(alpha: 0.25),
+                  ? onSurface.withValues(alpha: 0.86)
+                  : theme.colorScheme.outline.withValues(alpha: 0.22),
               width: _focused ? 3 : 1,
             ),
             boxShadow: _focused
                 ? [
                     BoxShadow(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.22),
-                      blurRadius: 18,
+                      color: onSurface.withValues(alpha: 0.12),
+                      blurRadius: 16,
                       spreadRadius: 1,
                     ),
                   ]

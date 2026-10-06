@@ -11,16 +11,15 @@ import 'package:medito/providers/background_sounds/background_sounds_notifier.da
 import 'package:medito/providers/player/repeat_state_provider.dart';
 import 'package:medito/providers/providers.dart';
 import 'package:medito/services/analytics/firebase_analytics_service.dart';
-import 'package:medito/src/audio_pigeon.g.dart' as pigeon;
 import 'package:medito/utils/audio_session_tracker.dart';
 import 'package:medito/views/tv/widgets/tv_focus_card.dart';
 import 'package:medito/widgets/network_image_widget.dart';
 
-/// A television-native meditation player.
+/// Television-native meditation player.
 ///
-/// The phone player is intentionally left untouched. TV removes touch-first
-/// chrome, relies on the remote Back button for exit, and exposes the actions
-/// that matter during a session as large D-pad targets.
+/// Its composition deliberately follows Medito's tablet/foldable player:
+/// metadata on the left, transport on the right, all over the blurred session
+/// artwork. TV-only controls keep large D-pad targets and remote Back exits.
 class TvPlayerView extends ConsumerStatefulWidget {
   const TvPlayerView({super.key});
 
@@ -70,7 +69,6 @@ class _TvPlayerViewState extends ConsumerState<TvPlayerView> {
   @override
   Widget build(BuildContext context) {
     final request = ref.watch(playerProvider);
-    final track = ref.watch(audioStateProvider.select((state) => state.track));
     final isPlaying = ref.watch(
       audioStateProvider.select((state) => state.isPlaying),
     );
@@ -108,6 +106,8 @@ class _TvPlayerViewState extends ConsumerState<TvPlayerView> {
       );
     }
 
+    final effectiveDuration = duration > 0 ? duration : request.duration;
+
     return PopScope<void>(
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) _stopAndReset();
@@ -117,22 +117,17 @@ class _TvPlayerViewState extends ConsumerState<TvPlayerView> {
           const SingleActivator(LogicalKeyboardKey.mediaPlayPause):
               _togglePlayPause,
           const SingleActivator(LogicalKeyboardKey.mediaPlay): _togglePlayPause,
-          const SingleActivator(LogicalKeyboardKey.mediaPause):
-              _togglePlayPause,
+          const SingleActivator(LogicalKeyboardKey.mediaPause): _togglePlayPause,
         },
         child: Scaffold(
           backgroundColor: const Color(0xFF121212),
           body: _completed
-              ? _CompletionSurface(
-                  title: track.title.isEmpty ? 'Meditation' : track.title,
-                  onDone: _finish,
-                )
+              ? _CompletionSurface(title: request.title, onDone: _finish)
               : _PlayerSurface(
                   request: request,
-                  track: track,
                   isPlaying: isPlaying,
                   position: position,
-                  duration: duration,
+                  duration: effectiveDuration,
                   speed: _speed,
                   repeatMode: repeatMode,
                   onPlayPause: _togglePlayPause,
@@ -200,7 +195,6 @@ class _TvPlayerViewState extends ConsumerState<TvPlayerView> {
 class _PlayerSurface extends ConsumerWidget {
   const _PlayerSurface({
     required this.request,
-    required this.track,
     required this.isPlaying,
     required this.position,
     required this.duration,
@@ -215,7 +209,6 @@ class _PlayerSurface extends ConsumerWidget {
   });
 
   final PlaybackRequest request;
-  final pigeon.Track track;
   final bool isPlaying;
   final int position;
   final int duration;
@@ -230,18 +223,25 @@ class _PlayerSurface extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final imageUrl = track.imageUrl;
+    final imageUrl = request.coverUrl;
     final bgState = ref.watch(backgroundSoundsNotifierProvider);
     final selectedSound = bgState.selectedBgSound;
+    final guide = request.guideName?.trim();
+    final artist = request.artist?.name.trim();
+    final byline = guide?.isNotEmpty == true
+        ? guide!
+        : artist?.isNotEmpty == true
+        ? artist!
+        : null;
 
     return Stack(
       fit: StackFit.expand,
       children: [
         if (imageUrl.isNotEmpty && !HTTPConstants.isDeadDomain(imageUrl))
           ImageFiltered(
-            imageFilter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            imageFilter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
             child: Opacity(
-              opacity: 0.42,
+              opacity: 0.62,
               child: NetworkImageWidget(url: imageUrl, shouldCache: true),
             ),
           ),
@@ -250,161 +250,237 @@ class _PlayerSurface extends ConsumerWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xCC101010), Color(0xF20D0D0D)],
+              colors: [Color(0xA6000000), Color(0xD9000000)],
             ),
           ),
         ),
         SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(58, 42, 58, 42),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 4,
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 430),
-                      child: AspectRatio(
-                        aspectRatio: 1,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(26),
-                          child: imageUrl.isNotEmpty
-                              ? NetworkImageWidget(
-                                  url: imageUrl,
-                                  shouldCache: true,
-                                )
-                              : Container(color: const Color(0xFF242424)),
-                        ),
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 36),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1180),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: _PlayerHeading(
+                        title: request.title,
+                        byline: byline,
+                        description: request.description,
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 54),
+                    Expanded(
+                      child: _PlayerControls(
+                        isPlaying: isPlaying,
+                        position: position,
+                        duration: duration,
+                        speed: speed,
+                        repeatMode: repeatMode,
+                        selectedAmbientSound:
+                            selectedSound == null ||
+                                selectedSound.id == kNoneBackgroundSoundId
+                            ? 'Off'
+                            : selectedSound.title,
+                        onPlayPause: onPlayPause,
+                        onBack10: onBack10,
+                        onForward10: onForward10,
+                        onRepeat: onRepeat,
+                        onSpeed: onSpeed,
+                        onBackgroundSound: onBackgroundSound,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 64),
-                Expanded(
-                  flex: 7,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'NOW PLAYING',
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: Colors.white70,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.8,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        track.title.isEmpty ? 'Meditation' : track.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          height: 1.04,
-                        ),
-                      ),
-                      if (track.artist?.trim().isNotEmpty == true) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          track.artist!,
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(color: Colors.white70),
-                        ),
-                      ],
-                      const SizedBox(height: 42),
-                      _TvProgress(position: position, duration: duration),
-                      const SizedBox(height: 34),
-                      Row(
-                        children: [
-                          _ControlCard(
-                            label: '10 sec',
-                            icon: Icons.replay_10_rounded,
-                            onPressed: onBack10,
-                          ),
-                          const SizedBox(width: 18),
-                          _ControlCard(
-                            autofocus: true,
-                            primary: true,
-                            label: isPlaying ? 'Pause' : 'Play',
-                            icon: isPlaying
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            onPressed: onPlayPause,
-                          ),
-                          const SizedBox(width: 18),
-                          _ControlCard(
-                            label: '10 sec',
-                            icon: Icons.forward_10_rounded,
-                            onPressed: onForward10,
-                          ),
-                          const SizedBox(width: 18),
-                          _ControlCard(
-                            selected: repeatMode != RepeatMode.none,
-                            label: _repeatLabel(repeatMode),
-                            icon: repeatMode == RepeatMode.once
-                                ? Icons.repeat_one_rounded
-                                : Icons.repeat_rounded,
-                            onPressed: onRepeat,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 28),
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 220,
-                            child: _UtilityCard(
-                              icon: Icons.speed_rounded,
-                              title: 'Playback speed',
-                              value: '${speed.toStringAsFixed(1)}×',
-                              onPressed: onSpeed,
-                            ),
-                          ),
-                          if (onBackgroundSound != null) ...[
-                            const SizedBox(width: 16),
-                            SizedBox(
-                              width: 300,
-                              child: _UtilityCard(
-                                icon: Icons.graphic_eq_rounded,
-                                title: 'Ambient sound',
-                                value:
-                                    selectedSound == null ||
-                                        selectedSound.id ==
-                                            kNoneBackgroundSoundId
-                                    ? 'Off'
-                                    : selectedSound.title,
-                                onPressed: onBackgroundSound!,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'Use the Back button on your remote to leave the player.',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Colors.white54,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
       ],
     );
   }
+}
 
-  String _repeatLabel(RepeatMode mode) {
+class _PlayerHeading extends StatelessWidget {
+  const _PlayerHeading({
+    required this.title,
+    required this.byline,
+    required this.description,
+  });
+
+  final String title;
+  final String? byline;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'NOW PLAYING',
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: Colors.white70,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.8,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          title.isEmpty ? 'Meditation' : title,
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.displayMedium?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            height: 1.06,
+          ),
+        ),
+        if (byline != null) ...[
+          const SizedBox(height: 14),
+          Text(
+            byline!,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              color: Colors.white70,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+        if (description.trim().isNotEmpty) ...[
+          const SizedBox(height: 22),
+          Text(
+            description,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: Colors.white60,
+              height: 1.45,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _PlayerControls extends StatelessWidget {
+  const _PlayerControls({
+    required this.isPlaying,
+    required this.position,
+    required this.duration,
+    required this.speed,
+    required this.repeatMode,
+    required this.selectedAmbientSound,
+    required this.onPlayPause,
+    required this.onBack10,
+    required this.onForward10,
+    required this.onRepeat,
+    required this.onSpeed,
+    required this.onBackgroundSound,
+  });
+
+  final bool isPlaying;
+  final int position;
+  final int duration;
+  final double speed;
+  final RepeatMode repeatMode;
+  final String selectedAmbientSound;
+  final VoidCallback onPlayPause;
+  final VoidCallback onBack10;
+  final VoidCallback onForward10;
+  final VoidCallback onRepeat;
+  final VoidCallback onSpeed;
+  final VoidCallback? onBackgroundSound;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _TvProgress(position: position, duration: duration),
+        const SizedBox(height: 30),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _TransportButton(
+              label: 'Back 10',
+              icon: Icons.replay_10_rounded,
+              onPressed: onBack10,
+            ),
+            const SizedBox(width: 18),
+            _TransportButton(
+              autofocus: true,
+              primary: true,
+              label: isPlaying ? 'Pause' : 'Play',
+              icon: isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              onPressed: onPlayPause,
+            ),
+            const SizedBox(width: 18),
+            _TransportButton(
+              label: 'Forward 10',
+              icon: Icons.forward_10_rounded,
+              onPressed: onForward10,
+            ),
+          ],
+        ),
+        const SizedBox(height: 30),
+        Wrap(
+          spacing: 14,
+          runSpacing: 14,
+          children: [
+            SizedBox(
+              width: 190,
+              child: _UtilityCard(
+                icon: Icons.speed_rounded,
+                title: 'Speed',
+                value: '${speed.toStringAsFixed(1)}×',
+                onPressed: onSpeed,
+              ),
+            ),
+            SizedBox(
+              width: 190,
+              child: _UtilityCard(
+                icon: repeatMode == RepeatMode.once
+                    ? Icons.repeat_one_rounded
+                    : Icons.repeat_rounded,
+                title: 'Repeat',
+                value: _repeatValue(repeatMode),
+                selected: repeatMode != RepeatMode.none,
+                onPressed: onRepeat,
+              ),
+            ),
+            if (onBackgroundSound != null)
+              SizedBox(
+                width: 230,
+                child: _UtilityCard(
+                  icon: Icons.graphic_eq_rounded,
+                  title: 'Ambient sound',
+                  value: selectedAmbientSound,
+                  onPressed: onBackgroundSound!,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 22),
+        Text(
+          'Press Back on your remote to leave the player.',
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: Colors.white54,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _repeatValue(RepeatMode mode) {
     return switch (mode) {
-      RepeatMode.none => 'Repeat',
-      RepeatMode.once => 'Repeat once',
-      RepeatMode.infinite => 'Repeat',
+      RepeatMode.none => 'Off',
+      RepeatMode.once => 'Once',
+      RepeatMode.infinite => 'On',
     };
   }
 }
@@ -427,7 +503,7 @@ class _TvProgress extends StatelessWidget {
           borderRadius: BorderRadius.circular(99),
           child: LinearProgressIndicator(
             value: progress,
-            minHeight: 10,
+            minHeight: 8,
             backgroundColor: Colors.white24,
             valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
           ),
@@ -457,22 +533,21 @@ class _TvProgress extends StatelessWidget {
   }
 
   static String _format(int milliseconds) {
-    final duration = Duration(milliseconds: milliseconds < 0 ? 0 : milliseconds);
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final value = Duration(milliseconds: milliseconds < 0 ? 0 : milliseconds);
+    final hours = value.inHours;
+    final minutes = value.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = value.inSeconds.remainder(60).toString().padLeft(2, '0');
     return hours > 0 ? '$hours:$minutes:$seconds' : '$minutes:$seconds';
   }
 }
 
-class _ControlCard extends StatelessWidget {
-  const _ControlCard({
+class _TransportButton extends StatelessWidget {
+  const _TransportButton({
     required this.label,
     required this.icon,
     required this.onPressed,
     this.autofocus = false,
     this.primary = false,
-    this.selected = false,
   });
 
   final String label;
@@ -480,28 +555,23 @@ class _ControlCard extends StatelessWidget {
   final VoidCallback onPressed;
   final bool autofocus;
   final bool primary;
-  final bool selected;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: primary ? 156 : 126,
+      width: primary ? 170 : 145,
       child: TvFocusCard(
         autofocus: autofocus,
         onPressed: onPressed,
         borderRadius: 18,
         padding: EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: primary ? 20 : 18,
+          horizontal: 14,
+          vertical: primary ? 22 : 19,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: primary ? 48 : 36,
-              color: selected ? Theme.of(context).colorScheme.primary : null,
-            ),
+            Icon(icon, size: primary ? 52 : 38, color: Colors.white),
             const SizedBox(height: 8),
             Text(
               label,
@@ -509,8 +579,8 @@ class _ControlCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Colors.white,
                 fontWeight: FontWeight.w700,
-                color: selected ? Theme.of(context).colorScheme.primary : null,
               ),
             ),
           ],
@@ -526,23 +596,29 @@ class _UtilityCard extends StatelessWidget {
     required this.title,
     required this.value,
     required this.onPressed,
+    this.selected = false,
   });
 
   final IconData icon;
   final String title;
   final String value;
   final VoidCallback onPressed;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
     return TvFocusCard(
       onPressed: onPressed,
       borderRadius: 16,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
       child: Row(
         children: [
-          Icon(icon, size: 30),
-          const SizedBox(width: 14),
+          Icon(
+            icon,
+            size: 28,
+            color: selected ? Colors.white : Colors.white70,
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -553,7 +629,7 @@ class _UtilityCard extends StatelessWidget {
                     color: Colors.white60,
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 2),
                 Text(
                   value,
                   maxLines: 1,
@@ -647,9 +723,7 @@ class _BackgroundSoundDialog extends ConsumerWidget {
                               selected
                                   ? Icons.radio_button_checked_rounded
                                   : Icons.radio_button_off_rounded,
-                              color: selected
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Colors.white70,
+                              color: Colors.white,
                               size: 30,
                             ),
                             const SizedBox(width: 16),
@@ -720,10 +794,10 @@ class _CompletionSurface extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.check_circle_rounded,
+                const Icon(
+                  Icons.check_circle_outline_rounded,
                   size: 92,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: Colors.white,
                 ),
                 const SizedBox(height: 26),
                 Text(

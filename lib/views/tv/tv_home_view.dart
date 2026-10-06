@@ -10,6 +10,9 @@ import 'package:medito/utils/utils.dart';
 import 'package:medito/views/tv/widgets/tv_focus_card.dart';
 import 'package:medito/widgets/network_image_widget.dart';
 
+/// TV home keeps the same vertical section rhythm as Medito's adaptive tablet
+/// home and caps the readable/content width rather than stretching shelves
+/// across the full television panel.
 class TvHomeView extends ConsumerWidget {
   const TvHomeView({super.key});
 
@@ -30,28 +33,37 @@ class TvHomeView extends ConsumerWidget {
           ),
           data: (homeData) => SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(40, 28, 40, 56),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  homeData.greeting?.trim().isNotEmpty == true
-                      ? homeData.greeting!
-                      : 'Medito',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      homeData.greeting?.trim().isNotEmpty == true
+                          ? homeData.greeting!
+                          : 'Medito',
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _UpNextHero(upNext: upNext),
+                    if (_tvCarouselItems(homeData.carousel).isNotEmpty) ...[
+                      const SizedBox(height: 34),
+                      _CarouselShelf(
+                        items: _tvCarouselItems(homeData.carousel),
+                      ),
+                    ],
+                    if (_tvShortcuts(homeData.shortcuts).isNotEmpty) ...[
+                      const SizedBox(height: 34),
+                      _ShortcutShelf(
+                        items: _tvShortcuts(homeData.shortcuts),
+                      ),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 20),
-                _UpNextHero(upNext: upNext),
-                if (_tvCarouselItems(homeData.carousel).isNotEmpty) ...[
-                  const SizedBox(height: 34),
-                  _CarouselShelf(items: _tvCarouselItems(homeData.carousel)),
-                ],
-                if (_tvShortcuts(homeData.shortcuts).isNotEmpty) ...[
-                  const SizedBox(height: 34),
-                  _ShortcutShelf(items: _tvShortcuts(homeData.shortcuts)),
-                ],
-              ],
+              ),
             ),
           ),
         ),
@@ -316,6 +328,7 @@ class _ShortcutShelf extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return _TvShelf(
       title: 'Quick access',
       height: 112,
@@ -335,7 +348,7 @@ class _ShortcutShelf extends ConsumerWidget {
                 Icon(
                   item.isHighlighted ? Icons.play_circle_fill : Icons.spa,
                   size: 32,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: onSurface,
                 ),
                 const SizedBox(width: 14),
                 Expanded(

@@ -6,6 +6,8 @@ import 'package:medito/views/tv/tv_library_view.dart';
 import 'package:medito/views/tv/tv_search_view.dart';
 import 'package:medito/views/tv/tv_settings_view.dart';
 
+/// TV navigation based on Medito's tablet/foldable sidebar, with explicit
+/// D-pad focus treatment layered on top.
 class TvNavigationShell extends StatefulWidget {
   const TvNavigationShell({super.key});
 
@@ -43,67 +45,70 @@ class _TvNavigationShellState extends State<TvNavigationShell> {
         child: Scaffold(
           body: Row(
             children: [
-              Container(
-                width: 190,
-                color: theme.colorScheme.surface,
+              Material(
+                color: theme.scaffoldBackgroundColor,
                 child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 22, 14, 18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 22),
-                          child: Text(
-                            'Medito',
-                            style: theme.textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
+                  right: false,
+                  child: SizedBox(
+                    width: 200,
+                    height: double.infinity,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 24,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 22),
+                            child: Text(
+                              'Medito',
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
-                        ),
-                        _TvRailButton(
-                          icon: Icons.home_rounded,
-                          label: 'Home',
-                          selected: _selectedIndex == 0,
-                          autofocus: true,
-                          onPressed: () => _select(0),
-                        ),
-                        _TvRailButton(
-                          icon: Icons.explore_rounded,
-                          label: 'Explore',
-                          selected: _selectedIndex == 1,
-                          onPressed: () => _select(1),
-                        ),
-                        _TvRailButton(
-                          icon: Icons.search_rounded,
-                          label: 'Search',
-                          selected: _selectedIndex == 2,
-                          onPressed: () => _select(2),
-                        ),
-                        _TvRailButton(
-                          icon: Icons.video_library_rounded,
-                          label: 'Library',
-                          selected: _selectedIndex == 3,
-                          onPressed: () => _select(3),
-                        ),
-                        const Spacer(),
-                        _TvRailButton(
-                          icon: Icons.settings_rounded,
-                          label: 'Settings',
-                          selected: _selectedIndex == 4,
-                          onPressed: () => _select(4),
-                        ),
-                      ],
+                          _TvSidebarItem(
+                            icon: Icons.home_rounded,
+                            label: 'Home',
+                            selected: _selectedIndex == 0,
+                            autofocus: true,
+                            onPressed: () => _select(0),
+                          ),
+                          _TvSidebarItem(
+                            icon: Icons.explore_rounded,
+                            label: 'Explore',
+                            selected: _selectedIndex == 1,
+                            onPressed: () => _select(1),
+                          ),
+                          _TvSidebarItem(
+                            icon: Icons.search_rounded,
+                            label: 'Search',
+                            selected: _selectedIndex == 2,
+                            onPressed: () => _select(2),
+                          ),
+                          _TvSidebarItem(
+                            icon: Icons.video_library_rounded,
+                            label: 'Library',
+                            selected: _selectedIndex == 3,
+                            onPressed: () => _select(3),
+                          ),
+                          const SizedBox(height: 18),
+                          _TvSidebarItem(
+                            icon: Icons.settings_rounded,
+                            label: 'Settings',
+                            selected: _selectedIndex == 4,
+                            onPressed: () => _select(4),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-              VerticalDivider(
-                width: 1,
-                thickness: 1,
-                color: theme.colorScheme.outline.withValues(alpha: 0.18),
-              ),
               Expanded(
+                key: const ValueKey('tv-main-content'),
                 child: IndexedStack(index: _selectedIndex, children: _pages),
               ),
             ],
@@ -114,8 +119,8 @@ class _TvNavigationShellState extends State<TvNavigationShell> {
   }
 }
 
-class _TvRailButton extends StatefulWidget {
-  const _TvRailButton({
+class _TvSidebarItem extends StatefulWidget {
+  const _TvSidebarItem({
     required this.icon,
     required this.label,
     required this.selected,
@@ -130,10 +135,10 @@ class _TvRailButton extends StatefulWidget {
   final bool autofocus;
 
   @override
-  State<_TvRailButton> createState() => _TvRailButtonState();
+  State<_TvSidebarItem> createState() => _TvSidebarItemState();
 }
 
-class _TvRailButtonState extends State<_TvRailButton> {
+class _TvSidebarItemState extends State<_TvSidebarItem> {
   bool _focused = false;
 
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
@@ -157,6 +162,7 @@ class _TvRailButtonState extends State<_TvRailButton> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
     final active = widget.selected || _focused;
 
     return Padding(
@@ -167,50 +173,57 @@ class _TvRailButtonState extends State<_TvRailButton> {
         onFocusChange: (focused) {
           if (_focused != focused) setState(() => _focused = focused);
         },
-        child: AnimatedContainer(
+        child: AnimatedScale(
+          scale: _focused ? 1.025 : 1,
           duration: const Duration(milliseconds: 120),
-          decoration: BoxDecoration(
-            color: _focused
-                ? theme.colorScheme.primary.withValues(alpha: 0.16)
-                : widget.selected
-                ? theme.colorScheme.primary.withValues(alpha: 0.09)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            decoration: BoxDecoration(
               color: _focused
-                  ? theme.colorScheme.primary
+                  ? onSurface.withValues(alpha: 0.14)
+                  : widget.selected
+                  ? onSurface.withValues(alpha: 0.10)
                   : Colors.transparent,
-              width: 2,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: _focused
+                    ? onSurface.withValues(alpha: 0.86)
+                    : Colors.transparent,
+                width: 2.5,
+              ),
             ),
-          ),
-          child: InkWell(
-            canRequestFocus: false,
-            onTap: widget.onPressed,
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              child: Row(
-                children: [
-                  Icon(
-                    widget.icon,
-                    size: 27,
-                    color: active
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurface.withValues(alpha: 0.74),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      widget.label,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                        color: active
-                            ? theme.colorScheme.onSurface
-                            : theme.colorScheme.onSurface.withValues(alpha: 0.76),
+            child: InkWell(
+              canRequestFocus: false,
+              onTap: widget.onPressed,
+              borderRadius: BorderRadius.circular(14),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      widget.icon,
+                      size: 26,
+                      color: active
+                          ? onSurface
+                          : onSurface.withValues(alpha: 0.68),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        widget.label,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                          color: active
+                              ? onSurface
+                              : onSurface.withValues(alpha: 0.72),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

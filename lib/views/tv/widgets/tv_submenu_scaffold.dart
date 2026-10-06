@@ -3,8 +3,9 @@ import 'package:medito/views/tv/widgets/tv_focus_card.dart';
 
 /// Shared 10-foot layout for routes pushed from the TV shell.
 ///
-/// Keeps nested screens visually consistent with the TV home surface instead
-/// of dropping back to phone-sized app bars and narrow mobile content.
+/// This follows the same centered, bounded-content approach used by Medito's
+/// tablet/foldable AdaptivePageBody while retaining TV-sized typography and
+/// remote focus targets.
 class TvSubmenuScaffold extends StatelessWidget {
   const TvSubmenuScaffold({
     super.key,
@@ -13,7 +14,7 @@ class TvSubmenuScaffold extends StatelessWidget {
     this.subtitle,
     this.onBack,
     this.showBackButton = true,
-    this.maxContentWidth = 1180,
+    this.maxContentWidth = 1200,
   });
 
   final String title;
@@ -31,8 +32,7 @@ class TvSubmenuScaffold extends StatelessWidget {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(40, 28, 40, 56),
-          child: Align(
-            alignment: Alignment.topLeft,
+          child: Center(
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: maxContentWidth),
               child: Column(
