@@ -135,6 +135,86 @@ jobs:
                   raise SystemExit(f'{feature} must be android:required="false"; got {features.get(feature)!r}')
           PY
 
+      - name: Upload TV AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: medito-android-tv-aab
+          path: build/app/outputs/bundle/**/*.aab
+          retention-days: 14
+
+  tv-smoke:
+    name: Manual Google TV Smoke Test
+    if: github.event_name == 'workflow_dispatch'
+    needs: tv-build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2.12.0
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Run build_runner
+        run: flutter packages pub run build_runner build --delete-conflicting-outputs
+
+      - name: Run pigeon
+        run: flutter pub run pigeon --input pigeon_conf.dart --package_name=medito
+
+      - name: Create compile-only Android config
+        run: |
+          cat > android/keystore.properties <<'EOF'
+          appId=meditofoundation.medito
+          storeFile=tv-ci.jks
+          storePassword=android
+          keyAlias=androiddebugkey
+          keyPassword=android
+          EOF
+
+          keytool -genkeypair \
+            -keystore android/tv-ci.jks \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android TV CI,OU=CI,O=Medito,L=Test,ST=Test,C=US"
+
+          cat > android/app/google-services.json <<'EOF'
+          {
+            "project_info": {
+              "project_number": "123456789",
+              "project_id": "medito-tv-ci",
+              "storage_bucket": "medito-tv-ci.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:123456789:android:0000000000000000",
+                  "android_client_info": {
+                    "package_name": "meditofoundation.medito"
+                  }
+                },
+                "api_key": [
+                  { "current_key": "mock-api-key" }
+                ]
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+
       - name: Build installable TV smoke-test APK
         run: |
           flutter build apk --flavor prod --debug \
@@ -172,11 +252,3 @@ jobs:
           path: /tmp/android-tv-smoke/
           retention-days: 14
           if-no-files-found: ignore
-
-      - name: Upload TV AAB
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: medito-android-tv-aab
-          path: build/app/outputs/bundle/**/*.aab
-          retention-days: 14
