@@ -3,9 +3,8 @@ import 'package:medito/views/tv/widgets/tv_focus_card.dart';
 
 /// Shared 10-foot layout for routes pushed from the TV shell.
 ///
-/// This follows the same centered, bounded-content approach used by Medito's
-/// tablet/foldable AdaptivePageBody while retaining TV-sized typography and
-/// remote focus targets.
+/// Remote Back is the primary back affordance on TV, matching the rest of the
+/// platform. A visible Back card remains opt-in for exceptional flows.
 class TvSubmenuScaffold extends StatelessWidget {
   const TvSubmenuScaffold({
     super.key,
@@ -13,7 +12,7 @@ class TvSubmenuScaffold extends StatelessWidget {
     required this.child,
     this.subtitle,
     this.onBack,
-    this.showBackButton = true,
+    this.showBackButton = false,
     this.maxContentWidth = 1200,
   });
 

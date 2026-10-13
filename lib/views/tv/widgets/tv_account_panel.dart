@@ -7,6 +7,7 @@ import 'package:medito/views/settings/sign_up_log_in_screen.dart';
 import 'package:medito/views/splash_view.dart';
 import 'package:medito/views/tv/widgets/tv_focus_card.dart';
 
+/// Compact account row matching the iPad Settings surface.
 class TvAccountPanel extends ConsumerWidget {
   const TvAccountPanel({super.key});
 
@@ -15,8 +16,7 @@ class TvAccountPanel extends ConsumerWidget {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
     final auth = ref.watch(authRepositorySyncProvider);
-    final user = auth.currentUser;
-    final email = user?.email;
+    final email = auth.currentUser?.email;
 
     if (email == null || email.isEmpty) {
       return TvFocusCard(
@@ -25,39 +25,27 @@ class TvAccountPanel extends ConsumerWidget {
             builder: (_) => const SignUpLogInPage(fromSettings: true),
           ),
         ),
-        padding: const EdgeInsets.all(26),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         child: Row(
           children: [
             Icon(
               Icons.account_circle_outlined,
-              size: 48,
-              color: onSurface.withValues(alpha: 0.76),
+              size: 32,
+              color: onSurface.withValues(alpha: 0.88),
             ),
             const SizedBox(width: 20),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Sign in or create an account',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Sync favorites and your Medito account across devices.',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: onSurface.withValues(alpha: 0.68),
-                    ),
-                  ),
-                ],
+              child: Text(
+                'Sign in / Sign up',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             Icon(
               Icons.chevron_right_rounded,
-              size: 32,
-              color: onSurface.withValues(alpha: 0.72),
+              size: 30,
+              color: onSurface.withValues(alpha: 0.78),
             ),
           ],
         ),
@@ -65,11 +53,10 @@ class TvAccountPanel extends ConsumerWidget {
     }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           decoration: BoxDecoration(
             color: theme.cardColor,
             borderRadius: BorderRadius.circular(16),
@@ -81,25 +68,27 @@ class TvAccountPanel extends ConsumerWidget {
             children: [
               Icon(
                 Icons.account_circle_outlined,
-                size: 46,
-                color: onSurface.withValues(alpha: 0.76),
+                size: 32,
+                color: onSurface.withValues(alpha: 0.88),
               ),
-              const SizedBox(width: 18),
+              const SizedBox(width: 20),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Signed in',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: onSurface.withValues(alpha: 0.65),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(
                       email,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: onSurface.withValues(alpha: 0.64),
                       ),
                     ),
                   ],
@@ -108,22 +97,27 @@ class TvAccountPanel extends ConsumerWidget {
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        SizedBox(
-          width: 280,
-          child: TvFocusCard(
-            onPressed: () => _signOut(context, ref),
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 17),
-            child: const Row(
-              children: [
-                Icon(Icons.logout_rounded, size: 28),
-                SizedBox(width: 14),
-                Text(
+        const SizedBox(height: 12),
+        TvFocusCard(
+          onPressed: () => _signOut(context, ref),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+          child: Row(
+            children: [
+              Icon(
+                Icons.logout_rounded,
+                size: 30,
+                color: onSurface.withValues(alpha: 0.88),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Text(
                   'Sign out',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ],

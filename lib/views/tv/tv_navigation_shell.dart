@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:medito/views/tv/tv_explore_view.dart';
 import 'package:medito/views/tv/tv_home_view.dart';
-import 'package:medito/views/tv/tv_library_view.dart';
 import 'package:medito/views/tv/tv_search_view.dart';
 import 'package:medito/views/tv/tv_settings_view.dart';
 
-/// TV navigation based on Medito's tablet/foldable sidebar, with explicit
-/// D-pad focus treatment layered on top.
+/// Android TV navigation intentionally mirrors Medito's iPad sidebar: a
+/// compact rail with Home, Explore, Search and Settings. TV adds an explicit
+/// focus outline and D-pad transitions, but does not invent extra destinations.
 class TvNavigationShell extends StatefulWidget {
   const TvNavigationShell({super.key});
 
@@ -22,7 +22,6 @@ class _TvNavigationShellState extends State<TvNavigationShell> {
     TvHomeView(),
     TvExploreView(),
     TvSearchView(),
-    TvLibraryView(),
     TvSettingsView(),
   ];
 
@@ -50,56 +49,45 @@ class _TvNavigationShellState extends State<TvNavigationShell> {
                 child: SafeArea(
                   right: false,
                   child: SizedBox(
-                    width: 200,
+                    width: 116,
                     height: double.infinity,
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 24,
+                        horizontal: 10,
+                        vertical: 26,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 22),
-                            child: Text(
-                              'Medito',
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
                           _TvSidebarItem(
-                            icon: Icons.home_rounded,
+                            icon: Icons.home_outlined,
+                            selectedIcon: Icons.home_rounded,
                             label: 'Home',
                             selected: _selectedIndex == 0,
                             autofocus: true,
                             onPressed: () => _select(0),
                           ),
                           _TvSidebarItem(
-                            icon: Icons.explore_rounded,
+                            icon: Icons.menu_book_outlined,
+                            selectedIcon: Icons.menu_book_rounded,
                             label: 'Explore',
                             selected: _selectedIndex == 1,
                             onPressed: () => _select(1),
                           ),
                           _TvSidebarItem(
                             icon: Icons.search_rounded,
+                            selectedIcon: Icons.search_rounded,
                             label: 'Search',
                             selected: _selectedIndex == 2,
                             onPressed: () => _select(2),
                           ),
+                          const SizedBox(height: 12),
                           _TvSidebarItem(
-                            icon: Icons.video_library_rounded,
-                            label: 'Library',
+                            icon: Icons.settings_outlined,
+                            selectedIcon: Icons.settings_rounded,
+                            label: 'Settings',
                             selected: _selectedIndex == 3,
                             onPressed: () => _select(3),
-                          ),
-                          const SizedBox(height: 18),
-                          _TvSidebarItem(
-                            icon: Icons.settings_rounded,
-                            label: 'Settings',
-                            selected: _selectedIndex == 4,
-                            onPressed: () => _select(4),
                           ),
                         ],
                       ),
@@ -122,6 +110,7 @@ class _TvNavigationShellState extends State<TvNavigationShell> {
 class _TvSidebarItem extends StatefulWidget {
   const _TvSidebarItem({
     required this.icon,
+    required this.selectedIcon,
     required this.label,
     required this.selected,
     required this.onPressed,
@@ -129,6 +118,7 @@ class _TvSidebarItem extends StatefulWidget {
   });
 
   final IconData icon;
+  final IconData selectedIcon;
   final String label;
   final bool selected;
   final VoidCallback onPressed;
@@ -166,7 +156,7 @@ class _TvSidebarItemState extends State<_TvSidebarItem> {
     final active = widget.selected || _focused;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Focus(
         autofocus: widget.autofocus,
         onKeyEvent: _onKeyEvent,
@@ -174,7 +164,7 @@ class _TvSidebarItemState extends State<_TvSidebarItem> {
           if (_focused != focused) setState(() => _focused = focused);
         },
         child: AnimatedScale(
-          scale: _focused ? 1.025 : 1,
+          scale: _focused ? 1.035 : 1,
           duration: const Duration(milliseconds: 120),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 120),
@@ -187,7 +177,7 @@ class _TvSidebarItemState extends State<_TvSidebarItem> {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: _focused
-                    ? onSurface.withValues(alpha: 0.86)
+                    ? onSurface.withValues(alpha: 0.90)
                     : Colors.transparent,
                 width: 2.5,
               ),
@@ -198,28 +188,27 @@ class _TvSidebarItemState extends State<_TvSidebarItem> {
               borderRadius: BorderRadius.circular(14),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 16,
+                  horizontal: 8,
+                  vertical: 15,
                 ),
-                child: Row(
+                child: Column(
                   children: [
                     Icon(
-                      widget.icon,
-                      size: 26,
+                      widget.selected ? widget.selectedIcon : widget.icon,
+                      size: 30,
                       color: active
                           ? onSurface
-                          : onSurface.withValues(alpha: 0.68),
+                          : onSurface.withValues(alpha: 0.70),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Text(
-                        widget.label,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                          color: active
-                              ? onSurface
-                              : onSurface.withValues(alpha: 0.72),
-                        ),
+                    const SizedBox(height: 7),
+                    Text(
+                      widget.label,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                        color: active
+                            ? onSurface
+                            : onSurface.withValues(alpha: 0.72),
                       ),
                     ),
                   ],
