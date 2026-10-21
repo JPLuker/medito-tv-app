@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:medito/constants/icons/medito_icons.dart';
+import 'package:medito/widgets/medito_icon.dart';
 import 'package:medito/views/tv/tv_explore_view.dart';
 import 'package:medito/views/tv/tv_home_view.dart';
 import 'package:medito/views/tv/tv_search_view.dart';
@@ -49,7 +51,7 @@ class _TvNavigationShellState extends State<TvNavigationShell> {
                 child: SafeArea(
                   right: false,
                   child: SizedBox(
-                    width: 116,
+                    width: 144,
                     height: double.infinity,
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.symmetric(
@@ -60,31 +62,27 @@ class _TvNavigationShellState extends State<TvNavigationShell> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           _TvSidebarItem(
-                            icon: Icons.home_outlined,
-                            selectedIcon: Icons.home_rounded,
+                            assetName: MeditoIcons.home,
                             label: 'Home',
                             selected: _selectedIndex == 0,
                             autofocus: true,
                             onPressed: () => _select(0),
                           ),
                           _TvSidebarItem(
-                            icon: Icons.menu_book_outlined,
-                            selectedIcon: Icons.menu_book_rounded,
+                            assetName: MeditoIcons.book,
                             label: 'Explore',
                             selected: _selectedIndex == 1,
                             onPressed: () => _select(1),
                           ),
                           _TvSidebarItem(
-                            icon: Icons.search_rounded,
-                            selectedIcon: Icons.search_rounded,
+                            assetName: MeditoIcons.search,
                             label: 'Search',
                             selected: _selectedIndex == 2,
                             onPressed: () => _select(2),
                           ),
                           const SizedBox(height: 12),
                           _TvSidebarItem(
-                            icon: Icons.settings_outlined,
-                            selectedIcon: Icons.settings_rounded,
+                            assetName: MeditoIcons.settings,
                             label: 'Settings',
                             selected: _selectedIndex == 3,
                             onPressed: () => _select(3),
@@ -109,16 +107,14 @@ class _TvNavigationShellState extends State<TvNavigationShell> {
 
 class _TvSidebarItem extends StatefulWidget {
   const _TvSidebarItem({
-    required this.icon,
-    required this.selectedIcon,
+    required this.assetName,
     required this.label,
     required this.selected,
     required this.onPressed,
     this.autofocus = false,
   });
 
-  final IconData icon;
-  final IconData selectedIcon;
+  final String assetName;
   final String label;
   final bool selected;
   final VoidCallback onPressed;
@@ -188,27 +184,32 @@ class _TvSidebarItemState extends State<_TvSidebarItem> {
               borderRadius: BorderRadius.circular(14),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 15,
+                  horizontal: 10,
+                  vertical: 18,
                 ),
                 child: Column(
                   children: [
-                    Icon(
-                      widget.selected ? widget.selectedIcon : widget.icon,
-                      size: 30,
+                    MeditoIcon(
+                      assetName: widget.assetName,
+                      size: 34,
                       color: active
                           ? onSurface
-                          : onSurface.withValues(alpha: 0.70),
+                          : onSurface.withValues(alpha: 0.74),
                     ),
                     const SizedBox(height: 7),
                     Text(
                       widget.label,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.visible,
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.labelLarge?.copyWith(
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontSize: 18,
+                        height: 1.1,
                         fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                         color: active
                             ? onSurface
-                            : onSurface.withValues(alpha: 0.72),
+                            : onSurface.withValues(alpha: 0.78),
                       ),
                     ),
                   ],
