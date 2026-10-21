@@ -189,10 +189,10 @@ class _UpNextHero extends ConsumerWidget {
                       end: Alignment.centerLeft,
                       colors: [
                         Colors.transparent,
-                        Color(0x88000000),
-                        Color(0xEE000000),
+                        Color(0xC4000000),
+                        Color(0xF7000000),
                       ],
-                      stops: [0.18, 0.58, 1],
+                      stops: [0.08, 0.52, 1],
                     ),
                   ),
                 ),
@@ -209,8 +209,15 @@ class _UpNextHero extends ConsumerWidget {
                           Text(
                             'CONTINUE YOUR PATH · ${data.pack.title}',
                             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              color: Colors.white70,
+                              color: Colors.white,
                               letterSpacing: 1.15,
+                              shadows: const [
+                                Shadow(
+                                  color: Colors.black,
+                                  blurRadius: 10,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(height: 9),
@@ -221,6 +228,13 @@ class _UpNextHero extends ConsumerWidget {
                             style: Theme.of(context).textTheme.displaySmall?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.w700,
+                              shadows: const [
+                                Shadow(
+                                  color: Colors.black,
+                                  blurRadius: 12,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
                             ),
                           ),
                           if (session.subtitle?.isNotEmpty == true) ...[
@@ -230,7 +244,14 @@ class _UpNextHero extends ConsumerWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                color: Colors.white70,
+                                color: Colors.white,
+                                shadows: const [
+                                  Shadow(
+                                    color: Colors.black,
+                                    blurRadius: 10,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -354,8 +375,12 @@ class _FeaturedShelf extends ConsumerWidget {
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
-                            colors: [Colors.transparent, Color(0xB9000000)],
-                            stops: [0.48, 1],
+                            colors: [
+                              Colors.transparent,
+                              Color(0xB8000000),
+                              Color(0xF2000000),
+                            ],
+                            stops: [0.32, 0.68, 1],
                           ),
                         ),
                       ),
@@ -369,7 +394,14 @@ class _FeaturedShelf extends ConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             color: Colors.white,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
+                            shadows: const [
+                              Shadow(
+                                color: Colors.black,
+                                blurRadius: 10,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
                           ),
                         ),
                       ),
