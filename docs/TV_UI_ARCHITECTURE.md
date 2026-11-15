@@ -45,7 +45,7 @@ The mobile streak/progress header, Your Path explainer interaction, donation/sho
 
 ## Library
 
-`TvLibraryView` provides TV entry points for Favorites and Downloads. It intentionally groups saved/offline content into one TV concept rather than exposing scattered mobile actions.
+`TvLibraryView` shows the user's favorites directly. Downloads are not offered on TV yet.
 
 ## Settings
 

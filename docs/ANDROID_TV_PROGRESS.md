@@ -1,48 +1,47 @@
 # Android TV / Google TV progress
 
-_Last updated: 2026-09-22_
+_Last updated: 2026-11-15_
 
 ## Scope and branch
 
-- Working branch: `feature/android-tv-support`
+- Working branch: `feature/android-tv-upstream-sync` (continues `feature/android-tv-support`, merged with upstream `develop` at `e3ebef11`, 2026-11-12)
 - Base branch: `develop`
-- Do not open the pull request until the Android TV build is functionally usable.
-- PWA/web work is intentionally shelved on the separate `feature/pwa-tv-foundation` branch. Do not merge that branch into this work unless a specific reusable change is deliberately selected.
-- Goal for this branch: add Google Play TV / Android TV support while preserving the existing Android phone/tablet behavior and keeping upstream Medito merges as low-conflict as practical.
+- PWA/web work is intentionally shelved on the separate `feature/pwa-tv-foundation` branch.
+- Goal: add Google Play TV / Android TV support while preserving the existing Android phone/tablet behavior and keeping upstream Medito merges as low-conflict as practical.
 
-## Current stopping point
+## Current state
 
-The TV branch is now at the runtime-validation stage rather than the initial
-manifest/build stage.
+The TV app is feature-complete for a first internal test in mock mode:
 
-Completed foundations include the Play/Leanback manifest overlays, TV banner,
-runtime Leanback detection, TV-specific top-level navigation, mock AAB
-validation, and an automated Google TV emulator smoke test.
+- Leanback manifest overlays, TV banner and runtime Leanback detection.
+- A dedicated remote-first presentation layer under `lib/views/tv/`: navigation
+  shell, Home, Explore, Search, Library (favorites), pack and meditation detail,
+  player with its own completion screen, Settings, playback defaults,
+  analytics/privacy and account sign-in. See `TV_UI_ARCHITECTURE.md`.
+- Phone-only behavior is gated on Leanback at the service level: reminders and
+  notifications, Meta SDK, home-screen widgets, Health Connect, review prompts,
+  browser/donation/shop/timer routes and onboarding.
+- CI (`Android TV Build`) analyzes, builds a mock-mode production-flavor AAB and
+  verifies the merged manifest on every push. The Google TV emulator smoke test
+  is a manual `workflow_dispatch` job.
 
-The branch was reconciled with the newer upstream Medito navigation redesign so
-phone/tablet keeps the upstream floating navigation while Leanback devices use
-the TV rail. Re-check upstream before the final PR, but do not fork whole
-screens into TV copies.
+### What changed in the upstream sync (2026-11-15)
 
-Local Windows setup is now reproducible through:
+Upstream reworked navigation, settings, sign-in and the end screen around an
+adaptive tablet layout. The merge was resolved with one rule: **shared
+phone/tablet screens stay identical to upstream; TV differences live in
+`lib/views/tv/` or behind a capability check in a service.**
 
-- `scripts/setup-tv-dev.ps1`
-- `scripts/run-tv-mock.ps1`
-- `docs/LOCAL_TV_DEVELOPMENT.md`
-
-These scripts were added after local testing exposed several contributor-only
-setup blockers: Flutter using Java 25 instead of Java 17, a mandatory local
-`keystore.properties`, missing generated Riverpod/Freezed/JSON/Pigeon files,
-and dummy Firebase configuration for mock builds.
-
-The CI emulator target is now Google TV API 36 x86_64. API 34 Google TV
-x86_64 was not available to the runner; temporarily switching to 32-bit x86
-made the system image installable but was not valid for Flutter runtime testing.
-Use x86_64 locally and in CI.
-
-When resuming product work, check the newest `Android TV Build` result first.
-Then continue the D-pad/focus audit on the current upstream UI rather than the
-pre-redesign Home/Explore implementation.
+- Earlier TV focus tweaks inside phone screens that TV no longer builds (Home
+  widgets, `PackView`, `PlayerView`, Settings, Downloads, end screen,
+  onboarding) were dropped in favor of upstream's versions.
+- `BottomNavigationBarView` keeps upstream's adaptive layout and returns
+  `TvNavigationShell` on Leanback devices.
+- Sign-in uses upstream's new form; TV adds only its frame, a
+  remote-reachable back button and the onboarding bypass.
+- The TV shop shelf was removed: upstream replaced the products API, and the
+  shelf opened a browser.
+- The diff against upstream is now 55 files, of which 29 are new.
 
 ## Completed work
 
@@ -106,7 +105,7 @@ Behavior:
 - Android TV / Google TV devices use a left-side `NavigationRail` with visible labels.
 - The rail participates in Flutter focus traversal and gives D-pad users a usable top-level navigation surface.
 
-This is only the first navigation adaptation. Individual screens still need a focus/D-pad audit.
+This first adaptation was later replaced by `TvNavigationShell` (see `TV_UI_ARCHITECTURE.md`).
 
 ### 5. Android TV AAB CI
 
@@ -210,150 +209,34 @@ The earlier PWA experiments remain isolated. Current priority is Android TV / Go
 
 ## Known gaps / not yet complete
 
-### D-pad and focus audit
+### Verification on real hardware
 
-Still needs explicit testing/fixes for:
+`ANDROID_TV_TEST_PLAN.md` is the acceptance checklist. It has to be re-run on a
+physical Android TV / Google TV after the upstream sync, because the merge
+changed the shared sign-in form and navigation host.
 
-- Home
-- Explore/search
-- pack/path screens
-- meditation/player screen
-- Favorites/downloads as applicable
-- Settings
-- authentication/account-entry screens
-- dialogs, sheets, and confirmation prompts
+### Live-data testing
 
-Confirmed current blockers found during the audit:
+The fork has no Medito keys. Per Medito, live testing happens through a Google
+Play internal-track build once mock mode is accepted.
 
-- TV onboarding is now bypassed entirely after authentication/guest setup.
-- Home Up Next still contains touch-oriented `GestureDetector` entry points
-  for the main card/play/CTA path.
-- Many other primary controls already use `InkWell`, `IconButton`, or
-  standard Flutter buttons; for those, focus visibility and traversal are the
-  larger remaining issues.
+### TV donation prompt
 
-Requirements include:
+Donations are hidden on TV. The planned QR-code support card is described in
+`TV_TESTING_BACKLOG.md` and is not built.
 
-- predictable four-way focus movement
-- clear visible focused state
-- no focus traps
-- focus restoration after navigating back
-- correct scrolling when focused content moves off screen
-- no touch-only interactions required for core flows
+### Downloads on TV
 
-### Player / media remote behavior
+Library shows favorites only. There is no TV surface for downloading or for
+playing downloaded sessions offline.
 
-Still needs validation for:
+### Automated TV journey test
 
-- center/select play/pause
-- hardware/media play-pause
-- seek/skip behavior
-- D-pad interaction with player controls
-- Back behavior
-- background playback/media session behavior on TV
-
-The existing Android Media3/audio infrastructure is a useful base, but TV remote behavior has not yet been proven end-to-end.
-
-### TV layout / 10-foot UI
-
-The app is not yet fully adapted for TV viewing distance. Individual screens still need review for:
-
-- landscape composition
-- readable text sizes
-- focus-target size
-- horizontal/vertical spacing
-- safe areas/overscan-like margins where appropriate
-- avoiding phone-centric layouts that look sparse or narrow on a television
-
-Do not globally force landscape on the entire shared Android app until the TV-only behavior has been tested; phone behavior must remain unchanged.
-
-### Phone-only features need capability gating review
-
-Review whether these should be hidden, disabled, or left alone on TV:
-
-- Health Connect
-- home-screen widgets
-- dynamic app icons
-- payment/donation flows where the UX is unsuitable for TV
-- reminder/exact-alarm flows
-- notification permission prompts
-- sharing flows
-
-Do not remove these from the Android phone application.
-
-### Android TV emulator CI
-
-The workflow now includes a real Google TV emulator smoke test.
-
-Current configuration:
-
-- API 36
-- Google TV target
-- x86_64 architecture
-- mock data/configuration
-- Leanback launcher resolution check
-- launch + D-pad key injection
-- process/crash check
-- screenshot, UI hierarchy, and logcat artifacts
-
-Resolution history:
-
-- API 34 Google TV x86_64 was not available to the GitHub runner.
-- API 34 Google TV x86 was available, but 32-bit Android x86 is not a valid
-  Flutter runtime target.
-- Local Android Studio testing confirmed a Google TV x86_64 AVD is the correct
-  architecture, so CI was moved to API 36 x86_64.
-
-The current smoke test proves launch/liveness, not the full user journey. It
-still needs to be extended through account/guest entry -> Home/Explore ->
-meditation -> player -> play/pause -> Back with deterministic focus assertions.
+The emulator smoke test proves launch and liveness under D-pad input, not the
+Home -> meditation -> player -> Back journey, and it does not run on push.
 
 ### Production release path
 
-Still needed:
-
-- add production `flutter build appbundle --flavor prod --release ...`
-- retain current APK output if useful
-- update Fastlane/Play upload to support the AAB
-- determine whether the same AAB is used for phone + TV or Play form-factor targeting is configured separately
-- run final production-signing validation
-
-### Play Console work
-
-After the application is functionally TV-ready:
-
-- enable/configure the TV form factor in Google Play Console
-- provide TV screenshots/listing assets as required
-- validate current Play TV quality/policy checks
-- submit to an internal/closed test track before production
-
-Re-check current Play Console UI/instructions at release time because those steps can change.
-
-## Recommended next steps when resuming
-
-1. **Check the newest `Android TV Build` run.** Confirm the API 36 x86_64
-   Google TV emulator boots and launches Medito.
-2. **Use the local scripts for visual validation.** Run
-   `./scripts/setup-tv-dev.ps1` once and `./scripts/run-tv-mock.ps1` for
-   repeat testing.
-3. **Validate the TV onboarding bypass locally.** On a cleared app, choose
-   guest/account entry and confirm TV goes directly to the main app.
-4. **Fix Home Up Next remote access.** Remove the remaining touch-only entry
-   points from the primary Home -> session path.
-5. **Standardize TV focus visibility.** Prefer a reusable focus treatment over
-   per-screen ad-hoc styling.
-6. **Validate pack/path -> player with only D-pad/select/back.**
-7. **Gate phone-only runtime behavior on Leanback.** Review Health Connect,
-   DND, notifications/reminders, widgets, dynamic icons, sharing, and donation
-   webview behavior.
-8. **Extend CI from launch smoke to a deterministic TV journey.**
-9. **Only after the core flow is functional, finish production AAB/Play Console
-   work and open the PR.**
-
-## Definition of the next functional milestone
-
-The next meaningful milestone is not “all TV screens polished.” It is:
-
-> On an Android TV / Google TV emulator, Medito launches from the TV launcher and can be operated with only a remote from Home/Explore through selecting a meditation, entering the player, starting/pausing playback, and navigating Back without losing focus.
-
-Until that works, remain on `feature/android-tv-support` and do not open the PR.
+- confirm the same AAB serves phone and TV, or configure Play form-factor targeting
+- enable the TV form factor in Play Console and supply TV listing assets
+- run production-signing validation on an internal track
