@@ -37,7 +37,8 @@ try {
     $requiredLocalFiles = @(
         "android\keystore.properties",
         "android\app\google-services.json",
-        "lib\src\audio_pigeon.g.dart"
+        "lib\src\audio_pigeon.g.dart",
+        "lib\src\watch_presence_pigeon.g.dart"
     )
 
     $needsSetup = $RefreshSetup

@@ -86,7 +86,8 @@ Obtain it from a Medito maintainer and keep production credentials out of git.
     }
 
     foreach ($generatedFile in @(
-        "lib\src\audio_pigeon.g.dart"
+        "lib\src\audio_pigeon.g.dart",
+        "lib\src\watch_presence_pigeon.g.dart"
     )) {
         if (-not (Test-Path (Join-Path $RepoRoot $generatedFile))) {
             throw "Generated file '$generatedFile' is missing. Run the normal code-generation steps first."

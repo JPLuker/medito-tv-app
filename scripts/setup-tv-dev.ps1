@@ -303,10 +303,16 @@ versionName=1.0.0
         throw "build_runner failed."
     }
 
-    Write-Step "Generating Pigeon Android/audio bindings"
-    & $FlutterBat pub run pigeon --input pigeon_conf.dart --package_name=medito
-    if ($LASTEXITCODE -ne 0) {
-        throw "Pigeon generation failed."
+    Write-Step "Generating Pigeon native bindings"
+    $pigeonInputs = @("pigeon_conf.dart")
+    if (Test-Path "pigeons") {
+        $pigeonInputs += Get-ChildItem "pigeons" -Filter "*.dart" | ForEach-Object { "pigeons/$($_.Name)" }
+    }
+    foreach ($pigeonInput in $pigeonInputs) {
+        & $FlutterBat pub run pigeon --input $pigeonInput --package_name=medito
+        if ($LASTEXITCODE -ne 0) {
+            throw "Pigeon generation failed for $pigeonInput."
+        }
     }
 
     Write-Step "Flutter-visible devices"
