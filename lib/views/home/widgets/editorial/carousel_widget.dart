@@ -5,21 +5,22 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/constants/colors/color_constants.dart';
+import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:medito/constants/styles/widget_styles.dart';
-import 'package:medito/constants/types/type_constants.dart';
 import 'package:medito/models/home/home_model.dart';
 import 'package:medito/providers/providers.dart';
-import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/routes/routes.dart';
 import 'package:medito/utils/utils.dart';
 
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/widgets/network_image_widget.dart';
+
 import '../../home_styles.dart';
 import '../home_gradient_border.dart';
 
+import 'package:medito/constants/theme/medito_text.dart';
+
 const _kCardBorderRadius = kHomeCardRadius;
-const _kChipFontSize = 11.0;
 const _kCarouselHeight = 180.0;
 
 class CarouselWidget extends ConsumerStatefulWidget {
@@ -89,31 +90,20 @@ class _CarouselWidgetState extends ConsumerState<CarouselWidget> {
         MediaQuery.of(context).size.shortestSide >= 600;
 
     final flexWeights = isWide ? [4, 3, 3, 3] : [4, 3, 2];
-    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
-      data: (value) => value.isAndroidTv,
-      orElse: () => false,
-    );
-    final carouselItems = isTv
-        ? widget.carouselItems
-              .where((item) => !_isPhoneOnlyAction(item.type, item.path))
-              .toList()
-        : widget.carouselItems;
-
-    if (carouselItems.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.only(left: padding16),
-          child: Text(
-            AppLocalizations.of(context)!.carouselTitle,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              fontFamily: teachers,
-              fontSize: 20,
-              fontWeight: FontWeight.w400,
-              height: 28 / 24,
-              color: Theme.of(context).colorScheme.onSurface,
+          // A heading, so screen-reader users can jump between Home sections.
+          child: Semantics(
+            header: true,
+            child: Text(
+              AppLocalizations.of(context)!.carouselTitle,
+              style: context.text.title.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
           ),
         ),
@@ -133,15 +123,16 @@ class _CarouselWidgetState extends ConsumerState<CarouselWidget> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(_kCardBorderRadius),
                 ),
-                onTap: (index) {
-                  if (index < carouselItems.length) {
-                    _onItemTap(carouselItems[index]);
-                  }
-                },
+                // The carousel's own tap layer sits beside each child, not
+                // around it: every card was two screen-reader stops (a label
+                // with no action, then an unlabelled tap target), and the two
+                // spacers below were focusable tap targets whose index
+                // overran carouselItems. Cards handle their own tap instead.
+                enableSplash: false,
                 children: [
-                  ...carouselItems.map((item) {
-                    return _buildCarouselItem(context, item);
-                  }),
+                  for (final (index, item) in widget.carouselItems.indexed)
+                    _buildTappableItem(context, item, index),
+                  // Spacers so the last card can scroll fully into view.
                   const SizedBox.shrink(),
                   const SizedBox.shrink(),
                 ],
@@ -164,9 +155,8 @@ class _CarouselWidgetState extends ConsumerState<CarouselWidget> {
                         end: Alignment.centerRight,
                         colors: [
                           Theme.of(context).scaffoldBackgroundColor,
-                          Theme.of(
-                            context,
-                          ).scaffoldBackgroundColor.withValues(alpha: 0),
+                          Theme.of(context).scaffoldBackgroundColor
+                              .withValues(alpha: 0),
                         ],
                       ),
                     ),
@@ -191,9 +181,8 @@ class _CarouselWidgetState extends ConsumerState<CarouselWidget> {
                         end: Alignment.centerLeft,
                         colors: [
                           Theme.of(context).scaffoldBackgroundColor,
-                          Theme.of(
-                            context,
-                          ).scaffoldBackgroundColor.withValues(alpha: 0),
+                          Theme.of(context).scaffoldBackgroundColor
+                              .withValues(alpha: 0),
                         ],
                       ),
                     ),
@@ -207,20 +196,22 @@ class _CarouselWidgetState extends ConsumerState<CarouselWidget> {
     );
   }
 
-  bool _isPhoneOnlyAction(String? type, String? path) {
-    return type == TypeConstants.url ||
-        type == TypeConstants.link ||
-        type == TypeConstants.email ||
-        type == 'donation' ||
-        (type == TypeConstants.route && path == RouteConstants.donation);
-  }
-
-  void _onItemTap(HomeCarouselModel item) {
+  void _onItemTap(int index) {
+    if (index >= widget.carouselItems.length) return;
+    final item = widget.carouselItems[index];
+    final analytics = ref.read(analyticsServiceProvider);
     unawaited(
-      ref
-          .read(analyticsServiceProvider)
-          .logFirstActionAfterOnboardingIfNeeded('carousel'),
+      analytics.logEvent(
+        name: AnalyticsEventConstants.carouselItemTapped,
+        parameters: {
+          AnalyticsEventConstants.paramCarouselItemId: item.id,
+          AnalyticsEventConstants.paramCarouselItemTitle: item.title,
+          AnalyticsEventConstants.paramCarouselItemType: ?item.type,
+          AnalyticsEventConstants.paramCarouselPosition: index + 1,
+        },
+      ),
     );
+    unawaited(analytics.logFirstActionAfterOnboardingIfNeeded('carousel'));
     handleNavigation(
       item.type,
       [item.path.toString().getIdFromPath(), item.path],
@@ -229,64 +220,81 @@ class _CarouselWidgetState extends ConsumerState<CarouselWidget> {
     );
   }
 
+  Widget _buildTappableItem(
+    BuildContext context,
+    HomeCarouselModel item,
+    int index,
+  ) {
+    // The label hides the "New" (or custom) banner chip, so carry it here.
+    final banner = item.showBanner == true
+        ? item.bannerLabel ?? AppLocalizations.of(context)!.neww
+        : null;
+    return Semantics(
+      label: banner == null ? item.title : '${item.title}, $banner',
+      button: true,
+      excludeSemantics: true,
+      onTap: () => _onItemTap(index),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _buildCarouselItem(context, item),
+          Material(
+            type: MaterialType.transparency,
+            child: InkWell(onTap: () => _onItemTap(index)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCarouselItem(BuildContext context, HomeCarouselModel item) {
     final cardColor = Theme.of(context).cardColor;
     final screenWidth = MediaQuery.of(context).size.width;
     final imageWidth = screenWidth * 0.55;
 
-    return Semantics(
-      label: item.title,
-      button: true,
-      child: _buildBanner(
-        item,
-        HomeGradientBorder(
-          backgroundColor: cardColor,
-          borderRadius: _kCardBorderRadius,
-          borderWidth: 0.5,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              OverflowBox(
-                maxWidth: imageWidth,
-                minWidth: imageWidth,
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: imageWidth,
-                  child: NetworkImageWidget(
-                    url: item.coverUrl,
-                    shouldCache: true,
-                  ),
+    return _buildBanner(
+      item,
+      HomeGradientBorder(
+        backgroundColor: cardColor,
+        borderRadius: _kCardBorderRadius,
+        borderWidth: 0.5,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            OverflowBox(
+              maxWidth: imageWidth,
+              minWidth: imageWidth,
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: imageWidth,
+                child: NetworkImageWidget(
+                  url: item.coverUrl,
+                  shouldCache: true,
                 ),
               ),
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(10, 36, 10, 12),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [Color(0xCC000000), Colors.transparent],
-                    ),
-                  ),
-                  child: Text(
-                    item.title,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontFamily: dmSans,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      height: 1.2,
-                      color: Colors.white,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+            ),
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(10, 36, 10, 12),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [Color(0xCC000000), Colors.transparent],
                   ),
                 ),
+                child: Text(
+                  item.title,
+                  style: context.text.on(Colors.white).label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -297,7 +305,7 @@ class _CarouselWidgetState extends ConsumerState<CarouselWidget> {
 
     final bannerColor = item.bannerColor != null
         ? parseColor(item.bannerColor!)
-        : context.brandPurple;
+        : context.brandAccent;
 
     return Stack(
       fit: StackFit.expand,
@@ -315,11 +323,7 @@ class _CarouselWidgetState extends ConsumerState<CarouselWidget> {
               ),
               child: Text(
                 item.bannerLabel ?? AppLocalizations.of(context)!.neww,
-                style: TextStyle(
-                  fontFamily: dmSans,
-                  fontSize: _kChipFontSize,
-                  fontWeight: FontWeight.w600,
-                  height: 1.2,
+                style: context.text.caption.copyWith(
                   color: parseColor(item.bannerLabelColor),
                 ),
               ),

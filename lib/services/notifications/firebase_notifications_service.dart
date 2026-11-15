@@ -19,8 +19,13 @@ import 'package:medito/utils/logger.dart';
 import 'package:medito/l10n/app_localizations.dart';
 
 import '../../constants/strings/analytics_event_constants.dart';
+import '../../utils/launch_source_tracker.dart';
 import '../../models/notification/notification_payload_model.dart';
 import '../analytics/firebase_analytics_service.dart';
+import 'local_notifications.dart';
+import 'notification_timing.dart';
+import '../../providers/donation/supporter_appeal_provider.dart';
+import '../../providers/donation/supporter_appeal_experiment.dart';
 import '../../routes/routes.dart';
 import '../../views/bottom_navigation/bottom_navigation_bar_view.dart';
 
@@ -31,10 +36,12 @@ final firebaseMessagingProvider = Provider<FirebaseMessagingHandler>((ref) {
 class FirebaseMessagingHandler {
   final Ref ref;
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+      LocalNotifications.plugin;
 
   // Track if notifications are initialized
   static bool _isFlutterLocalNotificationsInitialized = false;
+
+  static Future<void>? _openTrackingRegistration;
 
   // Create a channel for Android notifications
   static AndroidNotificationChannel? _channel;
@@ -62,17 +69,7 @@ class FirebaseMessagingHandler {
       return;
     }
     try {
-      await _setupFlutterNotifications();
-      _configureFirebaseMessaging(context, ref);
-      _initializeLocalNotifications(context, ref);
-
-      // Enable headless notification presentation for all platforms, but disable badges
-      await FirebaseMessaging.instance
-          .setForegroundNotificationPresentationOptions(
-            alert: true,
-            badge: false, // Never show badges
-            sound: true,
-          );
+      await registerOpenTracking(ref);
 
       if (kDebugMode) {
         AppLogger.d(
@@ -121,72 +118,105 @@ class FirebaseMessagingHandler {
       importance: Importance.high,
     );
 
-    // Check if the channel already exists (it might have been created in the native code)
     final androidImplementation = _flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >();
 
-    final channelExists =
-        await androidImplementation?.areNotificationsEnabled() ?? false;
-    if (!channelExists) {
-      // Only create the channel if needed
-      await androidImplementation?.createNotificationChannel(_channel!);
-    }
+    // Channel creation is idempotent and preserves the user's channel settings.
+    await androidImplementation?.createNotificationChannel(_channel!);
+    await androidImplementation?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'medito_supporter_appeal',
+        'Support Medito',
+        description: 'Occasional messages about Medito and supporting its work',
+        importance: Importance.defaultImportance,
+      ),
+    );
 
     _isFlutterLocalNotificationsInitialized = true;
   }
 
-  void _configureFirebaseMessaging(BuildContext context, WidgetRef ref) {
+  void _configureFirebaseMessaging(WidgetRef ref) {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     FirebaseMessaging.onMessage.listen(
-      (message) => _handleForegroundMessage(message, context, ref),
-    );
-    FirebaseMessaging.onMessageOpenedApp.listen(
-      (message) => _handleMessageOpenedApp(message, context, ref),
+      (message) =>
+          _handleForegroundMessage(message, navigatorKey.currentContext, ref),
     );
   }
 
-  void _initializeLocalNotifications(BuildContext context, WidgetRef ref) {
-    // Match the Firebase example approach
-    const initializationSettingsAndroid = AndroidInitializationSettings('logo');
+  /// Records and routes notification opens for the life of the app. Runs at
+  /// app start: it used to run only from the onboarding reminder screen, so
+  /// reminder and push opens from returning users were never seen.
+  /// Idempotent; onboarding calls it again harmlessly.
+  Future<void> registerOpenTracking(WidgetRef ref) {
+    if (isMockMode) return Future.value();
+    return _openTrackingRegistration ??= _registerOpenTracking(ref);
+  }
 
-    // For iOS, initialize with proper settings but disable badges
-    const initializationSettingsIOS = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: false, // Never request badge permission
-      requestSoundPermission: true,
-    );
+  Future<void> _registerOpenTracking(WidgetRef ref) async {
+    try {
+      LocalNotifications.tapHandler = (response) =>
+          _onLocalNotificationTap(response, ref);
+      await LocalNotifications.ensureInitialized();
+      // Returning users do not revisit onboarding. Receiving messages must be
+      // registered at startup too, without requesting notification permission.
+      await _setupFlutterNotifications();
+      await FirebaseMessaging.instance
+          .setForegroundNotificationPresentationOptions(
+            alert: true,
+            badge: false,
+            sound: true,
+          );
 
-    const initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-      iOS: initializationSettingsIOS,
-    );
+      // Finish fallible async setup before attaching listeners. A failed
+      // attempt can then retry without leaving duplicate message handlers.
+      final initialMessage = await FirebaseMessaging.instance
+          .getInitialMessage();
+      _configureFirebaseMessaging(ref);
 
-    _flutterLocalNotificationsPlugin.initialize(
-      settings: initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        final data = _decodePayload(response.payload);
-        unawaited(_logNotificationOpen(data));
+      // A reminder fires while the app is terminated, which is the normal case
+      // for a 7am notification. That tap never reaches the tap handler — it
+      // only shows up in the launch details — so without this the taps that
+      // matter most were the ones we could not see.
+      unawaited(_logColdStartNotificationOpen());
 
-        // Only deep-link when the payload actually asks for one. The smart
-        // reminder series carries no type/path, and routing it through
-        // _navigate would push a second home view on top of the current
-        // screen — the OS opening the app is already the whole intent.
-        if (data != null && data['type'] != null) {
-          _navigate(context, ref, data);
-        }
-      },
-    );
+      FirebaseMessaging.onMessageOpenedApp.listen(
+        (message) => _handleMessageOpenedApp(message, ref),
+      );
 
-    // A reminder fires while the app is terminated, which is the normal case
-    // for a 7am notification. That tap never reaches the callback above — it
-    // only shows up in the launch details — so without this the taps that
-    // matter most were the ones we could not see.
-    unawaited(_logColdStartNotificationOpen());
+      // Same gap for push: a tap that launches the app from terminated never
+      // reaches onMessageOpenedApp. Logged only — routing here would race the
+      // splash screen.
+      if (initialMessage != null) {
+        unawaited(
+          _logNotificationOpen(
+            initialMessage.data,
+            sourceOverride: AnalyticsEventConstants.sourcePush,
+          ),
+        );
+      }
+    } catch (e, st) {
+      _openTrackingRegistration = null;
+      AppLogger.e(
+        'FIREBASE_NOTIFICATIONS',
+        'Error registering notification open tracking: $e',
+        st,
+      );
+    }
+  }
 
-    if (kDebugMode) {
-      AppLogger.d('FIREBASE_NOTIFICATIONS', "Local notifications initialized");
+  void _onLocalNotificationTap(NotificationResponse response, WidgetRef ref) {
+    final data = _decodePayload(response.payload);
+    unawaited(_logNotificationOpen(data));
+
+    // Only deep-link when the payload actually asks for one. The daily
+    // reminder series carries no type/path, and routing it through
+    // _navigate would push a second home view on top of the current
+    // screen — the OS opening the app is already the whole intent.
+    final context = navigatorKey.currentContext;
+    if (data != null && data['type'] != null && context != null) {
+      _navigate(context, ref, data);
     }
   }
 
@@ -214,10 +244,20 @@ class FirebaseMessagingHandler {
     Map<String, dynamic>? data, {
     String? sourceOverride,
   }) async {
+    try {
+      await SupporterAppealRuntime.recordOpen(data);
+    } catch (e) {
+      AppLogger.w('SUPPORTER_APPEAL', 'Could not record appeal open: $e');
+    }
     final source =
         sourceOverride ??
         (data?['source'] as String?) ??
         (data == null ? 'unknown' : AnalyticsEventConstants.sourcePush);
+    if (source == AnalyticsEventConstants.sourceLocalReminder) {
+      LaunchSourceTracker.instance.markLocalReminder();
+    } else if (source != 'unknown') {
+      LaunchSourceTracker.instance.markPush();
+    }
     final day = data?[AnalyticsEventConstants.paramNotificationDay];
 
     await FirebaseAnalyticsService().logEvent(
@@ -225,6 +265,7 @@ class FirebaseMessagingHandler {
       parameters: {
         AnalyticsEventConstants.paramSource: source,
         if (day is int) AnalyticsEventConstants.paramNotificationDay: day,
+        ...NotificationTiming.opened(data, DateTime.now()),
       },
     );
   }
@@ -249,7 +290,7 @@ class FirebaseMessagingHandler {
 
   Future<void> _handleForegroundMessage(
     RemoteMessage message,
-    BuildContext context,
+    BuildContext? context,
     WidgetRef ref,
   ) async {
     // Debug log
@@ -265,9 +306,12 @@ class FirebaseMessagingHandler {
     if (AppLifecycleState.resumed == WidgetsBinding.instance.lifecycleState) {
       showNotification(message);
     }
+    if (message.data['source'] == SupporterAppealExperiment.name) {
+      ref.invalidate(supporterAppealProvider);
+    }
 
     // Still show snackbar for in-app UX, but make sure the context is valid
-    if (context.mounted) {
+    if (context != null && context.mounted) {
       final localizations = AppLocalizations.of(context)!;
       final snackBar = SnackBar(
         content: Text(
@@ -301,9 +345,16 @@ class FirebaseMessagingHandler {
         body: notification.body,
         notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
-            _channel!.id,
-            _channel!.name,
-            channelDescription: _channel!.description,
+            message.data['source'] == SupporterAppealExperiment.name
+                ? 'medito_supporter_appeal'
+                : _channel!.id,
+            message.data['source'] == SupporterAppealExperiment.name
+                ? 'Support Medito'
+                : _channel!.name,
+            channelDescription:
+                message.data['source'] == SupporterAppealExperiment.name
+                ? 'Occasional messages about Medito and supporting its work'
+                : _channel!.description,
             icon: 'logo',
             channelShowBadge: false,
           ),
@@ -315,7 +366,6 @@ class FirebaseMessagingHandler {
 
   Future<void> _handleMessageOpenedApp(
     RemoteMessage message,
-    BuildContext context,
     WidgetRef ref,
   ) async {
     unawaited(
@@ -324,7 +374,11 @@ class FirebaseMessagingHandler {
         sourceOverride: AnalyticsEventConstants.sourcePush,
       ),
     );
-    _navigate(context, ref, message.data);
+    final context = navigatorKey.currentContext;
+    if (context != null &&
+        message.data['source'] != SupporterAppealExperiment.name) {
+      _navigate(context, ref, message.data);
+    }
     await ref.read(reminderProvider).clearBadge();
   }
 
@@ -333,6 +387,10 @@ class FirebaseMessagingHandler {
     WidgetRef ref,
     Map<String, dynamic> data,
   ) {
+    if (data['source'] == SupporterAppealExperiment.name) {
+      unawaited(_logNotificationOpen(data));
+      return;
+    }
     var payload = NotificationPayloadModel.fromJson(data);
 
     if (payload.type?.isNotNullAndNotEmpty() == true) {

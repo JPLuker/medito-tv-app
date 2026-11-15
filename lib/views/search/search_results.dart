@@ -1,11 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/constants/constants.dart';
 import 'package:medito/constants/icons/medito_icons.dart';
 import 'package:medito/exceptions/app_error.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/models/explore/explore_list_item.dart';
-import 'package:medito/providers/explore/track_search_provider.dart';
+import 'package:medito/providers/providers.dart';
 import 'package:medito/utils/utils.dart';
 import 'package:medito/views/explore/widgets/pack_grid_sliver.dart';
 import 'package:medito/views/explore/widgets/track_list_sliver.dart';
@@ -45,12 +48,21 @@ enum SearchFilter {
 /// overlay above the tabs while the nav capsule holds the search field, so
 /// the bottom padding follows the bar height from the enclosing Scaffold.
 class SearchResults extends ConsumerStatefulWidget {
-  const SearchResults({super.key, required this.query, this.onBeforeNavigate});
+  const SearchResults({
+    super.key,
+    required this.query,
+    this.onBeforeNavigate,
+    this.onResults,
+  });
 
   final String query;
 
   /// Runs before a result navigates, e.g. to dismiss the keyboard.
   final VoidCallback? onBeforeNavigate;
+
+  /// Called once per query when its results have loaded, with whether there
+  /// were any. Analytics is the caller's (see SearchQueryLogger).
+  final void Function(String query, bool hasResults)? onResults;
 
   @override
   ConsumerState<SearchResults> createState() => _SearchResultsState();
@@ -61,6 +73,10 @@ class _SearchResultsState extends ConsumerState<SearchResults> {
   int? _previousPacksCount;
   int? _previousTracksCount;
   bool _filterSwitchScheduled = false;
+
+  /// The last query reported via [SearchResults.onResults], so each query is
+  /// reported once (not on every rebuild).
+  String? _reportedQuery;
 
   @override
   void didUpdateWidget(covariant SearchResults oldWidget) {
@@ -99,9 +115,8 @@ class _SearchResultsState extends ConsumerState<SearchResults> {
               Text(
                 AppLocalizations.of(context)!.searchEmptyHint,
                 textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
+                style: context.text.body.copyWith(
                   color: theme.colorScheme.onSurface.withOpacityValue(0.6),
-                  height: 1.4,
                 ),
               ),
             ],
@@ -114,8 +129,12 @@ class _SearchResultsState extends ConsumerState<SearchResults> {
   Widget _buildFilterTabs() {
     final query = widget.query;
     final packsCount = ref.watch(searchFilteredPacksProvider(query)).length;
-    final tracksCount =
-        ref.watch(searchTracksProvider(query)).value?.length ?? 0;
+    // Null until the tracks load, so the tab doesn't claim "0" meanwhile.
+    final loadedTracksCount = ref
+        .watch(searchTracksProvider(query))
+        .value
+        ?.length;
+    final tracksCount = loadedTracksCount ?? 0;
 
     if ((_previousPacksCount != packsCount ||
             _previousTracksCount != tracksCount) &&
@@ -150,7 +169,7 @@ class _SearchResultsState extends ConsumerState<SearchResults> {
                   label: filter.label(context),
                   count: filter == SearchFilter.packs
                       ? packsCount
-                      : tracksCount,
+                      : loadedTracksCount,
                   selected: _filter == filter,
                   onTap: () => setState(() => _filter = filter),
                 ),
@@ -170,6 +189,27 @@ class _SearchResultsState extends ConsumerState<SearchResults> {
 
     return tracksAsync.when(
       data: (tracks) {
+        if (query.isNotEmpty && _reportedQuery != query) {
+          _reportedQuery = query;
+          final hasResults = packs.isNotEmpty || tracks.isNotEmpty;
+          final total = packs.length + tracks.length;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            widget.onResults?.call(query, hasResults);
+            // The list swaps silently under the field; say what it found,
+            // once per settled (debounced) query.
+            unawaited(
+              SemanticsService.sendAnnouncement(
+                View.of(context),
+                hasResults
+                    ? l10n.searchResultsCount(total)
+                    : l10n.noResultsFound,
+                Directionality.of(context),
+              ),
+            );
+          });
+        }
+
         final shownPacks = _filter == SearchFilter.tracks
             ? <PackItem>[]
             : packs;
@@ -187,7 +227,7 @@ class _SearchResultsState extends ConsumerState<SearchResults> {
                   child: Text(
                     l10n.noResultsFound,
                     textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
+                    style: context.text.body.copyWith(
                       color: theme.colorScheme.onSurface.withOpacityValue(0.7),
                     ),
                   ),
@@ -227,8 +267,12 @@ class _SearchResultsState extends ConsumerState<SearchResults> {
           ),
         ];
       },
-      loading: () => const [
-        SliverFillRemaining(child: Center(child: CircularProgressIndicator())),
+      loading: () => [
+        SliverFillRemaining(
+          child: Center(
+            child: CircularProgressIndicator(semanticsLabel: l10n.loading),
+          ),
+        ),
       ],
     );
   }
@@ -243,7 +287,9 @@ class _FilterTab extends StatelessWidget {
   });
 
   final String label;
-  final int count;
+
+  /// Null while still loading: no count is shown or read.
+  final int? count;
   final bool selected;
   final VoidCallback onTap;
 
@@ -252,52 +298,63 @@ class _FilterTab extends StatelessWidget {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
     final primary = theme.colorScheme.primary;
-    final textColor = selected ? onSurface : onSurface.withOpacityValue(0.5);
+    // 0.65, not 0.5: the unselected tab must still pass contrast in light mode.
+    final textColor = selected ? onSurface : onSurface.withOpacityValue(0.65);
+    final count = this.count;
 
-    return InkWell(
+    // Was plain text read as "Packs", then a bare "12": no role, no
+    // selection, no hint what the number counts.
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: count == null
+          ? label
+          : '$label, ${AppLocalizations.of(context)!.searchResultsCount(count)}',
+      excludeSemantics: true,
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: selected
-                  ? primary
-                  : theme.colorScheme.outline.withOpacityValue(0.2),
-              width: selected ? 2 : 1,
+      child: InkWell(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: selected
+                    ? primary
+                    : theme.colorScheme.outline.withOpacityValue(0.2),
+                width: selected ? 2 : 1,
+              ),
             ),
           ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: textColor,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: selected
-                    ? primary.withOpacityValue(0.15)
-                    : onSurface.withOpacityValue(0.08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '$count',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: selected ? primary : textColor,
-                  fontWeight: FontWeight.w600,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(label, style: context.text.label.copyWith(color: textColor)),
+              if (count != null) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? primary.withOpacityValue(0.15)
+                        : onSurface.withOpacityValue(0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: context.text.label.copyWith(
+                      color: selected ? primary : textColor,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ],
+              ],
+            ],
+          ),
         ),
       ),
     );

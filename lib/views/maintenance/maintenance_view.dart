@@ -7,6 +7,7 @@ import 'package:medito/providers/device_capabilities_provider.dart';
 
 import '../../constants/colors/color_constants.dart';
 import 'package:medito/l10n/app_localizations.dart';
+import 'package:medito/constants/theme/medito_text.dart';
 
 class MaintenanceView extends ConsumerStatefulWidget {
   const MaintenanceView({
@@ -29,11 +30,7 @@ class _MaintenanceViewState extends ConsumerState<MaintenanceView> {
       data: (value) => value.isAndroidTv,
       orElse: () => false,
     );
-    var markDownTheme = Theme.of(context).textTheme.bodyMedium?.copyWith(
-      color: ColorConstants.white,
-      fontSize: 16,
-      fontWeight: FontWeight.w400,
-    );
+    var markDownTheme = context.text.on(ColorConstants.white).body;
 
     return Scaffold(
       backgroundColor: ColorConstants.ebony,
@@ -45,54 +42,57 @@ class _MaintenanceViewState extends ConsumerState<MaintenanceView> {
               child: Center(
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 400),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 24),
-                      Text(
-                        AppLocalizations.of(context)!.hey,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      MarkdownWidget(
-                        body: widget.maintenanceModel.message ?? '',
-                        textAlign: WrapAlignment.start,
-                        a: markDownTheme?.copyWith(
-                          decoration: TextDecoration.underline,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        p: markDownTheme?.copyWith(
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white70,
-                          fontSize: 16,
-                          height: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      if (!isTv &&
-                          widget.maintenanceModel.ctaLabel != null &&
-                          widget.maintenanceModel.ctaLabel!.isNotEmpty)
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: onPressed,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: ColorConstants.lightPurple,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: Text(widget.maintenanceModel.ctaLabel ?? ''),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 24),
+                        // Heading without the 👋, which screen readers read
+                        // out as "waving hand".
+                        Semantics(
+                          header: true,
+                          label: AppLocalizations.of(context)!.heyLabel,
+                          excludeSemantics: true,
+                          child: Text(
+                            AppLocalizations.of(context)!.hey,
+                            style: context.text.on(Colors.white).headline,
                           ),
                         ),
-                    ],
+                        const SizedBox(height: 12),
+                        MarkdownWidget(
+                          body: widget.maintenanceModel.message ?? '',
+                          textAlign: WrapAlignment.start,
+                          a: markDownTheme.copyWith(
+                            decoration: TextDecoration.underline,
+                          ),
+                          p: context.text.on(Colors.white70).body,
+                        ),
+                        const SizedBox(height: 24),
+                        if (!isTv &&
+                            widget.maintenanceModel.ctaLabel != null &&
+                            widget.maintenanceModel.ctaLabel!.isNotEmpty)
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: onPressed,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: ColorConstants.accentDark,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: Text(
+                                widget.maintenanceModel.ctaLabel ?? '',
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),

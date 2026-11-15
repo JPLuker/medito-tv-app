@@ -1,3 +1,4 @@
+import '../../models/background_sounds/session_bell_pattern.dart';
 import '../../utils/logger.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -17,11 +18,36 @@ abstract class BackgroundSoundsRepository {
 
   Future<List<BackgroundSoundsModel>?> fetchLocallySavedBackgroundSounds();
 
+  /// The sound list as last fetched online, or the sounds this device has
+  /// picked before if it has never been fetched. Never touches the network.
+  List<BackgroundSoundsModel> fetchCachedBackgroundSounds();
+
   Future<void> updateItemsInSavedBgSoundList(BackgroundSoundsModel sound);
 
+  /// The ambient sound, one choice shared by tracks and the Timer.
   void saveSelectedBgSoundToSharedPreferences(BackgroundSoundsModel sound);
 
+  /// The ambient sound (session bells have their own settings).
   BackgroundSoundsModel? getSelectedBgSoundFromSharedPreferences();
+
+  /// Bells default on for the Timer and off under tracks, except for users
+  /// who had picked bells as their background sound before they were a switch.
+  bool getSessionBellsEnabled({bool forTimer = false});
+
+  void saveSessionBellsEnabled(bool enabled, {bool forTimer = false});
+
+  SessionBellPattern getSessionBellPattern({bool forTimer = false});
+
+  void saveSessionBellPattern(
+    SessionBellPattern pattern, {
+    bool forTimer = false,
+  });
+
+  /// Seconds between interval bells on top of the pattern cues, or 0 for off.
+  /// Only used by the timer; tracks have no interval setting.
+  int getTimerBellIntervalSeconds();
+
+  void saveTimerBellIntervalSeconds(int seconds);
 
   void removeSelectedBgSound();
 
@@ -72,11 +98,47 @@ class BackgroundSoundsRepositoryImpl extends BackgroundSoundsRepository {
         }
       }
 
+      _cacheCatalog(sounds);
       return sounds;
     } catch (e) {
       AppLogger.e('BACKGROUND', 'Error fetching background sounds: $e');
       if (e is AppError) rethrow;
       throw const ServerError();
+    }
+  }
+
+  void _cacheCatalog(List<BackgroundSoundsModel> sounds) {
+    final encoded = jsonEncode([
+      for (final s in sounds)
+        if (s.id != kNoneBackgroundSoundId) s.toJson(),
+    ]);
+    unawaited(
+      ref
+          .read(sharedPreferencesProvider)
+          .setString(SharedPreferenceConstants.bgSoundCatalog, encoded),
+    );
+  }
+
+  @override
+  List<BackgroundSoundsModel> fetchCachedBackgroundSounds() {
+    try {
+      final prefs = ref.read(sharedPreferencesProvider);
+      final catalog = prefs.getString(SharedPreferenceConstants.bgSoundCatalog);
+      if (catalog != null) {
+        return [
+          for (final item in jsonDecode(catalog) as List)
+            BackgroundSoundsModel.fromJson(Map<String, Object?>.from(item)),
+        ];
+      }
+      return [
+        for (final item
+            in prefs.getStringList(SharedPreferenceConstants.listBgSound) ??
+                const <String>[])
+          BackgroundSoundsModel.fromJson(jsonDecode(item)),
+      ];
+    } catch (e) {
+      AppLogger.w('BACKGROUND', 'Unreadable cached sound list: $e');
+      return const [];
     }
   }
 
@@ -107,7 +169,7 @@ class BackgroundSoundsRepositoryImpl extends BackgroundSoundsRepository {
     BackgroundSoundsModel sound,
   ) async {
     try {
-      if (sound.id == kNoneBackgroundSoundId) {
+      if (sound.id == kNoneBackgroundSoundId || sound.id == kSessionBellsId) {
         return;
       } else {
         var pref = ref.read(sharedPreferencesProvider);
@@ -148,9 +210,96 @@ class BackgroundSoundsRepositoryImpl extends BackgroundSoundsRepository {
         .read(sharedPreferencesProvider)
         .getString(SharedPreferenceConstants.bgSound);
 
-    return bgSoundJson != null
-        ? BackgroundSoundsModel.fromJson(json.decode(bgSoundJson))
-        : null;
+    if (bgSoundJson == null) return null;
+    final sound = BackgroundSoundsModel.fromJson(json.decode(bgSoundJson));
+    // Saved before bells became a switch: the bells live in their own pref.
+    return sound.id == kSessionBellsId ? null : sound;
+  }
+
+  @override
+  bool getSessionBellsEnabled({bool forTimer = false}) {
+    final prefs = ref.read(sharedPreferencesProvider);
+    if (getSessionBellPattern(forTimer: forTimer) == SessionBellPattern.none) {
+      return false;
+    }
+    final saved = prefs.getBool(
+      forTimer
+          ? SharedPreferenceConstants.timerSessionBellsEnabled
+          : SharedPreferenceConstants.sessionBellsEnabled,
+    );
+    if (saved != null) return saved;
+    if (forTimer) return true;
+    final legacy = prefs.getString(SharedPreferenceConstants.bgSound);
+    return legacy != null && legacy.contains('"$kSessionBellsId"');
+  }
+
+  @override
+  void saveSessionBellsEnabled(bool enabled, {bool forTimer = false}) {
+    unawaited(
+      ref
+          .read(sharedPreferencesProvider)
+          .setBool(
+            forTimer
+                ? SharedPreferenceConstants.timerSessionBellsEnabled
+                : SharedPreferenceConstants.sessionBellsEnabled,
+            enabled,
+          ),
+    );
+  }
+
+  @override
+  SessionBellPattern getSessionBellPattern({bool forTimer = false}) {
+    final saved = ref
+        .read(sharedPreferencesProvider)
+        .getString(
+          forTimer
+              ? SharedPreferenceConstants.timerSessionBellPattern
+              : SharedPreferenceConstants.sessionBellPattern,
+        );
+    // The old recurring preset becomes the three visible cue checkboxes.
+    if (saved == 'everyMinute') return SessionBellPattern.beginningMiddleEnd;
+    return SessionBellPattern.values.firstWhere(
+      (pattern) => pattern.name == saved,
+      orElse: () => forTimer
+          ? SessionBellPattern.beginningEnd
+          : SessionBellPattern.beginningMiddleEnd,
+    );
+  }
+
+  @override
+  void saveSessionBellPattern(
+    SessionBellPattern pattern, {
+    bool forTimer = false,
+  }) {
+    unawaited(
+      ref
+          .read(sharedPreferencesProvider)
+          .setString(
+            forTimer
+                ? SharedPreferenceConstants.timerSessionBellPattern
+                : SharedPreferenceConstants.sessionBellPattern,
+            pattern.name,
+          ),
+    );
+  }
+
+  @override
+  int getTimerBellIntervalSeconds() =>
+      ref
+          .read(sharedPreferencesProvider)
+          .getInt(SharedPreferenceConstants.timerSessionBellIntervalSeconds) ??
+      0;
+
+  @override
+  void saveTimerBellIntervalSeconds(int seconds) {
+    unawaited(
+      ref
+          .read(sharedPreferencesProvider)
+          .setInt(
+            SharedPreferenceConstants.timerSessionBellIntervalSeconds,
+            seconds,
+          ),
+    );
   }
 
   @override

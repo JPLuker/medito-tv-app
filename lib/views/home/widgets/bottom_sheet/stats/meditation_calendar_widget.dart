@@ -1,4 +1,9 @@
+import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+import 'package:medito/models/timer/timer_session.dart';
+import 'package:medito/views/timer/timer_format.dart';
+import 'package:medito/views/timer/timer_view.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/constants/constants.dart';
 import 'package:medito/constants/icons/medito_icons.dart';
@@ -18,7 +23,14 @@ import 'package:medito/widgets/medito_icon.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'bulk_add_sessions_dialog.dart';
+import 'package:medito/widgets/calendar_stamp.dart';
 import 'manual_session_dialog.dart';
+import 'edit_session_dialog.dart';
+import 'session_actions_sheet.dart';
+
+/// Streak-freeze blue for light mode: [ColorConstants.lightBlue] is only
+/// ~2.3:1 on the light card. This one is ~4.9:1 as text.
+const _kFreezeBlueLight = Color(0xFF1F6FA8);
 
 class MeditationCalendarWidget extends ConsumerStatefulWidget {
   final LocalAllStats stats;
@@ -34,11 +46,14 @@ class _MeditationCalendarWidgetState
     extends ConsumerState<MeditationCalendarWidget>
     with SingleTickerProviderStateMixin {
   late DateTime _focusedDay;
-  late DateTime _selectedDay;
+  DateTime? _selectedDay;
   late DateTime _selectedDayForSessions;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   bool _isAddingSession = false;
+  Set<DateTime>? _knownStampDates;
+  final Set<DateTime> _pendingStampDates = {};
+  Map<DateTime, CalendarStampType> _stamps = {};
 
   // Range selection: long-press one day to anchor, long-press a second day
   // to complete the range. A third long-press resets to a new anchor.
@@ -226,6 +241,43 @@ class _MeditationCalendarWidgetState
       await ref.read(statsProvider.notifier).refreshFromLocal();
     } else {
       messenger.showSnackBar(SnackBar(content: Text(errorMessage)));
+    }
+  }
+
+  Future<void> _editSession(LocalAudioCompleted session) async {
+    final picked = await showDialog<DateTime>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => EditSessionDialog(
+        initialDate: DateTime.fromMillisecondsSinceEpoch(session.timestamp),
+      ),
+    );
+    if (picked == null ||
+        !mounted ||
+        picked.millisecondsSinceEpoch == session.timestamp) {
+      return;
+    }
+    setState(() => _isAddingSession = true);
+    final success = await editSessionDateTime(
+      session: session,
+      dateTime: picked,
+    );
+    if (!mounted) return;
+    if (success) await ref.read(statsProvider.notifier).refreshFromLocal();
+    if (!mounted) return;
+    setState(() {
+      _isAddingSession = false;
+      if (success) {
+        final day = dayOf(picked, _dayOffset);
+        _selectedDay = day;
+        _selectedDayForSessions = day;
+        _focusedDay = day;
+      }
+    });
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context)!.editSessionError)),
+      );
     }
   }
 
@@ -474,6 +526,15 @@ class _MeditationCalendarWidgetState
 
   @override
   Widget build(BuildContext context) {
+    _stamps = calendarStampsForSessions(
+      widget.stats.audioCompleted ?? [],
+      _dayOffset,
+    );
+    final stampDates = _stamps.keys.toSet();
+    if (_knownStampDates != null) {
+      _pendingStampDates.addAll(stampDates.difference(_knownStampDates!));
+    }
+    _knownStampDates = stampDates;
     final meditationDates = _getMeditationDates(widget.stats);
     final freezeDates = _getFreezeDates(widget.stats);
     final sessions = _getSessionsForDay(_selectedDayForSessions);
@@ -495,11 +556,7 @@ class _MeditationCalendarWidgetState
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _buildCalendarCard(
-          context,
-          meditationDates: meditationDates,
-          freezeDates: freezeDates,
-        ),
+        _buildCalendarCard(context),
         _buildDayDetailsCard(
           context,
           sessions: sessions,
@@ -511,51 +568,54 @@ class _MeditationCalendarWidgetState
     );
   }
 
-  Widget _buildCalendarCard(
-    BuildContext context, {
-    required Set<DateTime> meditationDates,
-    required Set<DateTime> freezeDates,
-  }) {
+  Widget _buildCalendarCard(BuildContext context) {
     return Container(
       decoration: _cardDecoration(context),
-      padding: const EdgeInsets.all(16),
-      child: TableCalendar<dynamic>(
-        firstDay: DateTime.utc(2020, 1, 1),
-        lastDay: DateTime.now(),
-        focusedDay: _focusedDay,
-        selectedDayPredicate: (day) {
-          // While a range is active, only range endpoints get selected styling.
-          if (_rangeStart != null) return _isRangeEndpoint(day);
-          return isSameDay(_selectedDay, day);
-        },
-        calendarFormat: CalendarFormat.month,
-        startingDayOfWeek: StartingDayOfWeek.monday,
-        headerStyle: _calendarHeaderStyle(context),
-        calendarStyle: _calendarStyle(context),
-        calendarBuilders: CalendarBuilders(
-          defaultBuilder: (context, date, events) => _buildDefaultDayCell(
-            context,
-            date,
-            meditationDates: meditationDates,
-            freezeDates: freezeDates,
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+      child: Column(
+        children: [
+          TableCalendar<dynamic>(
+            rowHeight: 78 + (MediaQuery.textScalerOf(context).scale(12) - 12),
+            daysOfWeekHeight: 28,
+            // Month title, weekday letters and each day's spoken label.
+            locale: Localizations.localeOf(context).toString(),
+            firstDay: DateTime.utc(2020, 1, 1),
+            lastDay: DateTime.now(),
+            focusedDay: _focusedDay,
+            selectedDayPredicate: _isSelectedDay,
+            calendarFormat: CalendarFormat.month,
+            // Let vertical drags scroll the history page around the calendar.
+            availableGestures: AvailableGestures.horizontalSwipe,
+            startingDayOfWeek: StartingDayOfWeek.monday,
+            headerStyle: _calendarHeaderStyle(context),
+            calendarStyle: _calendarStyle(context),
+            calendarBuilders: CalendarBuilders(
+              // CellContent excludes its children's semantics. A sibling marker
+              // merges selection into the existing date label and tap action.
+              markerBuilder: (context, day, _) => Semantics(
+                selected: _isSelectedDay(day),
+                button: true,
+                child: const SizedBox.expand(),
+              ),
+              disabledBuilder: (context, date, _) =>
+                  _buildCalendarDay(context, date, disabled: true),
+              defaultBuilder: (context, date, events) =>
+                  _buildCalendarDay(context, date),
+              todayBuilder: (context, date, events) =>
+                  _buildCalendarDay(context, date),
+              selectedBuilder: (context, date, events) =>
+                  _buildCalendarDay(context, date, selected: true),
+            ),
+            daysOfWeekStyle: _daysOfWeekStyle(context),
+            onDaySelected: _onDaySelected,
+            onDayLongPressed: (day, focusedDay) => _handleLongPress(day),
+            onPageChanged: (focusedDay) {
+              setState(() {
+                _focusedDay = focusedDay;
+              });
+            },
           ),
-          todayBuilder: (context, date, events) => _buildTodayDayCell(
-            context,
-            date,
-            meditationDates: meditationDates,
-            freezeDates: freezeDates,
-          ),
-          selectedBuilder: (context, date, events) =>
-              _buildSelectedDayCell(context, date, freezeDates: freezeDates),
-        ),
-        daysOfWeekStyle: _daysOfWeekStyle(context),
-        onDaySelected: _onDaySelected,
-        onDayLongPressed: (day, focusedDay) => _handleLongPress(day),
-        onPageChanged: (focusedDay) {
-          setState(() {
-            _focusedDay = focusedDay;
-          });
-        },
+        ],
       ),
     );
   }
@@ -565,25 +625,16 @@ class _MeditationCalendarWidgetState
     return HeaderStyle(
       formatButtonVisible: false,
       titleCentered: true,
-      titleTextStyle:
-          theme.textTheme.titleMedium?.copyWith(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            fontFamily: dmSans,
-          ) ??
-          TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            fontFamily: dmSans,
-            color: theme.colorScheme.onSurface,
-          ),
+      titleTextStyle: context.text.subtitle,
       leftChevronIcon: MeditoIcon(
         assetName: MeditoIcons.arrowLeft,
+        semanticLabel: AppLocalizations.of(context)!.previousMonth,
         size: 20,
         color: theme.colorScheme.onSurface,
       ),
       rightChevronIcon: MeditoIcon(
         assetName: MeditoIcons.arrowRight,
+        semanticLabel: AppLocalizations.of(context)!.nextMonth,
         size: 20,
         color: theme.colorScheme.onSurface,
       ),
@@ -596,169 +647,140 @@ class _MeditationCalendarWidgetState
       weekendTextStyle: _dayTextStyle(context),
       defaultTextStyle: _dayTextStyle(context),
       selectedDecoration: BoxDecoration(
-        color: context.brandPurple,
+        color: context.brandAccent,
         shape: BoxShape.circle,
       ),
-      todayTextStyle: _dayTextStyle(context, fontWeight: FontWeight.w600),
+      todayTextStyle: _dayTextStyle(context),
       todayDecoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         shape: BoxShape.circle,
-        border: Border.all(color: context.brandPurple, width: 2),
+        border: Border.all(color: context.brandAccent, width: 2),
       ),
     );
   }
 
   DaysOfWeekStyle _daysOfWeekStyle(BuildContext context) {
-    final style = (Theme.of(context).textTheme.bodySmall ?? const TextStyle())
-        .copyWith(
-          fontFamily: dmSans,
-          color: Theme.of(context).colorScheme.onSurface.withOpacityValue(0.6),
-          fontSize: 12,
-        );
+    final style = context.text.caption.copyWith(
+      color: Theme.of(context).colorScheme.onSurface.withOpacityValue(0.6),
+    );
 
     return DaysOfWeekStyle(weekdayStyle: style, weekendStyle: style);
   }
 
-  Widget? _buildDefaultDayCell(
+  bool _isSelectedDay(DateTime day) => _rangeStart != null
+      ? _isRangeEndpoint(day)
+      : isSameDay(_selectedDay, day);
+
+  Widget _buildCalendarDay(
     BuildContext context,
     DateTime date, {
-    required Set<DateTime> meditationDates,
-    required Set<DateTime> freezeDates,
-  }) {
-    final dayStart = startOfDay(date);
-    final hasMeditation = meditationDates.contains(dayStart);
-    final hasFreeze = freezeDates.contains(dayStart);
-    final inRange = _isInRange(date);
-
-    if (inRange && !hasMeditation && !hasFreeze) {
-      return _buildDayCircle(
-        context,
-        date,
-        color: context.brandPurple.withOpacityValue(0.20),
-      );
-    }
-
-    if (hasMeditation) {
-      return _buildDayCircle(
-        context,
-        date,
-        color: context.brandPurple.withOpacityValue(inRange ? 0.32 : 0.15),
-        fontWeight: FontWeight.w600,
-      );
-    }
-
-    if (hasFreeze) {
-      return _buildDayCircle(
-        context,
-        date,
-        color: ColorConstants.lightBlue.withOpacityValue(inRange ? 0.32 : 0.15),
-        fontWeight: FontWeight.w600,
-      );
-    }
-
-    return null;
-  }
-
-  Widget _buildTodayDayCell(
-    BuildContext context,
-    DateTime date, {
-    required Set<DateTime> meditationDates,
-    required Set<DateTime> freezeDates,
-  }) {
-    final dayStart = startOfDay(date);
-    final hasMeditation = meditationDates.contains(dayStart);
-    final hasFreeze = freezeDates.contains(dayStart);
-    final backgroundColor = hasMeditation
-        ? context.brandPurple.withOpacityValue(0.25)
-        : hasFreeze
-        ? ColorConstants.lightBlue.withOpacityValue(0.25)
-        : Theme.of(context).colorScheme.surface;
-
-    return _buildDayCircle(
-      context,
-      date,
-      color: backgroundColor,
-      fontWeight: FontWeight.w600,
-      border: Border.all(color: context.brandPurple, width: 2),
-    );
-  }
-
-  Widget _buildSelectedDayCell(
-    BuildContext context,
-    DateTime date, {
-    required Set<DateTime> freezeDates,
-  }) {
-    final dayStart = startOfDay(date);
-    final fillColor = freezeDates.contains(dayStart)
-        ? ColorConstants.lightBlue
-        : context.brandPurple;
-
-    if (_isRangeEndpoint(date)) {
-      return Container(
-        margin: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          color: fillColor.withOpacityValue(0.30),
-          shape: BoxShape.circle,
-        ),
-        child: _buildDayCircle(
-          context,
-          date,
-          color: fillColor,
-          margin: const EdgeInsets.all(3),
-          textColor: Theme.of(context).colorScheme.onPrimary,
-          fontWeight: FontWeight.w700,
-        ),
-      );
-    }
-
-    return _buildDayCircle(
-      context,
-      date,
-      color: fillColor,
-      textColor: Theme.of(context).colorScheme.onPrimary,
-      fontWeight: FontWeight.w700,
-    );
-  }
-
-  Widget _buildDayCircle(
-    BuildContext context,
-    DateTime date, {
-    required Color color,
-    EdgeInsets margin = const EdgeInsets.all(4),
-    Color? textColor,
-    FontWeight? fontWeight,
-    BoxBorder? border,
-  }) {
-    return Container(
-      margin: margin,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: border,
-      ),
-      child: Center(
-        child: Text(
-          '${date.day}',
-          style: _dayTextStyle(
-            context,
-            color: textColor,
-            fontWeight: fontWeight,
-          ),
-        ),
-      ),
-    );
-  }
-
-  TextStyle _dayTextStyle(
-    BuildContext context, {
-    Color? color,
-    FontWeight? fontWeight,
+    bool selected = false,
+    bool disabled = false,
   }) {
     final theme = Theme.of(context);
-    return (theme.textTheme.bodyMedium ?? const TextStyle()).copyWith(
-      fontFamily: dmSans,
-      color: color ?? theme.colorScheme.onSurface,
-      fontWeight: fontWeight,
+    final type = disabled ? null : _stamps[startOfDay(date)];
+    final today = isSameDay(date, DateTime.now());
+    final inRange = _isInRange(date);
+    final hasSelection =
+        _rangeStart != null ||
+        (_selectedDay != null &&
+            _selectedDay!.year == _focusedDay.year &&
+            _selectedDay!.month == _focusedDay.month);
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 200);
+    return AnimatedScale(
+      key: ValueKey('calendar-day-${startOfDay(date).toIso8601String()}'),
+      scale: selected ? 1.08 : 1,
+      duration: duration,
+      curve: Curves.easeOutCubic,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+        decoration: BoxDecoration(
+          color: inRange
+              ? theme.colorScheme.onSurface.withOpacityValue(0.04)
+              : null,
+          border: Border.all(
+            color: selected
+                ? theme.colorScheme.onSurface.withOpacityValue(0.85)
+                : Colors.transparent,
+            width: 1.5,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          children: [
+            Container(
+              constraints: const BoxConstraints(minWidth: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  DateFormat.d(
+                    Localizations.localeOf(context).toString(),
+                  ).format(date),
+                  textAlign: TextAlign.center,
+                  style:
+                      _dayTextStyle(
+                        context,
+                        color: theme.colorScheme.onSurface.withOpacityValue(
+                          disabled ? 0.3 : 0.85,
+                        ),
+                        // Bold is the only thing marking today in the grid.
+                      ).copyWith(
+                        fontWeight: selected || today ? FontWeight.w700 : null,
+                      ),
+                  maxLines: 1,
+                ),
+              ),
+            ),
+            Expanded(
+              child: AnimatedOpacity(
+                key: ValueKey(
+                  'calendar-stamp-opacity-${startOfDay(date).toIso8601String()}',
+                ),
+                opacity: hasSelection && !selected && !inRange && !disabled
+                    ? 0.65
+                    : 1,
+                duration: duration,
+                curve: Curves.easeOutCubic,
+                child: Center(
+                  child: type == null
+                      ? const SizedBox.shrink()
+                      : FittedBox(
+                          child: Padding(
+                            padding: const EdgeInsets.all(3),
+                            child: CalendarStamp(
+                              key: ValueKey(startOfDay(date)),
+                              date: date,
+                              type: type,
+                              animateIn: _pendingStampDates.contains(
+                                startOfDay(date),
+                              ),
+                              onRevealComplete: () =>
+                                  _pendingStampDates.remove(startOfDay(date)),
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _isDark(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark;
+
+  Color _freezeColor(BuildContext context) =>
+      _isDark(context) ? ColorConstants.lightBlue : _kFreezeBlueLight;
+
+  TextStyle _dayTextStyle(BuildContext context, {Color? color}) {
+    return context.text.caption.copyWith(
+      color: color ?? Theme.of(context).colorScheme.onSurface,
     );
   }
 
@@ -769,7 +791,7 @@ class _MeditationCalendarWidgetState
       _clearRange();
     }
     setState(() {
-      _selectedDay = selectedDay;
+      _selectedDay = isSameDay(_selectedDay, selectedDay) ? null : selectedDay;
       _focusedDay = focusedDay;
     });
     _toggleDaySessions(selectedDay);
@@ -792,8 +814,10 @@ class _MeditationCalendarWidgetState
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildDetailsTitle(context, rangeDays),
-            const SizedBox(height: 8),
+            if (_hasCompleteRange) ...[
+              _buildRangeTitle(context, rangeDays),
+              const SizedBox(height: 8),
+            ],
             _buildDetailsSubtitle(context, sessions),
             const SizedBox(height: 16),
             _buildSessionList(context, sessions),
@@ -811,15 +835,14 @@ class _MeditationCalendarWidgetState
     );
   }
 
-  Widget _buildDetailsTitle(BuildContext context, List<DateTime> rangeDays) {
-    return Text(
-      _hasCompleteRange
-          ? AppLocalizations.of(context)!.daysSelected(rangeDays.length)
-          : DateFormat('EEEE, MMMM d, y').format(_selectedDayForSessions),
-      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-        fontFamily: dmSans,
-        fontWeight: FontWeight.w600,
-        color: Theme.of(context).colorScheme.onSurface,
+  Widget _buildRangeTitle(BuildContext context, List<DateTime> rangeDays) {
+    return Semantics(
+      header: true,
+      child: Text(
+        AppLocalizations.of(context)!.daysSelected(rangeDays.length),
+        style: context.text.subtitle.copyWith(
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
       ),
     );
   }
@@ -831,10 +854,10 @@ class _MeditationCalendarWidgetState
     final l10n = AppLocalizations.of(context)!;
 
     if (_hasCompleteRange) {
+      final locale = Localizations.localeOf(context).toString();
       return Text(
-        '${DateFormat('MMM d').format(_rangeStart!)} – ${DateFormat('MMM d, y').format(_rangeEnd!)}',
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          fontFamily: dmSans,
+        '${DateFormat.MMMd(locale).format(_rangeStart!)} – ${DateFormat.yMMMd(locale).format(_rangeEnd!)}',
+        style: context.text.body.copyWith(
           color: Theme.of(context).colorScheme.onSurface,
         ),
       );
@@ -846,15 +869,15 @@ class _MeditationCalendarWidgetState
           MeditoIcon(
             assetName: MeditoIcons.snow,
             size: 16,
-            color: ColorConstants.lightBlue,
+            color: _freezeColor(context),
           ),
           const SizedBox(width: 6),
-          Text(
-            l10n.streakFreezeUsed,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontFamily: dmSans,
-              color: ColorConstants.lightBlue,
-              fontWeight: FontWeight.w500,
+          Flexible(
+            child: Text(
+              l10n.streakFreezeUsed,
+              style: context.text.subtitle.copyWith(
+                color: _freezeColor(context),
+              ),
             ),
           ),
         ],
@@ -862,9 +885,8 @@ class _MeditationCalendarWidgetState
     }
 
     return Text(
-      '${sessions.length} ${sessions.length == 1 ? l10n.session : l10n.sessions}',
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-        fontFamily: dmSans,
+      l10n.sessionCount(sessions.length),
+      style: context.text.body.copyWith(
         color: Theme.of(context).colorScheme.onSurface,
       ),
     );
@@ -878,7 +900,10 @@ class _MeditationCalendarWidgetState
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 16),
         child: Center(
-          child: CircularProgressIndicator(color: context.brandPurple),
+          child: CircularProgressIndicator(
+            color: context.brandAccent,
+            semanticsLabel: AppLocalizations.of(context)!.loading,
+          ),
         ),
       );
     }
@@ -896,6 +921,7 @@ class _MeditationCalendarWidgetState
             key: ValueKey(session.id + session.timestamp.toString()),
             session: session,
             onLongPress: () => _confirmDeleteSession(session),
+            onEdit: () => _editSession(session),
           ),
         );
       }).toList(),
@@ -908,12 +934,6 @@ class _MeditationCalendarWidgetState
     required int rangeProjectedStreak,
   }) {
     final l10n = AppLocalizations.of(context)!;
-    final dayLabel = widget.stats.streakCurrent == 1
-        ? l10n.day.toLowerCase()
-        : l10n.days;
-    final projectedDayLabel = rangeProjectedStreak == 1
-        ? l10n.day.toLowerCase()
-        : l10n.days;
 
     return Column(
       children: [
@@ -921,7 +941,7 @@ class _MeditationCalendarWidgetState
           padding: const EdgeInsets.all(14),
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: context.brandPurple.withOpacityValue(0.1),
+            color: context.brandAccent.withOpacityValue(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -929,12 +949,12 @@ class _MeditationCalendarWidgetState
             children: [
               _RangePreviewRow(
                 label: l10n.currentStreak,
-                value: '${widget.stats.streakCurrent} $dayLabel',
+                value: l10n.dayCount(widget.stats.streakCurrent),
               ),
               const SizedBox(height: 6),
               _RangePreviewRow(
                 label: l10n.newStreak,
-                value: '$rangeProjectedStreak $projectedDayLabel',
+                value: l10n.dayCount(rangeProjectedStreak),
                 emphasize: rangeProjectedStreak != widget.stats.streakCurrent,
               ),
               const SizedBox(height: 6),
@@ -958,15 +978,14 @@ class _MeditationCalendarWidgetState
             ),
             label: Text(
               l10n.addSessionsToSelectedDays,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontFamily: dmSans,
+              style: context.text.body.copyWith(
                 color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             style: OutlinedButton.styleFrom(
               backgroundColor: Colors.transparent,
               foregroundColor: Theme.of(context).colorScheme.onSurface,
-              side: BorderSide(color: context.brandPurple),
+              side: BorderSide(color: context.brandAccent),
               padding: const EdgeInsets.symmetric(vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -981,8 +1000,7 @@ class _MeditationCalendarWidgetState
             onPressed: _isAddingSession ? null : _clearRange,
             child: Text(
               l10n.cancel,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontFamily: dmSans,
+              style: context.text.body.copyWith(
                 color: Theme.of(
                   context,
                 ).colorScheme.onSurface.withOpacityValue(0.7),
@@ -1006,8 +1024,7 @@ class _MeditationCalendarWidgetState
         ),
         label: Text(
           AppLocalizations.of(context)!.addSession,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontFamily: dmSans,
+          style: context.text.body.copyWith(
             color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
@@ -1043,19 +1060,22 @@ class _MeditationCalendarWidgetState
 class _SessionItemWidget extends ConsumerWidget {
   final LocalAudioCompleted session;
   final VoidCallback? onLongPress;
+  final VoidCallback? onEdit;
 
   const _SessionItemWidget({
     super.key,
     required this.session,
     this.onLongPress,
+    this.onEdit,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final date = DateTime.fromMillisecondsSinceEpoch(session.timestamp);
-    final timeFormat = DateFormat('h:mm a');
     final isManual = isManualSession(session);
-    final trackAsync = isManual
+    final timerLength = timerSessionDuration(session.id);
+    final isTimer = timerLength != null;
+    final trackAsync = isManual || isTimer
         ? null
         : ref.watch(tracksProvider(trackId: session.id));
 
@@ -1075,14 +1095,12 @@ class _SessionItemWidget extends ConsumerWidget {
           SizedBox(
             width: 60,
             child: Text(
-              timeFormat.format(date),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontFamily: dmSans,
-                fontWeight: FontWeight.w600,
+              // The device's 12/24-hour setting and locale.
+              TimeOfDay.fromDateTime(date).format(context),
+              style: context.text.caption.copyWith(
                 color: Theme.of(
                   context,
                 ).colorScheme.onSurface.withOpacityValue(0.7),
-                fontSize: 12,
               ),
             ),
           ),
@@ -1091,83 +1109,123 @@ class _SessionItemWidget extends ConsumerWidget {
             width: 8,
             height: 8,
             decoration: BoxDecoration(
-              color: isManual ? ColorConstants.graphite : context.brandPurple,
+              color: isManual ? ColorConstants.graphite : context.brandAccent,
               shape: BoxShape.circle,
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: isManual
+            child: isTimer
+                ? Text(
+                    AppLocalizations.of(context)!.timerHistoryTitle(
+                      formatTimerLength(
+                        timerLength,
+                        AppLocalizations.of(context)!,
+                      ),
+                    ),
+                    style: context.text.subtitle.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  )
+                : isManual
                 ? Text(
                     getManualSessionTitle(
                       session.id,
                       AppLocalizations.of(context)!,
                     ),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontFamily: dmSans,
-                      fontWeight: FontWeight.w600,
+                    style: context.text.subtitle.copyWith(
                       color: Theme.of(context).colorScheme.onSurface,
                     ),
                   )
                 : trackAsync!.when(
                     data: (track) => Text(
                       track.title,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontFamily: dmSans,
-                        fontWeight: FontWeight.w600,
+                      style: context.text.subtitle.copyWith(
                         color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     loading: () => Text(
-                      'Loading...',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontFamily: dmSans,
-                        fontWeight: FontWeight.w600,
+                      AppLocalizations.of(context)!.loading,
+                      style: context.text.subtitle.copyWith(
                         color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     error: (_, _) => Text(
-                      'Track ${session.id}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontFamily: dmSans,
-                        fontWeight: FontWeight.w600,
+                      AppLocalizations.of(context)!.historySessionFallback,
+                      style: context.text.subtitle.copyWith(
                         color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ),
           ),
-          if (!isManual)
-            Icon(
-              Icons.chevron_right_rounded,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withOpacityValue(0.6),
-              size: 20,
-            ),
+          Icon(
+            Icons.more_horiz,
+            semanticLabel: AppLocalizations.of(context)!.sessionOptions,
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withOpacityValue(0.6),
+            size: 20,
+          ),
         ],
       ),
     );
 
-    if (isManual) {
-      return InkWell(
-        onLongPress: onLongPress,
-        borderRadius: BorderRadius.circular(8),
-        child: content,
-      );
-    }
+    // Long-press delete has no discoverable VoiceOver equivalent: offer it as
+    // a named action on the row too.
+    Widget withDeleteAction(Widget row) => onLongPress == null
+        ? row
+        : Semantics(
+            customSemanticsActions: {
+              CustomSemanticsAction(
+                label: AppLocalizations.of(context)!.deleteSessionTitle,
+              ): onLongPress!,
+            },
+            child: row,
+          );
 
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => TrackView(trackId: session.id),
-          ),
-        );
-      },
-      onLongPress: onLongPress,
-      borderRadius: BorderRadius.circular(8),
-      child: content,
+    return withDeleteAction(
+      Semantics(
+        button: true,
+        child: InkWell(
+          onTap: () async {
+            final l10n = AppLocalizations.of(context)!;
+            final title = isManual
+                ? getManualSessionTitle(session.id, l10n)
+                : isTimer
+                ? l10n.timerHistoryTitle(formatTimerLength(timerLength, l10n))
+                : trackAsync?.value?.title ?? l10n.historySessionFallback;
+            final action = await showSessionActionsSheet(
+              context,
+              title: title,
+              date: date,
+              canOpen: !isManual,
+            );
+            if (!context.mounted) return;
+            if (action == SessionAction.delete) {
+              onLongPress?.call();
+              return;
+            }
+            if (action == SessionAction.edit) {
+              onEdit?.call();
+              return;
+            }
+            if (action != SessionAction.open) return;
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => isTimer
+                    ? const TimerView(
+                        source: AnalyticsEventConstants.sourceHistory,
+                      )
+                    : TrackView(trackId: session.id),
+              ),
+            );
+          },
+          onLongPress: onLongPress,
+          borderRadius: BorderRadius.circular(8),
+          child: content,
+        ),
+      ),
     );
   }
 }
@@ -1186,27 +1244,30 @@ class _RangePreviewRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontFamily: dmSans,
-            color: theme.colorScheme.onSurface.withOpacityValue(0.75),
+    // One stop per row ("Current streak, 3 days"); the label wraps rather
+    // than pushing the value off the edge at large text.
+    return MergeSemantics(
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: context.text.body.copyWith(
+                color: theme.colorScheme.onSurface.withOpacityValue(0.75),
+              ),
+            ),
           ),
-        ),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontFamily: dmSans,
-            fontWeight: FontWeight.w700,
-            color: emphasize
-                ? context.brandPurple
-                : theme.colorScheme.onSurface,
+          const SizedBox(width: 12),
+          Text(
+            value,
+            style: context.text.subtitle.copyWith(
+              color: emphasize
+                  ? context.brandAccent
+                  : theme.colorScheme.onSurface,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

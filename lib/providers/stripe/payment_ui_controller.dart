@@ -7,6 +7,7 @@ import 'package:medito/providers/stripe/payment_providers.dart';
 import 'package:medito/utils/currency.dart';
 import 'package:medito/utils/logger.dart';
 import 'package:medito/widgets/snackbar_widget.dart';
+import 'package:medito/views/donation/donation_success_sheet.dart';
 import 'package:medito/services/analytics/firebase_analytics_service.dart';
 import 'package:medito/services/analytics/meta_sdk_service.dart';
 import 'package:medito/constants/strings/analytics_event_constants.dart';
@@ -40,6 +41,8 @@ class PaymentUIController extends _$PaymentUIController {
     String? variantId,
     String? experimentId,
     VoidCallback? onSuccess,
+    bool showSuccessFeedback = true,
+    Map<String, String> campaignMetadata = const {},
   }) async {
     try {
       final me = await ref.read(meProvider.future);
@@ -57,6 +60,7 @@ class PaymentUIController extends _$PaymentUIController {
         experimentVariant: variantId,
         paywallSource: paywallSource,
         paywallId: paywallId,
+        campaignMetadata: campaignMetadata,
       );
 
       if (context.mounted) {
@@ -70,6 +74,7 @@ class PaymentUIController extends _$PaymentUIController {
           variantId,
           experimentId,
           onSuccess,
+          showSuccessFeedback,
         );
       }
 
@@ -98,6 +103,8 @@ class PaymentUIController extends _$PaymentUIController {
     String? variantId,
     String? experimentId,
     VoidCallback? onSuccess,
+    bool showSuccessFeedback = true,
+    Map<String, String> campaignMetadata = const {},
   }) async {
     try {
       final me = await ref.read(meProvider.future);
@@ -115,6 +122,7 @@ class PaymentUIController extends _$PaymentUIController {
         experimentVariant: variantId,
         paywallSource: paywallSource,
         paywallId: paywallId,
+        campaignMetadata: campaignMetadata,
       );
 
       if (context.mounted) {
@@ -128,6 +136,7 @@ class PaymentUIController extends _$PaymentUIController {
           variantId,
           experimentId,
           onSuccess,
+          showSuccessFeedback,
         );
       }
 
@@ -160,6 +169,8 @@ class PaymentUIController extends _$PaymentUIController {
     String? variantId,
     String? experimentId,
     VoidCallback? onSuccess,
+    bool showSuccessFeedback = true,
+    Map<String, String> campaignMetadata = const {},
   }) async {
     try {
       final me = await ref.read(meProvider.future);
@@ -177,6 +188,7 @@ class PaymentUIController extends _$PaymentUIController {
         experimentVariant: variantId,
         paywallSource: paywallSource,
         paywallId: paywallId,
+        campaignMetadata: campaignMetadata,
       );
 
       if (context.mounted) {
@@ -190,6 +202,7 @@ class PaymentUIController extends _$PaymentUIController {
           variantId,
           experimentId,
           onSuccess,
+          showSuccessFeedback,
         );
       }
 
@@ -249,9 +262,10 @@ class PaymentUIController extends _$PaymentUIController {
     String? variantId,
     String? experimentId,
     VoidCallback? onSuccess,
+    bool showSuccessFeedback,
   ) async {
-    result.when(
-      success: (paymentIntentId, amount, currency) {
+    await result.when<Future<void>>(
+      success: (paymentIntentId, amount, currency) async {
         // Track successful donation
         final donationEventName = frequency == 'monthly'
             ? AnalyticsEventConstants.donationMonthly
@@ -264,6 +278,13 @@ class PaymentUIController extends _$PaymentUIController {
           parameters: {
             AnalyticsEventConstants.paramAmount: amount.toDouble(),
             AnalyticsEventConstants.paramDonationCurrency: currency,
+            // GA4's standard value/currency (major units, ISO code), which
+            // Google Ads reads when these events are imported as conversions.
+            AnalyticsEventConstants.paramValue: currencyAmountToUnits(
+              amount,
+              currency,
+            ),
+            AnalyticsEventConstants.paramCurrency: currency.toUpperCase(),
             AnalyticsEventConstants.paramPaywallId: paywallId ?? 'unknown',
             AnalyticsEventConstants.paramMeditoUserId: userId ?? 'unknown',
             AnalyticsEventConstants.paramPaywallSource:
@@ -298,24 +319,18 @@ class PaymentUIController extends _$PaymentUIController {
               );
             });
 
-        onSuccess?.call(); // Notify screen
-
-        // paymentSuccessMessage takes the amount and the currency as separate
-        // placeholders, so this is the bare number — but it still has to be in
-        // the right units: /100 would thank a ¥1000 donor for ¥10.
-        final amountString = currencyAmountToUnitsString(amount, currency);
-        AppLogger.d(
-          'PAYMENT_UI',
-          '✅ Showing success message: $amountString $currency (Intent: $paymentIntentId)',
-        );
-        _showSuccessSnackbar(
-          context,
-          AppLocalizations.of(
+        if (showSuccessFeedback && context.mounted) {
+          await showDonationSuccessSheet(
             context,
-          )!.paymentSuccessMessage(amountString, currency),
-        );
+            amount: amount,
+            currency: currency,
+          );
+        }
+        // Navigation follows the acknowledgement, so onboarding and donation
+        // routes cannot disappear underneath the confirmation.
+        if (context.mounted) onSuccess?.call();
       },
-      failure: (errorMessage, paymentIntentId, error) {
+      failure: (errorMessage, paymentIntentId, error) async {
         AppLogger.e(
           'PAYMENT_UI',
           '❌ Showing error message: $errorMessage (Intent: $paymentIntentId)',
@@ -366,7 +381,7 @@ class PaymentUIController extends _$PaymentUIController {
           ),
         );
       },
-      cancelled: () {
+      cancelled: () async {
         AppLogger.d('PAYMENT_UI', 'ℹ️ Showing cancellation message');
 
         final eventParams = {
@@ -398,11 +413,6 @@ class PaymentUIController extends _$PaymentUIController {
         );
       },
     );
-  }
-
-  /// Shows a success snackbar
-  void _showSuccessSnackbar(BuildContext context, String message) {
-    showSnackBar(context, message);
   }
 
   /// Shows an error snackbar with detailed error information

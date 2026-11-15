@@ -1,3 +1,4 @@
+import 'package:medito/widgets/adaptive/adaptive_page_body.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,7 +6,6 @@ import 'package:medito/constants/constants.dart';
 import 'package:medito/constants/icons/medito_icons.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/providers/providers.dart';
-import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/routes/routes.dart';
 import 'package:medito/views/debug/debug_info_screen.dart';
 import 'package:medito/views/home/widgets/bottom_sheet/row_item_widget.dart';
@@ -13,14 +13,13 @@ import 'package:medito/views/home/widgets/header/home_header_widget.dart';
 import 'package:medito/views/home/widgets/home_gradient_border.dart';
 import 'package:medito/views/onboarding/onboarding_pager_screen.dart';
 import 'package:medito/views/player/widgets/bottom_actions/single_back_action_bar.dart';
-import 'package:medito/views/settings/manage_defaults_screen.dart';
 import 'package:medito/views/settings/restore_stats_screen.dart';
 import 'package:medito/views/settings/widgets/day_boundary_offset_dialog.dart';
 import 'package:medito/widgets/medito_icon.dart';
 
 /// "Advanced" settings, previously an expandable section at the bottom of the
-/// Settings page. Defaults, stats restore, day boundary, debug info and the
-/// legal links.
+/// Settings page. Stats restore, day boundary, debug info and the legal
+/// links.
 class AdvancedSettingsScreen extends ConsumerWidget {
   const AdvancedSettingsScreen({super.key});
 
@@ -47,33 +46,19 @@ class AdvancedSettingsScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final dayOffset = ref.watch(dayBoundaryOffsetProvider).value ?? 0;
-    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
-      data: (value) => value.isAndroidTv,
-      orElse: () => false,
-    );
 
     final rows = <Widget>[
       RowItemWidget(
-        icon: Icon(Icons.settings_outlined, color: onSurface),
-        title: l10n.manageDefaults,
-        onTap: () => _push(context, const ManageDefaultsScreen()),
+        icon: Icon(Icons.restore_outlined, color: onSurface),
+        title: l10n.restorePreviousStats,
+        onTap: () => _push(context, const RestoreStatsScreen()),
       ),
-      // TV runs as a permanent Zen experience. Stats-management and day-
-      // boundary controls only support the mobile streak/history workflow and
-      // are intentionally omitted from the television UI.
-      if (!isTv)
-        RowItemWidget(
-          icon: Icon(Icons.restore_outlined, color: onSurface),
-          title: l10n.restorePreviousStats,
-          onTap: () => _push(context, const RestoreStatsScreen()),
-        ),
-      if (!isTv)
-        RowItemWidget(
-          icon: Icon(Icons.bedtime_outlined, color: onSurface),
-          title: 'When my day starts',
-          subTitle: dayOffset == 0 ? 'Midnight (default)' : '$dayOffset:00 AM',
-          onTap: () => _showDayBoundaryOffsetDialog(context, ref),
-        ),
+      RowItemWidget(
+        icon: Icon(Icons.bedtime_outlined, color: onSurface),
+        title: l10n.dayStartsTitle,
+        subTitle: dayBoundaryLabel(context, dayOffset),
+        onTap: () => _showDayBoundaryOffsetDialog(context, ref),
+      ),
       RowItemWidget(
         icon: Icon(Icons.bug_report_outlined, color: onSurface),
         title: l10n.debugInfo,
@@ -84,27 +69,33 @@ class AdvancedSettingsScreen extends ConsumerWidget {
       ),
       // Replaying onboarding re-fires experiment exposure and paywall events
       // and resets persisted onboarding state, so it must never ship enabled.
-      if (kDebugMode && !isTv)
+      if (kDebugMode)
         RowItemWidget(
           icon: MeditoIcon(assetName: MeditoIcons.arrowRight, color: onSurface),
           title: l10n.onboarding,
           onTap: () => _push(context, const OnboardingPagerScreen()),
         ),
-      if (!isTv)
-        RowItemWidget(
-          icon: MeditoIcon(assetName: MeditoIcons.document, color: onSurface),
-          title: l10n.termsOfService,
-          onTap: () => handleNavigation(
-            'url',
-            ['https://meditofoundation.org/terms-of-service'],
-            context,
-            ref: ref,
+      // Opens a web page: say so. The outer MergeSemantics folds this into
+      // the row's own merged node.
+      MergeSemantics(
+        child: Semantics(
+          link: true,
+          hint: l10n.externalLink,
+          child: RowItemWidget(
+            icon: MeditoIcon(assetName: MeditoIcons.document, color: onSurface),
+            title: l10n.termsOfService,
+            onTap: () => handleNavigation(
+              'url',
+              ['https://meditofoundation.org/terms-of-service'],
+              context,
+              ref: ref,
+            ),
           ),
         ),
+      ),
       RowItemWidget(
         icon: MeditoIcon(assetName: MeditoIcons.privacy, color: onSurface),
         title: l10n.privacyPolicy,
-        hasUnderline: false,
         onTap: () => handleNavigation(
           TypeConstants.route,
           [RouteConstants.analytics],
@@ -112,41 +103,51 @@ class AdvancedSettingsScreen extends ConsumerWidget {
           ref: ref,
         ),
       ),
+      RowItemWidget(
+        icon: Icon(Icons.description_outlined, color: onSurface),
+        title: MaterialLocalizations.of(context).licensesPageTitle,
+        hasUnderline: false,
+        onTap: () =>
+            showLicensePage(context: context, applicationName: 'Medito'),
+      ),
     ];
 
     return Scaffold(
       bottomNavigationBar: SingleBackButtonActionBar(
         onBackPressed: () => Navigator.pop(context),
       ),
-      body: SafeArea(
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverAppBar(
-              centerTitle: false,
-              automaticallyImplyLeading: false,
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-              toolbarHeight: 56.0,
-              pinned: true,
-              floating: true,
-              elevation: 0.0,
-              title: HomeHeaderWidget(greeting: l10n.advanced),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.all(padding16),
-              sliver: SliverToBoxAdapter(
-                child: HomeGradientBorder(
-                  backgroundColor: Theme.of(context).cardColor,
-                  borderRadius: 14,
-                  borderWidth: 0.5,
-                  child: Material(
-                    type: MaterialType.transparency,
-                    child: Column(children: rows),
+      body: AdaptivePageBody(
+        maxWidth: 760,
+        child: SafeArea(
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverAppBar(
+                centerTitle: false,
+                automaticallyImplyLeading: false,
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                toolbarHeight: 56.0,
+                pinned: true,
+                floating: true,
+                elevation: 0.0,
+                title: HomeHeaderWidget(greeting: l10n.advanced),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.all(padding16),
+                sliver: SliverToBoxAdapter(
+                  child: HomeGradientBorder(
+                    backgroundColor: Theme.of(context).cardColor,
+                    borderRadius: 14,
+                    borderWidth: 0.5,
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: Column(children: rows),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

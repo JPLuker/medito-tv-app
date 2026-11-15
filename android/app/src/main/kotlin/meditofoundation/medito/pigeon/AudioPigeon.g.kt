@@ -861,6 +861,8 @@ interface MeditoAudioServiceApi {
   fun setBackgroundSound(uri: String?)
   fun setBackgroundSoundVolume(volume: Double)
   fun stopBackgroundSound()
+  /** Scheduled bells, independent of the ambient background sound. */
+  fun setSessionBells(enabled: Boolean, pattern: String)
   fun playBackgroundSound()
   fun pauseBackgroundSound()
 
@@ -1061,6 +1063,25 @@ interface MeditoAudioServiceApi {
         }
       }
       run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.medito.MeditoAudioServiceApi.setSessionBells$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val enabledArg = args[0] as Boolean
+            val patternArg = args[1] as String
+            val wrapped: List<Any?> = try {
+              api.setSessionBells(enabledArg, patternArg)
+              listOf(null)
+            } catch (exception: Throwable) {
+              AudioPigeonPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
         val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.medito.MeditoAudioServiceApi.playBackgroundSound$separatedMessageChannelSuffix", codec)
         if (api != null) {
           channel.setMessageHandler { _, reply ->
@@ -1124,6 +1145,26 @@ class MeditoAudioServiceCallbackApi(private val binaryMessenger: BinaryMessenger
 {
     val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
     val channelName = "dev.flutter.pigeon.medito.MeditoAudioServiceCallbackApi.handleCompletedTrack$separatedMessageChannelSuffix"
+    val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
+    channel.send(listOf(completionDataArg)) {
+      if (it is List<*>) {
+        if (it.size > 1) {
+          callback(Result.failure(FlutterError(it[0] as String, it[1] as String, it[2] as String?)))
+        } else if (it[0] == null) {
+          callback(Result.failure(FlutterError("null-error", "Flutter api returned null value for non-null return value.", "")))
+        } else {
+          val output = it[0] as Boolean
+          callback(Result.success(output))
+        }
+      } else {
+        callback(Result.failure(AudioPigeonPigeonUtils.createConnectionError(channelName)))
+      } 
+    }
+  }
+  fun handleRepeatPlaythrough(completionDataArg: CompletionData, callback: (Result<Boolean>) -> Unit)
+{
+    val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+    val channelName = "dev.flutter.pigeon.medito.MeditoAudioServiceCallbackApi.handleRepeatPlaythrough$separatedMessageChannelSuffix"
     val channel = BasicMessageChannel<Any?>(binaryMessenger, channelName, codec)
     channel.send(listOf(completionDataArg)) {
       if (it is List<*>) {

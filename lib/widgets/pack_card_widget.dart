@@ -2,6 +2,7 @@ import 'package:medito/constants/constants.dart';
 import 'package:medito/views/home/widgets/home_gradient_border.dart';
 import 'package:medito/widgets/network_image_widget.dart';
 import 'package:flutter/material.dart';
+import 'package:medito/views/pack/widgets/pack_complete_badge.dart';
 
 class PackCardWidget extends StatefulWidget {
   const PackCardWidget({
@@ -10,12 +11,16 @@ class PackCardWidget extends StatefulWidget {
     this.subTitle,
     this.coverUrlPath,
     this.onTap,
+    this.isCompleted = false,
   });
 
   final String title;
   final String? subTitle;
   final String? coverUrlPath;
   final void Function()? onTap;
+
+  /// Shows a tick when every session in the pack is complete.
+  final bool isCompleted;
 
   @override
   State<PackCardWidget> createState() => _PackCardWidgetState();
@@ -24,14 +29,13 @@ class PackCardWidget extends StatefulWidget {
 class _PackCardWidgetState extends State<PackCardWidget> {
   @override
   Widget build(BuildContext context) {
-    var textTheme = Theme.of(context).textTheme;
     final theme = Theme.of(context);
 
     final backgroundColor = theme.cardColor;
     final titleColor = theme.colorScheme.onSurface;
     final subtitleColor = theme.colorScheme.onSurface;
 
-    return HomeGradientBorder(
+    final card = HomeGradientBorder(
       backgroundColor: backgroundColor,
       borderRadius: 14,
       borderWidth: 0.5,
@@ -53,13 +57,9 @@ class _PackCardWidgetState extends State<PackCardWidget> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _title(textTheme, title: widget.title, color: titleColor),
+                  _title(title: widget.title, color: titleColor),
                   if (widget.subTitle != null) const SizedBox(height: 4),
-                  _description(
-                    textTheme,
-                    subtitle: widget.subTitle,
-                    color: subtitleColor,
-                  ),
+                  _description(subtitle: widget.subTitle, color: subtitleColor),
                 ],
               ),
             ),
@@ -68,37 +68,39 @@ class _PackCardWidgetState extends State<PackCardWidget> {
       ),
     ),
     );
-  }
 
-  Text _title(
-    TextTheme textTheme, {
-    required String title,
-    required Color color,
-  }) {
-    return Text(
-      title,
-      style: textTheme.displayLarge?.copyWith(
-        fontFamily: dmSans,
-        height: 1.2,
-        color: color,
+    // One button reading title, subtitle and (when done) "Completed": the
+    // badge sits outside the InkWell, so without the merge it was a separate
+    // stop.
+    return MergeSemantics(
+      child: Semantics(
+        button: true,
+        child: !widget.isCompleted
+            ? card
+            : Stack(
+                children: [
+                  card,
+                  // Decorative: let taps on the badge reach the card's InkWell.
+                  const Positioned(
+                    top: 10,
+                    right: 10,
+                    child: IgnorePointer(child: PackCompleteBadge()),
+                  ),
+                ],
+              ),
       ),
     );
   }
 
-  Widget _description(
-    TextTheme textTheme, {
-    String? subtitle,
-    required Color color,
-  }) {
+  Text _title({required String title, required Color color}) {
+    return Text(title, style: context.text.title.copyWith(color: color));
+  }
+
+  Widget _description({String? subtitle, required Color color}) {
     if (subtitle != null) {
       return Text(
         subtitle,
-        style: textTheme.titleMedium?.copyWith(
-          letterSpacing: 0,
-          color: color,
-          fontSize: 14,
-          height: 1.4,
-        ),
+        style: context.text.bodySmall.copyWith(color: color),
       );
     }
 

@@ -4,14 +4,18 @@ import 'package:flutter/services.dart';
 import 'package:medito/constants/theme/text_theme.dart';
 
 import '../colors/color_constants.dart';
-import '../styles/widget_styles.dart';
 import 'input_theme.dart';
+import 'package:medito/constants/theme/medito_text.dart';
 
 ThemeData appTheme(BuildContext context, [ThemeMode? themeMode]) {
   final brightness = MediaQuery.of(context).platformBrightness;
   final isDark =
       themeMode == ThemeMode.dark ||
       (themeMode == ThemeMode.system && brightness == Brightness.dark);
+
+  final text = MeditoText.forBrightness(
+    isDark ? Brightness.dark : Brightness.light,
+  );
 
   return ThemeData(
     useMaterial3: true,
@@ -27,14 +31,15 @@ ThemeData appTheme(BuildContext context, [ThemeMode? themeMode]) {
     ),
     colorScheme: isDark
         ? const ColorScheme.dark(
-            primary: ColorConstants.lightPurple,
+            primary: ColorConstants.accentDark,
             onPrimary: ColorConstants.onAccentDark,
             secondary: ColorConstants.white,
             onSecondary: ColorConstants.black,
             surface: ColorConstants.ebony,
             onSurface: ColorConstants.white,
             error: ColorConstants.amber,
-            onError: ColorConstants.white,
+            // White on amber (#FF6568) is 2.87:1; near-black is ~6.2:1.
+            onError: ColorConstants.greyIsTheNewBlack,
           )
         : const ColorScheme.light(
             primary: ColorConstants.lightPrimary,
@@ -51,6 +56,45 @@ ThemeData appTheme(BuildContext context, [ThemeMode? themeMode]) {
         : ColorConstants.lightBackground,
     textTheme: meditoTextTheme(context, themeMode),
     inputDecorationTheme: inputDecorationTheme(),
+    // The time picker's hour/minute fields are Material's own TextFields, so
+    // match them to MeditoTextField by letting their InputDecoration own the
+    // box: cardColor fill, 12px rounded corners, a 0.5px outline, and — on the
+    // focused field — the same 4px translucent light ring (the "glow").
+    timePickerTheme: TimePickerThemeData(
+      backgroundColor: isDark
+          ? ColorConstants.ebony
+          : ColorConstants.lightSurface,
+      // Transparent so only the InputDecoration below paints the box.
+      hourMinuteColor: ColorConstants.transparent,
+      hourMinuteTextColor: isDark
+          ? ColorConstants.white
+          : ColorConstants.lightOnSurface,
+      hourMinuteShape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: isDark ? ColorConstants.onyx : ColorConstants.lightCard,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color:
+                (isDark ? ColorConstants.white : ColorConstants.lightOnSurface)
+                    .withValues(alpha: 0.3),
+            width: 0.5,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color:
+                (isDark ? ColorConstants.white : ColorConstants.lightOnSurface)
+                    .withValues(alpha: 0.35),
+            width: 4,
+          ),
+        ),
+      ),
+    ),
     appBarTheme: AppBarTheme(
       systemOverlayStyle: SystemUiOverlayStyle(
         systemNavigationBarColor: isDark
@@ -65,55 +109,43 @@ ThemeData appTheme(BuildContext context, [ThemeMode? themeMode]) {
       ),
     ),
     // Enhanced button themes.
-    // Light mode uses lightPrimary (#5D4EC0, 6.35:1 on white — AA) for both
-    // fills and text; dark mode keeps the brand lightPurple on dark surfaces.
+    // Light mode uses lightPrimary (#171717) for both fills and text; dark mode
+    // uses accentDark (#E5E5E5) on dark surfaces.
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: isDark
-            ? ColorConstants.lightPurple
+            ? ColorConstants.accentDark
             : ColorConstants.lightPrimary,
         foregroundColor: isDark
             ? ColorConstants.onAccentDark
             : ColorConstants.onAccentLight,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        textStyle: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          fontFamily: dmSans,
-        ),
+        textStyle: text.inherited.subtitle,
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         backgroundColor: Colors.transparent,
         foregroundColor: isDark
-            ? ColorConstants.lightPurple
+            ? ColorConstants.accentDark
             : ColorConstants.lightPrimary,
         side: BorderSide(
           color: isDark
-              ? ColorConstants.lightPurple
+              ? ColorConstants.accentDark
               : ColorConstants.lightPrimary,
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        textStyle: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          fontFamily: dmSans,
-        ),
+        textStyle: text.inherited.subtitle,
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: isDark
-            ? ColorConstants.lightPurple
+            ? ColorConstants.accentDark
             : ColorConstants.lightPrimary,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        textStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          fontFamily: dmSans,
-        ),
+        textStyle: text.inherited.label,
       ),
     ),
     // Dialog theme
@@ -121,18 +153,8 @@ ThemeData appTheme(BuildContext context, [ThemeMode? themeMode]) {
       backgroundColor: isDark
           ? ColorConstants.ebony
           : ColorConstants.lightSurface,
-      titleTextStyle: TextStyle(
-        color: isDark ? ColorConstants.white : ColorConstants.lightOnSurface,
-        fontSize: 18,
-        fontWeight: FontWeight.w600,
-        fontFamily: dmSans,
-      ),
-      contentTextStyle: TextStyle(
-        color: isDark ? ColorConstants.white : ColorConstants.lightOnSurface,
-        fontSize: 14,
-        fontWeight: FontWeight.w400,
-        fontFamily: dmSans,
-      ),
+      titleTextStyle: text.title,
+      contentTextStyle: text.bodySmall,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
     // Bottom sheet theme
@@ -165,9 +187,9 @@ ThemeData appTheme(BuildContext context, [ThemeMode? themeMode]) {
       trackColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
           // Light mode: use solid lightPrimary for a 3:1+ track against the
-          // white thumb. Dark mode keeps the semi-transparent brand purple.
+          // white thumb. Dark mode keeps the semi-transparent brand accent.
           return isDark
-              ? ColorConstants.lightPurple.withValues(alpha: 0.3)
+              ? ColorConstants.accentDark.withValues(alpha: 0.3)
               : ColorConstants.lightPrimary;
         }
         return isDark
@@ -177,7 +199,7 @@ ThemeData appTheme(BuildContext context, [ThemeMode? themeMode]) {
     ),
     // Progress indicator theme
     progressIndicatorTheme: ProgressIndicatorThemeData(
-      color: isDark ? ColorConstants.lightPurple : ColorConstants.lightPrimary,
+      color: isDark ? ColorConstants.accentDark : ColorConstants.lightPrimary,
       linearTrackColor: isDark
           ? ColorConstants.greyIsTheNewGrey
           : ColorConstants.lightGrey,

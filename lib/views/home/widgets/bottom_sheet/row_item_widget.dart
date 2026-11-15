@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:medito/widgets/medito_icon.dart';
 import 'package:medito/utils/utils.dart';
 
-class RowItemWidget extends StatefulWidget {
+class RowItemWidget extends StatelessWidget {
   const RowItemWidget({
     super.key,
     required this.title,
@@ -21,6 +21,7 @@ class RowItemWidget extends StatefulWidget {
     this.iconColor,
     this.trailingIcon = Icons.chevron_right_rounded,
     this.trailing,
+    this.selected,
   });
 
   final String title;
@@ -42,48 +43,31 @@ class RowItemWidget extends StatefulWidget {
   /// of the current selection (theme swatch, app icon).
   final Widget? trailing;
 
-  @override
-  State<RowItemWidget> createState() => _RowItemWidgetState();
-}
-
-class _RowItemWidgetState extends State<RowItemWidget> {
-  bool _hasFocus = false;
+  /// For rows in a pick-one list (e.g. reminder times): announced as
+  /// selected / not selected, which sighted users see from a check mark.
+  final bool? selected;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final border = Border(
-      bottom: widget.hasUnderline
+    var border = Border(
+      bottom: hasUnderline
           ? BorderSide(
               width: 0.7,
-              color: theme.colorScheme.onSurface.withOpacityValue(0.2),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withOpacityValue(0.2),
             )
           : BorderSide.none,
     );
 
     return MergeSemantics(
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(10),
-        onFocusChange: (focused) {
-          if (_hasFocus != focused) {
-            setState(() => _hasFocus = focused);
-          }
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          decoration: BoxDecoration(
-            color: _hasFocus
-                ? theme.colorScheme.primary.withValues(alpha: 0.12)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: _hasFocus
-                  ? theme.colorScheme.primary
-                  : Colors.transparent,
-              width: 2,
-            ),
-          ),
+      // Without the button role, rows that open something were read as plain
+      // text. Switch rows get their role from the Switch.
+      child: Semantics(
+        button: onTap != null && !isSwitch,
+        selected: selected,
+        child: InkWell(
+          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Container(
@@ -100,17 +84,13 @@ class _RowItemWidgetState extends State<RowItemWidget> {
                         Expanded(
                           child: Text.rich(
                             TextSpan(
-                              style: const TextStyle(fontSize: 18.0),
+                              style: context.text.inherited.body,
                               children: [
                                 TextSpan(
-                                  text: widget.title,
-                                  style:
-                                      widget.titleStyle ??
-                                      theme.textTheme.labelMedium?.copyWith(
-                                        color: theme.colorScheme.onSurface,
-                                      ),
+                                  text: title,
+                                  style: titleStyle ?? context.text.subtitle,
                                 ),
-                                if (widget.subTitle != null) _subtitle(context),
+                                if (subTitle != null) _subtitle(context),
                               ],
                             ),
                           ),
@@ -118,17 +98,17 @@ class _RowItemWidgetState extends State<RowItemWidget> {
                       ],
                     ),
                   ),
-                  if (widget.trailing != null) ...[widget.trailing!, width16],
-                  if (widget.isTrailingIcon && !widget.isSwitch)
+                  if (trailing != null) ...[trailing!, width16],
+                  if (isTrailingIcon && !isSwitch)
                     Icon(
-                      widget.trailingIcon,
-                      size: widget.trailingIconSize,
-                      color: theme.colorScheme.onSurface,
+                      trailingIcon,
+                      size: trailingIconSize,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
-                  if (widget.isSwitch)
+                  if (isSwitch)
                     Switch(
-                      value: widget.switchValue ?? false,
-                      onChanged: widget.onSwitchChanged,
+                      value: switchValue ?? false,
+                      onChanged: onSwitchChanged,
                     ),
                 ],
               ),
@@ -140,24 +120,22 @@ class _RowItemWidgetState extends State<RowItemWidget> {
   }
 
   Widget _buildIconWithColor() {
-    if (widget.iconColor != null && widget.icon is MeditoRemoteIcon) {
-      final meditoIcon = widget.icon as MeditoRemoteIcon;
+    if (iconColor != null && icon is MeditoRemoteIcon) {
+      final meditoIcon = icon as MeditoRemoteIcon;
       return MeditoRemoteIcon(
         icon: meditoIcon.icon,
-        color: widget.iconColor,
+        color: iconColor,
         size: meditoIcon.size,
       );
     }
-    return widget.icon;
+    return icon;
   }
 
   TextSpan _subtitle(BuildContext context) {
     return TextSpan(
-      text: widget.subTitle != null ? '\n${widget.subTitle}' : '',
-      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+      text: subTitle != null ? '\n$subTitle' : '',
+      style: context.text.label.copyWith(
         color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-        letterSpacing: 0,
-        height: 1.7,
       ),
     );
   }

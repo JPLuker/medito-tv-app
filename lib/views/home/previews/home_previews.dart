@@ -18,15 +18,16 @@ import 'package:medito/constants/constants.dart';
 import 'package:medito/mock/mock_data.dart';
 import 'package:medito/models/local_all_stats.dart';
 import 'package:medito/models/home/announcement/announcement_model.dart';
-import 'package:medito/models/home/product/product_model.dart';
 import 'package:medito/models/local_audio_completed.dart';
 import 'package:medito/models/models.dart';
 import 'package:medito/providers/home/announcement_provider.dart';
 import 'package:medito/providers/home/home_provider.dart';
-import 'package:medito/providers/home/products_provider.dart';
+import 'package:medito/providers/shop/shop_providers.dart';
+import 'package:medito/views/shop/previews/shop_previews.dart';
 import 'package:medito/providers/home/up_next_provider.dart';
 import 'package:medito/providers/stats_provider.dart';
 import 'package:medito/views/home/home_view.dart';
+import 'package:medito/views/home/widgets/header/home_hero.dart';
 import 'package:medito/views/home/widgets/shortcuts/shortcuts_items_widget.dart';
 import 'package:medito/views/home/widgets/up_next/up_next_widget.dart';
 import 'package:medito/views/previews/preview_support.dart';
@@ -39,13 +40,11 @@ import 'package:medito/views/previews/preview_support.dart';
 const Map<String, Object> homePrefsDark = {
   SharedPreferenceConstants.themePreference: 'dark',
   SharedPreferenceConstants.streakCircleDisplayPreference: 'currentStreak',
-  SharedPreferenceConstants.hasSeenYourPathExplainer: true,
 };
 
 const Map<String, Object> homePrefsLight = {
   SharedPreferenceConstants.themePreference: 'light',
   SharedPreferenceConstants.streakCircleDisplayPreference: 'currentStreak',
-  SharedPreferenceConstants.hasSeenYourPathExplainer: true,
 };
 
 /// First run: explainer strip visible, consistency score in the pill.
@@ -115,6 +114,34 @@ final previewHome = HomeModel(
       path: 'packs/pack-3',
       icon: 'solidRoundedMedal06',
     ),
+    ShortcutsModel(
+      id: 'shortcut-favorites',
+      title: 'Favorites',
+      icon: 'solidRoundedStar',
+      type: 'pack',
+      path: 'packs/favorites',
+    ),
+    ShortcutsModel(
+      id: 'shortcut-downloads',
+      title: 'Downloads',
+      icon: 'solidRoundedDownloadSquare02',
+      type: 'flow',
+      path: 'downloads',
+    ),
+    ShortcutsModel(
+      id: 'shortcut-breathing',
+      title: 'Breathing',
+      icon: 'solidRoundedHealtcare',
+      type: 'pack',
+      path: 'packs/pack-4',
+    ),
+    ShortcutsModel(
+      id: 'shortcut-beginners',
+      title: 'Beginners',
+      icon: 'solidRoundedBook02',
+      type: 'pack',
+      path: 'packs/pack-1',
+    ),
   ],
   carousel: [
     mockHome.carousel.first.copyWith(showBanner: true),
@@ -125,6 +152,30 @@ final previewHome = HomeModel(
       subtitle: 'Short resets for busy days',
       coverUrl: 'https://picsum.photos/seed/medito3/800/400',
       path: 'packs/pack-3',
+      type: 'pack',
+    ),
+    HomeCarouselModel(
+      id: 'carousel-4',
+      title: 'Unwind Tonight',
+      subtitle: 'Ease into a restful evening',
+      coverUrl: 'https://picsum.photos/seed/medito4/800/400',
+      path: 'packs/pack-4',
+      type: 'pack',
+    ),
+    HomeCarouselModel(
+      id: 'carousel-5',
+      title: 'Everyday Kindness',
+      subtitle: 'Make room for compassion',
+      coverUrl: 'https://picsum.photos/seed/medito5/800/400',
+      path: 'packs/pack-5',
+      type: 'pack',
+    ),
+    HomeCarouselModel(
+      id: 'carousel-6',
+      title: 'Finding Balance',
+      subtitle: 'Take a moment for yourself',
+      coverUrl: 'https://picsum.photos/seed/medito6/800/400',
+      path: 'packs/pack-6',
       type: 'pack',
     ),
   ],
@@ -244,33 +295,8 @@ LocalAllStats _stats({required bool doneToday}) {
 final previewStats = _stats(doneToday: false);
 final previewStatsDoneToday = _stats(doneToday: true);
 
-ProductGroupModel _product(String name, String seed, {bool isNew = false}) {
-  final image = 'https://picsum.photos/seed/$seed/400/400';
-  return ProductGroupModel(
-    groupId: name,
-    name: name,
-    url: 'https://shop.meditofoundation.org',
-    imageUrl: image,
-    variants: [
-      ProductModel(
-        id: '$seed-1',
-        name: name,
-        price: 25,
-        currency: 'EUR',
-        imageUrl: image,
-        firstSeenDate: isNew ? DateTime.now() : null,
-      ),
-    ],
-    allImageUrls: [image],
-    displayImageUrl: image,
-  );
-}
-
-final previewProducts = [
-  _product('Medito Tee', 'tee', isNew: true),
-  _product('Meditation Cushion', 'cushion'),
-  _product('Enamel Mug', 'mug'),
-];
+/// Shop row fixtures: the first few real products from the shop previews.
+final previewProducts = previewShopProducts.take(4).toList();
 
 /// [StatsNotifier] that serves a fixture instead of syncing.
 class _PreviewStatsNotifier extends StatsNotifier {
@@ -289,9 +315,14 @@ List<Override> _homeOverrides({
 }) => [
   fetchHomeProvider.overrideWith((ref) async => previewHome),
   upNextProvider.overrideWith((ref) => upNext ?? AsyncData(previewUpNext)),
+  homeHeroCoverProvider.overrideWith(
+    (ref) => (upNext ?? AsyncData(previewUpNext)).value?.pack.coverUrl,
+  ),
   statsProvider.overrideWith(() => _PreviewStatsNotifier(stats)),
   fetchLatestAnnouncementProvider.overrideWith((ref) async => announcement),
-  productsProvider.overrideWith((ref) async => previewProducts),
+  homeShopProductsProvider.overrideWith(
+    (ref) async => HomeShopProducts(products: previewProducts, curated: true),
+  ),
 ];
 
 // Wrappers must be top-level functions so they can be referenced from a

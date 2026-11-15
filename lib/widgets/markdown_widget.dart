@@ -14,8 +14,6 @@ class MarkdownWidget extends ConsumerWidget {
     this.p,
     this.a,
     this.textAlign,
-    this.pFontSize = 16,
-    this.aFontSize = 13,
     this.selectable = false,
   });
 
@@ -23,17 +21,16 @@ class MarkdownWidget extends ConsumerWidget {
   final void Function(String, String?, String)? onTapLink;
   final TextStyle? p, a;
   final WrapAlignment? textAlign;
-  final double pFontSize;
-  final double aFontSize;
   final bool selectable;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Links cannot be opened usefully on a TV, so they render as body text.
     final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
       data: (value) => value.isAndroidTv,
       orElse: () => false,
     );
-    var titleMedium = Theme.of(context).textTheme.titleMedium;
+    final text = context.text;
     var walterWhite = ColorConstants.white.withOpacityValue(0.9);
 
     return Markdown(
@@ -45,33 +42,38 @@ class MarkdownWidget extends ConsumerWidget {
       padding: const EdgeInsets.all(0),
       physics: const NeverScrollableScrollPhysics(),
       selectable: selectable,
+      sizedImageBuilder: _image,
       styleSheet: buildMarkdownStyleSheet(context).copyWith(
-        p:
-            p ??
-            titleMedium?.copyWith(
-              fontFamily: dmMono,
-              fontSize: pFontSize,
-              letterSpacing: 0,
-              color: walterWhite,
-            ),
+        p: p ?? text.on(walterWhite).body,
         textAlign: textAlign ?? WrapAlignment.center,
         a: isTv
-            ? (p ??
-                  titleMedium?.copyWith(
-                    fontFamily: dmMono,
-                    fontSize: pFontSize,
-                    letterSpacing: 0,
-                    color: walterWhite,
-                    decoration: TextDecoration.none,
-                  ))
+            ? (p ?? text.on(walterWhite).body)
             : a ??
-                  titleMedium?.copyWith(
-                    fontFamily: dmMono,
-                    color: walterWhite,
-                    fontSize: aFontSize,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  text
+                      .on(walterWhite)
+                      .body
+                      .copyWith(decoration: TextDecoration.underline),
       ),
+    );
+  }
+
+  /// Like the package's default for web images, but reads the alt text: the
+  /// default left images nameless to screen readers. Only http(s) images are
+  /// rendered; markdown here comes from the API, not local assets.
+  Widget _image(MarkdownImageConfig config) {
+    final uri = config.uri;
+    if (uri.scheme != 'http' && uri.scheme != 'https') {
+      return const SizedBox.shrink();
+    }
+    final alt = config.alt?.trim() ?? '';
+    return Image.network(
+      uri.toString(),
+      width: config.width,
+      height: config.height,
+      semanticLabel: alt.isEmpty ? null : alt,
+      // No alt text means decorative.
+      excludeFromSemantics: alt.isEmpty,
+      errorBuilder: (_, _, _) => const SizedBox.shrink(),
     );
   }
 

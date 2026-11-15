@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart' as intl;
 
+import 'app_localizations_de.dart';
 import 'app_localizations_en.dart';
 import 'app_localizations_es.dart';
 
@@ -94,6 +95,7 @@ abstract class AppLocalizations {
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
+    Locale('de'),
     Locale('en'),
     Locale('es'),
   ];
@@ -157,6 +159,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Removed'**
   String get removed;
+
+  /// Snackbar action that reverses the removal just made
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get undo;
+
+  /// Accessibility label for a drag handle that reorders a list item
+  ///
+  /// In en, this message translates to:
+  /// **'Reorder'**
+  String get reorder;
 
   /// No description provided for @meditationProducts.
   ///
@@ -236,6 +250,18 @@ abstract class AppLocalizations {
   /// **'Background Sound'**
   String get backgroundSounds;
 
+  /// One-time tooltip above the player's background sound button on the second visit with a background sound or session bells enabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap here to change background sounds or bells.'**
+  String get changeBackgroundSoundsHint;
+
+  /// Screen-reader label for the close button on the player's one-time background sound tip
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss tip'**
+  String get dismissTip;
+
   /// No description provided for @x06.
   ///
   /// In en, this message translates to:
@@ -296,6 +322,60 @@ abstract class AppLocalizations {
   /// **'Tap to share'**
   String get tapToShare;
 
+  /// Screen-reader label of a background swatch on the quote share screen, e.g. Ocean background
+  ///
+  /// In en, this message translates to:
+  /// **'{name} background'**
+  String quoteBackgroundOption(String name);
+
+  /// Name of a quote share card background
+  ///
+  /// In en, this message translates to:
+  /// **'Midnight'**
+  String get quotePaletteMidnight;
+
+  /// Name of a quote share card background
+  ///
+  /// In en, this message translates to:
+  /// **'Indigo'**
+  String get quotePaletteIndigo;
+
+  /// Name of a quote share card background
+  ///
+  /// In en, this message translates to:
+  /// **'Ocean'**
+  String get quotePaletteOcean;
+
+  /// Name of a quote share card background
+  ///
+  /// In en, this message translates to:
+  /// **'Forest'**
+  String get quotePaletteForest;
+
+  /// Name of a quote share card background
+  ///
+  /// In en, this message translates to:
+  /// **'Sunset'**
+  String get quotePaletteSunset;
+
+  /// Name of a quote share card background
+  ///
+  /// In en, this message translates to:
+  /// **'Rose'**
+  String get quotePaletteRose;
+
+  /// Name of a quote share card background
+  ///
+  /// In en, this message translates to:
+  /// **'Cream'**
+  String get quotePaletteCream;
+
+  /// Name of a quote share card background
+  ///
+  /// In en, this message translates to:
+  /// **'Slate'**
+  String get quotePaletteSlate;
+
   /// No description provided for @id.
   ///
   /// In en, this message translates to:
@@ -344,29 +424,23 @@ abstract class AppLocalizations {
   /// **'buildNumber'**
   String get buildNumber;
 
-  /// Accessibility label for dismiss/close buttons
-  ///
-  /// In en, this message translates to:
-  /// **'Dismiss'**
-  String get dismiss;
-
   /// No description provided for @debugInfo.
   ///
   /// In en, this message translates to:
   /// **'Debug info'**
   String get debugInfo;
 
-  /// Text indicating where to write in debug reports
-  ///
-  /// In en, this message translates to:
-  /// **'--- Write below this line ---'**
-  String get writeBelowThisLine;
-
   /// No description provided for @explore.
   ///
   /// In en, this message translates to:
   /// **'Explore'**
   String get explore;
+
+  /// Empty state on the Explore tab when no packs load
+  ///
+  /// In en, this message translates to:
+  /// **'No packs available'**
+  String get explorePacksEmpty;
 
   /// No description provided for @welcome.
   ///
@@ -383,13 +457,13 @@ abstract class AppLocalizations {
   /// No description provided for @thanksForSharingNeutral.
   ///
   /// In en, this message translates to:
-  /// **'Happy face'**
+  /// **'Neutral face'**
   String get thanksForSharingNeutral;
 
   /// No description provided for @thanksForSharingHappy.
   ///
   /// In en, this message translates to:
-  /// **'Neutral face'**
+  /// **'Happy face'**
   String get thanksForSharingHappy;
 
   /// No description provided for @thanksForSharingSad.
@@ -397,6 +471,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sad face'**
   String get thanksForSharingSad;
+
+  /// Screen-reader version of the end-screen feedback thank-you, without the emoji
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks for sharing'**
+  String get thanksForSharingSpoken;
+
+  /// One of the random messages shown on the end screen in zen mode
+  ///
+  /// In en, this message translates to:
+  /// **'Well done for showing up.'**
+  String get zenModeEndMessage1;
+
+  /// One of the random messages shown on the end screen in zen mode
+  ///
+  /// In en, this message translates to:
+  /// **'Thank you for practicing.'**
+  String get zenModeEndMessage2;
+
+  /// One of the random messages shown on the end screen in zen mode
+  ///
+  /// In en, this message translates to:
+  /// **'Time well spent.'**
+  String get zenModeEndMessage3;
+
+  /// One of the random messages shown on the end screen in zen mode
+  ///
+  /// In en, this message translates to:
+  /// **'A moment just for you.'**
+  String get zenModeEndMessage4;
+
+  /// One of the random messages shown on the end screen in zen mode
+  ///
+  /// In en, this message translates to:
+  /// **'Grateful for this pause.'**
+  String get zenModeEndMessage5;
+
+  /// One of the random messages shown on the end screen in zen mode
+  ///
+  /// In en, this message translates to:
+  /// **'Enjoy the rest of your day.'**
+  String get zenModeEndMessage6;
+
+  /// One of the random messages shown on the end screen in zen mode
+  ///
+  /// In en, this message translates to:
+  /// **'Take this feeling with you.'**
+  String get zenModeEndMessage7;
+
+  /// One of the random messages shown on the end screen in zen mode
+  ///
+  /// In en, this message translates to:
+  /// **'Carry this calm forward.'**
+  String get zenModeEndMessage8;
+
+  /// One of the random messages shown on the end screen in zen mode
+  ///
+  /// In en, this message translates to:
+  /// **'Until next time.'**
+  String get zenModeEndMessage9;
+
+  /// One of the random messages shown on the end screen in zen mode
+  ///
+  /// In en, this message translates to:
+  /// **'See you tomorrow.'**
+  String get zenModeEndMessage10;
+
+  /// One of the random messages shown on the end screen in zen mode
+  ///
+  /// In en, this message translates to:
+  /// **'Session complete.'**
+  String get zenModeEndMessage11;
+
+  /// One of the random messages shown on the end screen in zen mode
+  ///
+  /// In en, this message translates to:
+  /// **'Practice complete.'**
+  String get zenModeEndMessage12;
+
+  /// One of the random messages shown on the end screen in zen mode
+  ///
+  /// In en, this message translates to:
+  /// **'Here and now.'**
+  String get zenModeEndMessage13;
+
+  /// Title of the one-time ask for a store rating, shown on the end screen after the user taps the happy face
+  ///
+  /// In en, this message translates to:
+  /// **'Could you leave Medito a rating?'**
+  String get ratingAskTitle;
+
+  /// No description provided for @ratingAskBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It only takes a moment, and it helps more people find free meditation.'**
+  String get ratingAskBody;
+
+  /// Button that opens the App Store / Play Store review page
+  ///
+  /// In en, this message translates to:
+  /// **'Rate Medito'**
+  String get ratingAskCta;
 
   /// No description provided for @min.
   ///
@@ -409,6 +585,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'👋 Hey'**
   String get hey;
+
+  /// Screen-reader text for the maintenance screen heading (the visible heading `hey` starts with a waving-hand emoji)
+  ///
+  /// In en, this message translates to:
+  /// **'Hey'**
+  String get heyLabel;
 
   /// No description provided for @someThingWentWrong.
   ///
@@ -535,18 +717,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Medito relies only on your donations to survive. We produce free content to help humanity.'**
   String get meditoReliesOnYourDonationsToSurvive;
-
-  /// Body text for daily meditation reminder notifications
-  ///
-  /// In en, this message translates to:
-  /// **'It\'s time for your daily meditation. Take a moment to relax and focus.'**
-  String get reminderNotificationBody;
-
-  /// Title for daily meditation reminder notifications
-  ///
-  /// In en, this message translates to:
-  /// **'Daily Meditation Reminder'**
-  String get reminderNotificationTitle;
 
   /// No description provided for @pickTimeHelpText.
   ///
@@ -818,12 +988,6 @@ abstract class AppLocalizations {
   /// **'hour'**
   String get hourFull;
 
-  /// Short placeholder text for duration input
-  ///
-  /// In en, this message translates to:
-  /// **'Minutes'**
-  String get minutes;
-
   /// No description provided for @minute.
   ///
   /// In en, this message translates to:
@@ -884,12 +1048,6 @@ abstract class AppLocalizations {
   /// **'Email'**
   String get emailLabel;
 
-  /// Error message for invalid email format
-  ///
-  /// In en, this message translates to:
-  /// **'Invalid Email.'**
-  String get invalidEmailError;
-
   /// No description provided for @createAccountButtonText.
   ///
   /// In en, this message translates to:
@@ -901,6 +1059,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sign in or Sign up'**
   String get createAccountLogInButtonText;
+
+  /// Primary button on the splash screen; starts the app as a guest
+  ///
+  /// In en, this message translates to:
+  /// **'Get started'**
+  String get getStarted;
+
+  /// Secondary link on the splash screen to sign in or create an account
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in or sign up'**
+  String get splashSignInOrSignUp;
 
   /// No description provided for @sendMeMyPasswordText.
   ///
@@ -943,6 +1113,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Resend code in {seconds} s'**
   String resendCodeInSeconds(Object seconds);
+
+  /// Screen-reader reading of the rate-limited sign-in button (retryInSeconds), with the unit spelled out
+  ///
+  /// In en, this message translates to:
+  /// **'Retry in {seconds, plural, =1{1 second} other{{seconds} seconds}}'**
+  String retryInSecondsSpoken(int seconds);
+
+  /// Screen-reader reading of the rate-limited resend-code button (resendCodeInSeconds), with the unit spelled out
+  ///
+  /// In en, this message translates to:
+  /// **'Resend code in {seconds, plural, =1{1 second} other{{seconds} seconds}}'**
+  String resendCodeInSecondsSpoken(int seconds);
 
   /// No description provided for @byContinuingAgreeTo.
   ///
@@ -1061,7 +1243,7 @@ abstract class AppLocalizations {
   /// No description provided for @deleteAccountConfirmation.
   ///
   /// In en, this message translates to:
-  /// **'Are you sure you want to delete your account? This action cannot be undone and you must follow the instructions on the next page.'**
+  /// **'This permanently deletes your account, including your stats and favorites. It can\'t be undone.'**
   String get deleteAccountConfirmation;
 
   /// No description provided for @deleteAccountButtonText.
@@ -1081,6 +1263,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to delete account.'**
   String get deleteAccountError;
+
+  /// Shown in the delete-account confirmation dialog; account deletion does not cancel Stripe subscriptions
+  ///
+  /// In en, this message translates to:
+  /// **'Deleting your account does not cancel a recurring (monthly or yearly) donation. You can cancel it in the donation portal with the email you donated with.'**
+  String get deleteAccountDonationNotice;
+
+  /// No description provided for @deleteAccountManageDonations.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage donations'**
+  String get deleteAccountManageDonations;
+
+  /// Heading of the delete-account reason picker screen
+  ///
+  /// In en, this message translates to:
+  /// **'Why are you leaving?'**
+  String get deleteAccountReasonTitle;
+
+  /// No description provided for @deleteAccountReasonSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional, but it helps us improve Medito.'**
+  String get deleteAccountReasonSubtitle;
+
+  /// No description provided for @deleteAccountReasonNotUsing.
+  ///
+  /// In en, this message translates to:
+  /// **'I\'m not using it anymore'**
+  String get deleteAccountReasonNotUsing;
+
+  /// No description provided for @deleteAccountReasonPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy concerns'**
+  String get deleteAccountReasonPrivacy;
+
+  /// No description provided for @deleteAccountReasonSwitchingApp.
+  ///
+  /// In en, this message translates to:
+  /// **'I\'m switching to another app'**
+  String get deleteAccountReasonSwitchingApp;
+
+  /// No description provided for @deleteAccountReasonTechnicalIssues.
+  ///
+  /// In en, this message translates to:
+  /// **'Technical problems'**
+  String get deleteAccountReasonTechnicalIssues;
+
+  /// No description provided for @deleteAccountReasonTooManyNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many notifications'**
+  String get deleteAccountReasonTooManyNotifications;
+
+  /// No description provided for @deleteAccountReasonOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Something else'**
+  String get deleteAccountReasonOther;
+
+  /// No description provided for @deleteAccountDetailsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Anything else you\'d like to tell us? (optional)'**
+  String get deleteAccountDetailsHint;
+
+  /// No description provided for @deleteAccountFinalButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete my account'**
+  String get deleteAccountFinalButton;
+
+  /// No description provided for @deleteAccountFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete account, please try again.'**
+  String get deleteAccountFailed;
+
+  /// Delete-account error when the request never got a definite answer (network dropped or timed out after retries)
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t confirm your account was deleted. Check your connection and try again.'**
+  String get deleteAccountUnconfirmed;
+
+  /// Confirmation screen shown after the account was deleted (required by Apple)
+  ///
+  /// In en, this message translates to:
+  /// **'Your account has been deleted'**
+  String get accountDeletedTitle;
+
+  /// No description provided for @accountDeletedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your profile, stats and favorites have been removed. You can keep using Medito without an account.'**
+  String get accountDeletedBody;
 
   /// No description provided for @accountMarkedForDeletionError.
   ///
@@ -1153,12 +1431,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Locked'**
   String get locked;
-
-  /// No description provided for @loadingPath.
-  ///
-  /// In en, this message translates to:
-  /// **'Loading your path...'**
-  String get loadingPath;
 
   /// No description provided for @pathLoadError.
   ///
@@ -1327,6 +1599,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'day streak'**
   String get dayStreak;
+
+  /// Screen-reader label for the current streak, e.g. '5 day streak'.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 day streak} other{{count} day streak}}'**
+  String streakDays(int count);
 
   /// No description provided for @dailyQuote.
   ///
@@ -1526,6 +1804,12 @@ abstract class AppLocalizations {
   /// **'Organize Home Layout'**
   String get customiseHomeLayout;
 
+  /// Instruction at the top of the Organize Home Layout screen
+  ///
+  /// In en, this message translates to:
+  /// **'Touch and hold an item, then drag it to reorder. With a screen reader, use the actions menu to move items.'**
+  String get customiseHomeLayoutHint;
+
   /// No description provided for @featuresIntegrations.
   ///
   /// In en, this message translates to:
@@ -1556,11 +1840,59 @@ abstract class AppLocalizations {
   /// **'Advanced'**
   String get advanced;
 
+  /// Settings row and screen title for theme, app icon, home layout and widgets
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get appearance;
+
+  /// Settings section title for the Telegram and WhatsApp links
+  ///
+  /// In en, this message translates to:
+  /// **'Community'**
+  String get community;
+
   /// No description provided for @restorePreviousStats.
   ///
   /// In en, this message translates to:
   /// **'Restore previous stats'**
   String get restorePreviousStats;
+
+  /// Advanced settings row that opens the day-boundary picker (when a new day starts for streaks)
+  ///
+  /// In en, this message translates to:
+  /// **'When my day starts'**
+  String get dayStartsTitle;
+
+  /// Day-boundary option: the day starts at midnight, the default
+  ///
+  /// In en, this message translates to:
+  /// **'Midnight (default)'**
+  String get dayStartsMidnightDefault;
+
+  /// Title of the day-boundary picker dialog
+  ///
+  /// In en, this message translates to:
+  /// **'When does your day start?'**
+  String get dayStartsDialogTitle;
+
+  /// Explanation in the day-boundary picker dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Pick when a new day begins for your streak. Useful if you usually meditate late at night and want sessions after midnight to still count for the previous day.'**
+  String get dayStartsDialogBody;
+
+  /// Warning note in the day-boundary picker dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Experimental. Changing this updates how every past session is grouped into days, so your current and longest streak may shift.'**
+  String get dayStartsExperimentalNote;
+
+  /// Generic Save button in a dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
 
   /// No description provided for @restorePreviousStatsExplainer.
   ///
@@ -1616,6 +1948,24 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 day selected} other{{count} days selected}}'**
   String daysSelected(int count);
 
+  /// A number of days, e.g. a streak length in the add-sessions preview
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 day} other{{count} days}}'**
+  String dayCount(int count);
+
+  /// Number of sessions on the selected calendar day
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 session} other{{count} sessions}}'**
+  String sessionCount(int count);
+
+  /// Title of a past session in the calendar when its track can no longer be loaded
+  ///
+  /// In en, this message translates to:
+  /// **'Meditation session'**
+  String get historySessionFallback;
+
   /// No description provided for @newStreak.
   ///
   /// In en, this message translates to:
@@ -1651,6 +2001,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Minutes per day (optional)'**
   String get minutesPerDayOptional;
+
+  /// Label of the duration field in the Add session dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Duration (in minutes, optional)'**
+  String get durationMinutesOptional;
 
   /// Title for the onboarding section in settings
   ///
@@ -1730,6 +2086,18 @@ abstract class AppLocalizations {
   /// **'Your daily breath is waiting. Just tap to begin.'**
   String get notificationPreviewBodyB;
 
+  /// Progress label under the onboarding pages, next to the circular progress ring
+  ///
+  /// In en, this message translates to:
+  /// **'Step {current} of {total}'**
+  String onboardingStepIndicator(int current, int total);
+
+  /// Shown on the onboarding reminder screen when a reminder is already set, above the chips that let the user change it
+  ///
+  /// In en, this message translates to:
+  /// **'Daily reminder set for {time}'**
+  String onboardingReminderCurrentlySet(String time);
+
   /// Question above the time-of-day chips in the onboarding notifications screen (chips arm of the reminder experiment)
   ///
   /// In en, this message translates to:
@@ -1784,13 +2152,13 @@ abstract class AppLocalizations {
   /// **'Open Settings'**
   String get openSettings;
 
-  /// Call to action replacing 'Turn on Smart Reminders' when notification permission is permanently denied
+  /// Call to action replacing 'Turn on Daily reminders' when notification permission is permanently denied
   ///
   /// In en, this message translates to:
   /// **'Turn On in Settings'**
   String get turnOnInSettings;
 
-  /// Subtitle on the settings smart-reminder tile when notification permission is permanently denied
+  /// Subtitle on the settings daily-reminder tile when notification permission is permanently denied
   ///
   /// In en, this message translates to:
   /// **'Switched off in phone settings'**
@@ -1820,7 +2188,7 @@ abstract class AppLocalizations {
   /// **'No time picked yet — choose one above, or skip for now.'**
   String get reminderCustomCancelled;
 
-  /// Title of the settings tile that opens the reminder time bottom sheet (replaced the Smart Reminders switch)
+  /// Title of the settings tile that opens the reminder time bottom sheet (replaced the Daily reminders switch)
   ///
   /// In en, this message translates to:
   /// **'Daily reminder'**
@@ -1856,6 +2224,30 @@ abstract class AppLocalizations {
   /// **'Update Setting'**
   String get onboardingBatteryOptimize;
 
+  /// Title of the device-maker (OEM) auto-start dialog opened from the onboarding battery step
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Auto Start'**
+  String get onboardingBatteryAutoStartTitle;
+
+  /// Body of the device-maker (OEM) auto-start dialog opened from the onboarding battery step
+  ///
+  /// In en, this message translates to:
+  /// **'Follow the steps to turn on auto start for Medito.'**
+  String get onboardingBatteryAutoStartBody;
+
+  /// Title of the device-maker (OEM) battery optimization dialog opened from the onboarding battery step
+  ///
+  /// In en, this message translates to:
+  /// **'Your device has additional battery optimization'**
+  String get onboardingBatteryOemTitle;
+
+  /// Body of the device-maker (OEM) battery optimization dialog opened from the onboarding battery step
+  ///
+  /// In en, this message translates to:
+  /// **'Follow the steps to turn off these optimizations so Medito runs smoothly.'**
+  String get onboardingBatteryOemBody;
+
   /// No description provided for @skipForNow.
   ///
   /// In en, this message translates to:
@@ -1867,36 +2259,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Skip'**
   String get skip;
-
-  /// No description provided for @packSetAsUpNext.
-  ///
-  /// In en, this message translates to:
-  /// **'This pack will now appear in the Your Path section on the homepage'**
-  String get packSetAsUpNext;
-
-  /// No description provided for @packUnpinnedFromUpNext.
-  ///
-  /// In en, this message translates to:
-  /// **'This pack has been removed from the Your Path section'**
-  String get packUnpinnedFromUpNext;
-
-  /// Label for the smart reminders feature toggle
-  ///
-  /// In en, this message translates to:
-  /// **'Smart Reminders'**
-  String get smartReminders;
-
-  /// Button text to enable smart reminders
-  ///
-  /// In en, this message translates to:
-  /// **'Turn on Smart Reminders'**
-  String get turnOnSmartReminders;
-
-  /// Status text when smart reminders are enabled
-  ///
-  /// In en, this message translates to:
-  /// **'Smart Reminders On'**
-  String get smartRemindersOn;
 
   /// No description provided for @donationTitle.
   ///
@@ -2036,11 +2398,11 @@ abstract class AppLocalizations {
   /// **'Meditation Made Simple'**
   String get splashHeadline;
 
-  /// No description provided for @splashBenefit1Title.
+  /// One-line value proposition under the splash headline
   ///
   /// In en, this message translates to:
-  /// **'Free for Everyone, Forever'**
-  String get splashBenefit1Title;
+  /// **'Free forever. No ads. Not-for-profit.'**
+  String get splashSubtitle;
 
   /// No description provided for @splashBenefit1Subtitle.
   ///
@@ -2048,23 +2410,11 @@ abstract class AppLocalizations {
   /// **'Explore hours of guided meditations, advanced courses, and more. No paywall.'**
   String get splashBenefit1Subtitle;
 
-  /// No description provided for @splashBenefit2Title.
-  ///
-  /// In en, this message translates to:
-  /// **'Challenges & Reminders'**
-  String get splashBenefit2Title;
-
   /// No description provided for @splashBenefit2Subtitle.
   ///
   /// In en, this message translates to:
   /// **'Stay motivated daily, track progress, and build lasting habits.'**
   String get splashBenefit2Subtitle;
-
-  /// No description provided for @splashBenefit3Title.
-  ///
-  /// In en, this message translates to:
-  /// **'Not-for-profit & Ad-Free'**
-  String get splashBenefit3Title;
 
   /// No description provided for @splashBenefit3Subtitle.
   ///
@@ -2083,6 +2433,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remind Me Daily'**
   String get setReminderB;
+
+  /// No description provided for @donationContinueToPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue to payment'**
+  String get donationContinueToPayment;
 
   /// No description provided for @donationEmailLabel.
   ///
@@ -2107,6 +2463,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'That email address does not look right.'**
   String get donationEmailInvalid;
+
+  /// Tappable hint under an email field when the domain looks mistyped, e.g. gmil.com.
+  ///
+  /// In en, this message translates to:
+  /// **'Did you mean {email}?'**
+  String emailTypoSuggestion(String email);
+
+  /// No description provided for @emailTypoDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check your email'**
+  String get emailTypoDialogTitle;
+
+  /// First line of the email typo confirm dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'You typed {email}.'**
+  String emailTypoDialogTyped(String email);
+
+  /// No description provided for @emailTypoUseSuggestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this'**
+  String get emailTypoUseSuggestion;
+
+  /// No description provided for @emailTypoKeepTyped.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep mine'**
+  String get emailTypoKeepTyped;
 
   /// No description provided for @donationThankYouTitle.
   ///
@@ -3008,6 +3394,12 @@ abstract class AppLocalizations {
   /// **'English'**
   String get english;
 
+  /// No description provided for @german.
+  ///
+  /// In en, this message translates to:
+  /// **'Deutsch'**
+  String get german;
+
   /// No description provided for @spanish.
   ///
   /// In en, this message translates to:
@@ -3092,11 +3484,23 @@ abstract class AppLocalizations {
   /// **'Debug info'**
   String get debugInfoLabel;
 
+  /// Text indicating where to write in debug reports
+  ///
+  /// In en, this message translates to:
+  /// **'--- Write below this line ---'**
+  String get writeBelowThisLine;
+
   /// Error message when a required field is empty
   ///
   /// In en, this message translates to:
   /// **'Field is Required'**
   String get fieldRequiredError;
+
+  /// Error message for invalid email format
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid Email.'**
+  String get invalidEmailError;
 
   /// Error message for invalid input
   ///
@@ -3122,6 +3526,18 @@ abstract class AppLocalizations {
   /// **'An unknown error occurred. Either we\'re having issues or you\'re offline.'**
   String get anErrorOccurredMessage;
 
+  /// Title for daily meditation reminder notifications
+  ///
+  /// In en, this message translates to:
+  /// **'Daily Meditation Reminder'**
+  String get reminderNotificationTitle;
+
+  /// Body text for daily meditation reminder notifications
+  ///
+  /// In en, this message translates to:
+  /// **'It\'s time for your daily meditation. Take a moment to relax and focus.'**
+  String get reminderNotificationBody;
+
   /// Section title for help settings
   ///
   /// In en, this message translates to:
@@ -3145,6 +3561,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add Home Screen Widget'**
   String get addHomeScreenWidget;
+
+  /// Title of the iOS sheet explaining how to add a home screen widget
+  ///
+  /// In en, this message translates to:
+  /// **'Add a Medito widget'**
+  String get addWidgetSheetTitle;
+
+  /// Step 1 of adding an iOS home screen widget
+  ///
+  /// In en, this message translates to:
+  /// **'Touch and hold an empty spot on your Home Screen until the apps jiggle.'**
+  String get addWidgetStepHold;
+
+  /// Step 2 of adding an iOS home screen widget; Edit / Add Widget are iOS button labels
+  ///
+  /// In en, this message translates to:
+  /// **'Tap Edit in the top corner, then Add Widget. On older iOS versions, tap +.'**
+  String get addWidgetStepEdit;
+
+  /// Step 3; Streak, Consistency and Continue are the iOS widget gallery names (English-only in the widget extension), keep them untranslated
+  ///
+  /// In en, this message translates to:
+  /// **'Search for Medito and choose Streak, Consistency or Continue.'**
+  String get addWidgetStepSearch;
+
+  /// Step 4; Add Widget / Done are iOS button labels
+  ///
+  /// In en, this message translates to:
+  /// **'Tap Add Widget, then Done.'**
+  String get addWidgetStepAdd;
+
+  /// Footnote under the add-widget steps
+  ///
+  /// In en, this message translates to:
+  /// **'Your widget updates after every meditation. For your Lock Screen, touch and hold it, then tap Customise and Add Widgets.'**
+  String get addWidgetFootnote;
 
   /// Title for theme selection setting in customization section
   ///
@@ -3326,12 +3778,6 @@ abstract class AppLocalizations {
   /// **'We rely on donors like you to continue providing mindfulness to everyone.'**
   String get donorSupportMessage;
 
-  /// Button text for donating again after a previous donation
-  ///
-  /// In en, this message translates to:
-  /// **'Donate Again'**
-  String get donateAgain;
-
   /// Title for the donation info dialog explaining why users might see the donation ask
   ///
   /// In en, this message translates to:
@@ -3356,347 +3802,371 @@ abstract class AppLocalizations {
   /// **'Donation ask hidden for 30 days'**
   String get donationAskHiddenMessage;
 
+  /// Label for the daily reminders opt-in card on the end screen
+  ///
+  /// In en, this message translates to:
+  /// **'Daily Reminders'**
+  String get dailyReminders;
+
+  /// Button text to enable daily reminders
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on reminders'**
+  String get turnOnReminders;
+
   /// Message shown when user dismisses the reminder prompt on the end screen
   ///
   /// In en, this message translates to:
   /// **'You can turn reminders on or off in Settings'**
   String get reminderPromptDismissedMessage;
 
-  /// Smart reminder day 1 title variant 1
+  /// Confirmation after turning on a daily reminder from the end-screen card
+  ///
+  /// In en, this message translates to:
+  /// **'Daily reminder set for {time}'**
+  String reminderSetFor(String time);
+
+  /// Screen-reader name of the ✕ that permanently hides an end-screen card
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t show again'**
+  String get dontShowAgain;
+
+  /// Daily reminder day 1 title variant 1
   ///
   /// In en, this message translates to:
   /// **'Keep your streak going 🌱'**
-  String get smartReminderDay1TitleVar1;
+  String get reminderDay1TitleVar1;
 
-  /// Smart reminder day 1 body variant 1
+  /// Daily reminder day 1 body variant 1
   ///
   /// In en, this message translates to:
   /// **'You are on a {streak} day streak. Keep it going?'**
-  String smartReminderDay1BodyVar1(String streak);
+  String reminderDay1BodyVar1(String streak);
 
-  /// Smart reminder day 1 title variant 2
+  /// Daily reminder day 1 title variant 2
   ///
   /// In en, this message translates to:
   /// **'Strong step ✨'**
-  String get smartReminderDay1TitleVar2;
+  String get reminderDay1TitleVar2;
 
-  /// Smart reminder day 1 body variant 2
+  /// Daily reminder day 1 body variant 2
   ///
   /// In en, this message translates to:
   /// **'Consistency {consistency}%. Let’s keep it going.'**
-  String smartReminderDay1BodyVar2(String consistency);
+  String reminderDay1BodyVar2(String consistency);
 
-  /// Smart reminder day 1 title variant 3
+  /// Daily reminder day 1 title variant 3
   ///
   /// In en, this message translates to:
   /// **'Tiny wins add up 💜'**
-  String get smartReminderDay1TitleVar3;
+  String get reminderDay1TitleVar3;
 
-  /// Smart reminder day 1 body variant 3
+  /// Daily reminder day 1 body variant 3
   ///
   /// In en, this message translates to:
   /// **'A few minutes now keeps your momentum alive.'**
-  String get smartReminderDay1BodyVar3;
+  String get reminderDay1BodyVar3;
 
-  /// Smart reminder day 1 title variant 4
+  /// Daily reminder day 1 title variant 4
   ///
   /// In en, this message translates to:
   /// **'Your practice awaits 🌸'**
-  String get smartReminderDay1TitleVar4;
+  String get reminderDay1TitleVar4;
 
-  /// Smart reminder day 1 body variant 4
+  /// Daily reminder day 1 body variant 4
   ///
   /// In en, this message translates to:
   /// **'Take a moment to reconnect with yourself.'**
-  String get smartReminderDay1BodyVar4;
+  String get reminderDay1BodyVar4;
 
-  /// Smart reminder day 1 title variant 5
+  /// Daily reminder day 1 title variant 5
   ///
   /// In en, this message translates to:
   /// **'One breath at a time 🫧'**
-  String get smartReminderDay1TitleVar5;
+  String get reminderDay1TitleVar5;
 
-  /// Smart reminder day 1 body variant 5
+  /// Daily reminder day 1 body variant 5
   ///
   /// In en, this message translates to:
   /// **'Every session counts, no matter how short.'**
-  String get smartReminderDay1BodyVar5;
+  String get reminderDay1BodyVar5;
 
-  /// Smart reminder day 2 title variant 1
+  /// Daily reminder day 2 title variant 1
   ///
   /// In en, this message translates to:
   /// **'Keep the flow 🔁'**
-  String get smartReminderDay2TitleVar1;
+  String get reminderDay2TitleVar1;
 
-  /// Smart reminder day 2 body variant 1
+  /// Daily reminder day 2 body variant 1
   ///
   /// In en, this message translates to:
   /// **'Let’s get that streak going again. Just a few minutes can make a big difference.'**
-  String get smartReminderDay2BodyVar1;
+  String get reminderDay2BodyVar1;
 
-  /// Smart reminder day 2 title variant 2
+  /// Daily reminder day 2 title variant 2
   ///
   /// In en, this message translates to:
   /// **'Build your rhythm 🧘'**
-  String get smartReminderDay2TitleVar2;
+  String get reminderDay2TitleVar2;
 
-  /// Smart reminder day 2 body variant 2
+  /// Daily reminder day 2 body variant 2
   ///
   /// In en, this message translates to:
   /// **'Another gentle practice awaits.'**
-  String get smartReminderDay2BodyVar2;
+  String get reminderDay2BodyVar2;
 
-  /// Smart reminder day 2 title variant 3
+  /// Daily reminder day 2 title variant 3
   ///
   /// In en, this message translates to:
   /// **'You have got this 🌟'**
-  String get smartReminderDay2TitleVar3;
+  String get reminderDay2TitleVar3;
 
-  /// Smart reminder day 2 body variant 3
+  /// Daily reminder day 2 body variant 3
   ///
   /// In en, this message translates to:
   /// **'Return to your breath, one moment at a time.'**
-  String get smartReminderDay2BodyVar3;
+  String get reminderDay2BodyVar3;
 
-  /// Smart reminder day 2 title variant 4
+  /// Daily reminder day 2 title variant 4
   ///
   /// In en, this message translates to:
   /// **'Small steps forward 🚶'**
-  String get smartReminderDay2TitleVar4;
+  String get reminderDay2TitleVar4;
 
-  /// Smart reminder day 2 body variant 4
+  /// Daily reminder day 2 body variant 4
   ///
   /// In en, this message translates to:
   /// **'Consistency builds strength. Start with just a few minutes.'**
-  String get smartReminderDay2BodyVar4;
+  String get reminderDay2BodyVar4;
 
-  /// Smart reminder day 2 title variant 5
+  /// Daily reminder day 2 title variant 5
   ///
   /// In en, this message translates to:
   /// **'Gentle return 💚'**
-  String get smartReminderDay2TitleVar5;
+  String get reminderDay2TitleVar5;
 
-  /// Smart reminder day 2 body variant 5
+  /// Daily reminder day 2 body variant 5
   ///
   /// In en, this message translates to:
   /// **'Your mindful practice is here whenever you are ready.'**
-  String get smartReminderDay2BodyVar5;
+  String get reminderDay2BodyVar5;
 
-  /// Smart reminder day 3 title variant 1
+  /// Daily reminder day 3 title variant 1
   ///
   /// In en, this message translates to:
   /// **'Build the habit 📆'**
-  String get smartReminderDay3TitleVar1;
+  String get reminderDay3TitleVar1;
 
-  /// Smart reminder day 3 body variant 1
+  /// Daily reminder day 3 body variant 1
   ///
   /// In en, this message translates to:
   /// **'Momentum matters. You have got this.'**
-  String get smartReminderDay3BodyVar1;
+  String get reminderDay3BodyVar1;
 
-  /// Smart reminder day 3 title variant 2
+  /// Daily reminder day 3 title variant 2
   ///
   /// In en, this message translates to:
   /// **'Three day spark ✴️'**
-  String get smartReminderDay3TitleVar2;
+  String get reminderDay3TitleVar2;
 
-  /// Smart reminder day 3 body variant 2
+  /// Daily reminder day 3 body variant 2
   ///
   /// In en, this message translates to:
   /// **'Your practice is taking shape.'**
-  String get smartReminderDay3BodyVar2;
+  String get reminderDay3BodyVar2;
 
-  /// Smart reminder day 3 title variant 3
+  /// Daily reminder day 3 title variant 3
   ///
   /// In en, this message translates to:
   /// **'A gentle nudge 🤍'**
-  String get smartReminderDay3TitleVar3;
+  String get reminderDay3TitleVar3;
 
-  /// Smart reminder day 3 body variant 3
+  /// Daily reminder day 3 body variant 3
   ///
   /// In en, this message translates to:
   /// **'Two mindful minutes is enough.'**
-  String get smartReminderDay3BodyVar3;
+  String get reminderDay3BodyVar3;
 
-  /// Smart reminder day 3 title variant 4
+  /// Daily reminder day 3 title variant 4
   ///
   /// In en, this message translates to:
   /// **'Growing stronger 🌿'**
-  String get smartReminderDay3TitleVar4;
+  String get reminderDay3TitleVar4;
 
-  /// Smart reminder day 3 body variant 4
+  /// Daily reminder day 3 body variant 4
   ///
   /// In en, this message translates to:
   /// **'Each day you practice, you build something meaningful.'**
-  String get smartReminderDay3BodyVar4;
+  String get reminderDay3BodyVar4;
 
-  /// Smart reminder day 3 title variant 5
+  /// Daily reminder day 3 title variant 5
   ///
   /// In en, this message translates to:
   /// **'Find your calm 🕊️'**
-  String get smartReminderDay3TitleVar5;
+  String get reminderDay3TitleVar5;
 
-  /// Smart reminder day 3 body variant 5
+  /// Daily reminder day 3 body variant 5
   ///
   /// In en, this message translates to:
   /// **'A brief pause can reset your entire day.'**
-  String get smartReminderDay3BodyVar5;
+  String get reminderDay3BodyVar5;
 
-  /// Smart reminder day 4 title
+  /// Daily reminder day 4 title
   ///
   /// In en, this message translates to:
   /// **'Small steps 🪴'**
-  String get smartReminderDay4Title;
+  String get reminderDay4Title;
 
-  /// Smart reminder day 4 body
+  /// Daily reminder day 4 body
   ///
   /// In en, this message translates to:
   /// **'It has been 4 days since you meditated. Resume your practice with a short session.'**
-  String get smartReminderDay4Body;
+  String get reminderDay4Body;
 
-  /// Smart reminder day 5 title
+  /// Daily reminder day 5 title
   ///
   /// In en, this message translates to:
   /// **'Time to reconnect 💪'**
-  String get smartReminderDay5Title;
+  String get reminderDay5Title;
 
-  /// Smart reminder day 5 body
+  /// Daily reminder day 5 body
   ///
   /// In en, this message translates to:
   /// **'It has been 5 days. A calm pause now can help you get back on track.'**
-  String get smartReminderDay5Body;
+  String get reminderDay5Body;
 
-  /// Smart reminder day 6 title
+  /// Daily reminder day 6 title
   ///
   /// In en, this message translates to:
   /// **'Almost a week ⏰'**
-  String get smartReminderDay6Title;
+  String get reminderDay6Title;
 
-  /// Smart reminder day 6 body
+  /// Daily reminder day 6 body
   ///
   /// In en, this message translates to:
   /// **'It has been almost a week since you meditated. Close the loop with a mindful moment.'**
-  String get smartReminderDay6Body;
+  String get reminderDay6Body;
 
-  /// Smart reminder day 7 title
+  /// Daily reminder day 7 title
   ///
   /// In en, this message translates to:
   /// **'One week check in 📅'**
-  String get smartReminderDay7Title;
+  String get reminderDay7Title;
 
-  /// Smart reminder day 7 body
+  /// Daily reminder day 7 body
   ///
   /// In en, this message translates to:
   /// **'It has been a week since you meditated. Take a moment for yourself now.'**
-  String get smartReminderDay7Body;
+  String get reminderDay7Body;
 
-  /// Smart reminder day 8 title
+  /// Daily reminder day 8 title
   ///
   /// In en, this message translates to:
   /// **'Fresh start 🌤️'**
-  String get smartReminderDay8Title;
+  String get reminderDay8Title;
 
-  /// Smart reminder day 8 body
+  /// Daily reminder day 8 body
   ///
   /// In en, this message translates to:
   /// **'It has been over a week. A fresh start with just a few mindful minutes.'**
-  String get smartReminderDay8Body;
+  String get reminderDay8Body;
 
-  /// Smart reminder day 9 title
+  /// Daily reminder day 9 title
   ///
   /// In en, this message translates to:
   /// **'Find your centre 🎯'**
-  String get smartReminderDay9Title;
+  String get reminderDay9Title;
 
-  /// Smart reminder day 9 body
+  /// Daily reminder day 9 body
   ///
   /// In en, this message translates to:
   /// **'A short session can reset your day.'**
-  String get smartReminderDay9Body;
+  String get reminderDay9Body;
 
-  /// Smart reminder day 10 title
+  /// Daily reminder day 10 title
   ///
   /// In en, this message translates to:
   /// **'Double digits 🔟'**
-  String get smartReminderDay10Title;
+  String get reminderDay10Title;
 
-  /// Smart reminder day 10 body
+  /// Daily reminder day 10 body
   ///
   /// In en, this message translates to:
   /// **'It has been 10 days since you meditated. Pick up where you left off.'**
-  String get smartReminderDay10Body;
+  String get reminderDay10Body;
 
-  /// Smart reminder day 11 title
+  /// Daily reminder day 11 title
   ///
   /// In en, this message translates to:
   /// **'Gentle nudge 🤍'**
-  String get smartReminderDay11Title;
+  String get reminderDay11Title;
 
-  /// Smart reminder day 11 body
+  /// Daily reminder day 11 body
   ///
   /// In en, this message translates to:
   /// **'Pause, breathe, and notice how you feel.'**
-  String get smartReminderDay11Body;
+  String get reminderDay11Body;
 
-  /// Smart reminder day 12 title
+  /// Daily reminder day 12 title
   ///
   /// In en, this message translates to:
   /// **'Keep steady 🧭'**
-  String get smartReminderDay12Title;
+  String get reminderDay12Title;
 
-  /// Smart reminder day 12 body
+  /// Daily reminder day 12 body
   ///
   /// In en, this message translates to:
   /// **'A calm moment is waiting for you.'**
-  String get smartReminderDay12Body;
+  String get reminderDay12Body;
 
-  /// Smart reminder day 13 title
+  /// Daily reminder day 13 title
   ///
   /// In en, this message translates to:
   /// **'Approaching two weeks ⏳'**
-  String get smartReminderDay13Title;
+  String get reminderDay13Title;
 
-  /// Smart reminder day 13 body
+  /// Daily reminder day 13 body
   ///
   /// In en, this message translates to:
   /// **'It has been almost two weeks since you meditated. Try a two minute restart.'**
-  String get smartReminderDay13Body;
+  String get reminderDay13Body;
 
-  /// Smart reminder day 14 title
+  /// Daily reminder day 14 title
   ///
   /// In en, this message translates to:
   /// **'Two week check in 🔔'**
-  String get smartReminderDay14Title;
+  String get reminderDay14Title;
 
-  /// Smart reminder day 14 body
+  /// Daily reminder day 14 body
   ///
   /// In en, this message translates to:
   /// **'It has been 14 days since you meditated. Resume your practice now, gently.'**
-  String get smartReminderDay14Body;
+  String get reminderDay14Body;
 
-  /// Smart reminder day 15 title
+  /// Daily reminder day 15 title
   ///
   /// In en, this message translates to:
   /// **'Pausing reminders 🌿'**
-  String get smartReminderDay15Title;
+  String get reminderDay15Title;
 
-  /// Smart reminder day 15 body
+  /// Daily reminder day 15 body
   ///
   /// In en, this message translates to:
   /// **'We\'re pausing reminders for now. We are here whenever you are ready.'**
-  String get smartReminderDay15Body;
+  String get reminderDay15Body;
 
-  /// Smart reminder day 30 title
+  /// Daily reminder day 30 title
   ///
   /// In en, this message translates to:
   /// **'A gentle nudge 🤗'**
-  String get smartReminderDay30Title;
+  String get reminderDay30Title;
 
-  /// Smart reminder day 30 body
+  /// Daily reminder day 30 body
   ///
   /// In en, this message translates to:
   /// **'It\'s been a month since you meditated. Just 2 minutes can help you feel better. We\'re here when you\'re ready.'**
-  String get smartReminderDay30Body;
+  String get reminderDay30Body;
 
   /// Tooltip text for repeat mode when set to normal (no repeat)
   ///
@@ -3715,6 +4185,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Repeat Forever'**
   String get repeatModeForever;
+
+  /// Repeat sheet option: no repeat
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get repeatModeOff;
+
+  /// Repeat sheet: description of no repeat
+  ///
+  /// In en, this message translates to:
+  /// **'Play once, then finish.'**
+  String get repeatModeOffDescription;
+
+  /// Repeat sheet: description of repeat once
+  ///
+  /// In en, this message translates to:
+  /// **'Play it twice, then finish.'**
+  String get repeatModeOnceDescription;
+
+  /// Repeat sheet: description of repeat forever
+  ///
+  /// In en, this message translates to:
+  /// **'Keep playing until you stop it.'**
+  String get repeatModeForeverDescription;
 
   /// Title for adding a manual meditation session
   ///
@@ -3800,6 +4294,12 @@ abstract class AppLocalizations {
   /// **'Duration (minutes)'**
   String get durationInMinutes;
 
+  /// Short placeholder text for duration input
+  ///
+  /// In en, this message translates to:
+  /// **'Minutes'**
+  String get minutes;
+
   /// Text to indicate an optional field
   ///
   /// In en, this message translates to:
@@ -3866,10 +4366,10 @@ abstract class AppLocalizations {
   /// **'Completed at'**
   String get completedAt;
 
-  /// Title for the Your Path section on the home screen
+  /// Eyebrow on the home hero once the pack is under way (CONTINUE · pack), and the section name in Customise Home
   ///
   /// In en, this message translates to:
-  /// **'Your Path'**
+  /// **'Continue'**
   String get upNextTitle;
 
   /// Caption next to the pack progress bar on the Your Path card, e.g. 3 of 7
@@ -3877,6 +4377,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{completed} of {total}'**
   String upNextProgress(int completed, int total);
+
+  /// Screen-reader form of the Up Next progress caption, e.g. 3 of 7 sessions done
+  ///
+  /// In en, this message translates to:
+  /// **'{total, plural, =1{{completed} of 1 session done} other{{completed} of {total} sessions done}}'**
+  String upNextProgressSemantics(int completed, int total);
+
+  /// Screen-reader announcement after skipping the Up Next session, naming the session that replaced it
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped. Up next: {title}'**
+  String upNextSkippedAnnouncement(String title);
 
   /// Headline on the Up Next card when every session in the pinned pack is complete
   ///
@@ -3905,20 +4417,20 @@ abstract class AppLocalizations {
   /// Headline shown when the user finishes the final pack in the curated sequence
   ///
   /// In en, this message translates to:
-  /// **'You\'ve completed your path'**
+  /// **'You\'ve finished every pack in the series'**
   String get upNextPathCompletedTitle;
 
   /// Supporting line shown when there is no next pack to offer
   ///
   /// In en, this message translates to:
-  /// **'Every pack in your path is done. Explore the library to choose what\'s next.'**
+  /// **'Explore the library to find what\'s next.'**
   String get upNextPathCompletedSubtitle;
 
-  /// Snackbar confirming the next pack was pinned as Up Next
+  /// Snackbar after the completed hero's button puts the next pack in the series on Home
   ///
   /// In en, this message translates to:
-  /// **'Your next pack is ready in Your Path'**
-  String get upNextNextPackPinnedSnack;
+  /// **'{packTitle} is ready on Home'**
+  String upNextNextPackPinnedSnack(String packTitle);
 
   /// Shows the current session number out of total sessions
   ///
@@ -3971,7 +4483,7 @@ abstract class AppLocalizations {
   /// Note explaining how defaults work in Up Next
   ///
   /// In en, this message translates to:
-  /// **'These defaults are set from your last selection on any track. Your Path uses them to skip the selection screen.'**
+  /// **'Set from what you play on any track. Home and your watch use them to start sessions without the selection screen.'**
   String get defaultsNote;
 
   /// Text shown when a streak freeze was used on a particular day
@@ -4004,17 +4516,17 @@ abstract class AppLocalizations {
   /// **'Pause'**
   String get pause;
 
-  /// Accessibility label for the skip-back button in the player
+  /// Accessibility label for the skip-back button in the player (it seeks 15 seconds)
   ///
   /// In en, this message translates to:
-  /// **'Skip back 10 seconds'**
-  String get skipBackward10Seconds;
+  /// **'Skip back 15 seconds'**
+  String get skipBackward15Seconds;
 
-  /// Accessibility label for the skip-forward button in the player
+  /// Accessibility label for the skip-forward button in the player (it seeks 15 seconds)
   ///
   /// In en, this message translates to:
-  /// **'Skip forward 10 seconds'**
-  String get skipForward10Seconds;
+  /// **'Skip forward 15 seconds'**
+  String get skipForward15Seconds;
 
   /// Accessibility label for the repeat button in the player
   ///
@@ -4040,11 +4552,35 @@ abstract class AppLocalizations {
   /// **'Delete download'**
   String get deleteDownload;
 
+  /// Snackbar after a download is removed from the Downloads list (with Undo)
+  ///
+  /// In en, this message translates to:
+  /// **'“{title}” removed'**
+  String downloadRemoved(String title);
+
   /// Accessibility label for the playback speed control in the player
   ///
   /// In en, this message translates to:
   /// **'Playback speed'**
   String get playbackSpeed;
+
+  /// Screen-reader value for the playback speed, shown on screen as 0.8×
+  ///
+  /// In en, this message translates to:
+  /// **'{speed} times'**
+  String playbackSpeedValue(String speed);
+
+  /// Speed sheet: button that sets playback speed back to 1.0x
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get speedReset;
+
+  /// Background sound sheet: label above the list of ambient sounds
+  ///
+  /// In en, this message translates to:
+  /// **'Sounds'**
+  String get backgroundSoundsSection;
 
   /// Accessibility label for the report button in the player
   ///
@@ -4064,11 +4600,17 @@ abstract class AppLocalizations {
   /// **'Refresh'**
   String get refresh;
 
-  /// Accessibility label prefix for the Your Path card on the home screen
+  /// Accessibility label prefix for the home hero card
   ///
   /// In en, this message translates to:
-  /// **'Your Path'**
+  /// **'Continue'**
   String get upNext;
+
+  /// Accessibility label for dismiss/close buttons
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get dismiss;
 
   /// Accessibility label for the donation information button
   ///
@@ -4109,20 +4651,8 @@ abstract class AppLocalizations {
   /// Stage 2 text in the Your Path explainer strip, shown after the user taps Got it
   ///
   /// In en, this message translates to:
-  /// **'Swipe left to skip.'**
+  /// **'Swipe left to skip or open the pack.'**
   String get yourPathExplainerSwipeHint;
-
-  /// Step indicator label on onboarding question screen 1 (of 2)
-  ///
-  /// In en, this message translates to:
-  /// **'1 of 2'**
-  String get onboardingStep1of2;
-
-  /// Step indicator label on onboarding question screen 2 (of 2)
-  ///
-  /// In en, this message translates to:
-  /// **'2 of 2'**
-  String get onboardingStep2of2;
 
   /// Question on onboarding screen 1 — asking about the user's meditation experience
   ///
@@ -4183,6 +4713,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Manage stress, sleep, or emotions'**
   String get onboardingIntentStress;
+
+  /// Step indicator label on onboarding question screen 1 (of 2)
+  ///
+  /// In en, this message translates to:
+  /// **'1 of 2'**
+  String get onboardingStep1of2;
+
+  /// Step indicator label on onboarding question screen 2 (of 2)
+  ///
+  /// In en, this message translates to:
+  /// **'2 of 2'**
+  String get onboardingStep2of2;
 
   /// Question on onboarding attribution screen — asking how the user discovered Medito
   ///
@@ -4298,23 +4840,35 @@ abstract class AppLocalizations {
   /// **'Add to favorites'**
   String get addToFavorites;
 
+  /// Snackbar after the star button adds a pack or track to Favorites
+  ///
+  /// In en, this message translates to:
+  /// **'Added to Favorites'**
+  String get addedToFavorites;
+
+  /// Snackbar after the star button removes a pack or track from Favorites
+  ///
+  /// In en, this message translates to:
+  /// **'Removed from Favorites'**
+  String get removedFromFavorites;
+
   /// Accessibility label for the favorite button when the item is already favorited
   ///
   /// In en, this message translates to:
   /// **'Remove from favorites'**
   String get removeFromFavorites;
 
-  /// Accessibility label for the pin button when the pack is not pinned
+  /// Swipe action on the home Your Path card that opens the pack
   ///
   /// In en, this message translates to:
-  /// **'Pin to Your Path'**
-  String get pinToUpNext;
+  /// **'Open pack'**
+  String get openPack;
 
-  /// Accessibility label for the pin button when the pack is already pinned
+  /// Pack screen status row subtitle when every session in Your Path is complete
   ///
   /// In en, this message translates to:
-  /// **'Unpin from Your Path'**
-  String get unpinFromUpNext;
+  /// **'All sessions done'**
+  String get yourPathAllDone;
 
   /// Title shown when the donation paywall webview fails to load
   ///
@@ -4363,6 +4917,1158 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Mark incomplete'**
   String get markTrackIncomplete;
+
+  /// Title of the end-screen card that invites an anonymous user to add an email to their account
+  ///
+  /// In en, this message translates to:
+  /// **'Keep your progress safe'**
+  String get accountPromptTitle;
+
+  /// Body of the end-screen account-conversion card
+  ///
+  /// In en, this message translates to:
+  /// **'Add your email so your streak and history follow you to a new phone.'**
+  String get accountPromptBody;
+
+  /// Primary button on the end-screen account-conversion card
+  ///
+  /// In en, this message translates to:
+  /// **'Save my progress'**
+  String get accountPromptCta;
+
+  /// Primary pay button on the inline end-screen donation card
+  ///
+  /// In en, this message translates to:
+  /// **'Donate {amount}/month'**
+  String donateAmountPerMonth(String amount);
+
+  /// Text before the Apple Pay mark on the Apple Pay button
+  ///
+  /// In en, this message translates to:
+  /// **'Donate with'**
+  String get donateWithApplePayPrefix;
+
+  /// Link on the inline end-screen donation card that opens the full donation page
+  ///
+  /// In en, this message translates to:
+  /// **'Other amount'**
+  String get donateOtherAmount;
+
+  /// Badge on the suggested amount chip
+  ///
+  /// In en, this message translates to:
+  /// **'Most popular'**
+  String get donateMostPopular;
+
+  /// Small print under the inline pay button
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly, cancel any time. Secure payment via Stripe.'**
+  String get donateMonthlyDisclosure;
+
+  /// Screen-reader version of donateAmountPerMonth, so "/month" is not read as "slash month"
+  ///
+  /// In en, this message translates to:
+  /// **'Donate {amount} per month'**
+  String donateAmountPerMonthSpoken(String amount);
+
+  /// Screen-reader name of the inline Apple Pay button (the Apple logo glyph cannot be spoken)
+  ///
+  /// In en, this message translates to:
+  /// **'Donate {amount} per month with Apple Pay'**
+  String donateAmountPerMonthWithApplePay(String amount);
+
+  /// Screen-reader name of the Apple Pay button on the donation page (the Apple logo glyph cannot be spoken)
+  ///
+  /// In en, this message translates to:
+  /// **'Donate with Apple Pay'**
+  String get donateWithApplePay;
+
+  /// Card button on the donation page when Apple Pay is offered above it
+  ///
+  /// In en, this message translates to:
+  /// **'Donate with card'**
+  String get donateWithCard;
+
+  /// Yearly frequency option on the donation page
+  ///
+  /// In en, this message translates to:
+  /// **'Yearly'**
+  String get yearlyDonation;
+
+  /// Small skip link at the bottom of the donation page
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get donateNotNow;
+
+  /// Error under the custom amount field on the donation page
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum amount is {amount}'**
+  String donationMinimumAmount(String amount);
+
+  /// Hint in the custom amount field on the donation page
+  ///
+  /// In en, this message translates to:
+  /// **'Other amount (min {amount})'**
+  String donationOtherAmountHint(String amount);
+
+  /// Small print under the pay buttons on the donation page
+  ///
+  /// In en, this message translates to:
+  /// **'Your donation helps keep Medito free for everyone — no ads, no paywalls. You will receive an email confirmation shortly.'**
+  String get donationDisclosure;
+
+  /// Trust line under the donation page disclosure
+  ///
+  /// In en, this message translates to:
+  /// **'Secure payment powered by Stripe'**
+  String get donationStripeTrust;
+
+  /// Fallback title of the end-screen donation card
+  ///
+  /// In en, this message translates to:
+  /// **'Support Medito'**
+  String get supportMedito;
+
+  /// Content tag chip label (server tag id: sleep)
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep'**
+  String get tagSleep;
+
+  /// Content tag chip label (server tag id: stress)
+  ///
+  /// In en, this message translates to:
+  /// **'Stress'**
+  String get tagStress;
+
+  /// Content tag chip label (server tag id: anxiety)
+  ///
+  /// In en, this message translates to:
+  /// **'Anxiety'**
+  String get tagAnxiety;
+
+  /// Content tag chip label (server tag id: low_mood)
+  ///
+  /// In en, this message translates to:
+  /// **'Low mood'**
+  String get tagLowMood;
+
+  /// Content tag chip label (server tag id: focus)
+  ///
+  /// In en, this message translates to:
+  /// **'Focus'**
+  String get tagFocus;
+
+  /// Content tag chip label (server tag id: calm)
+  ///
+  /// In en, this message translates to:
+  /// **'Calm'**
+  String get tagCalm;
+
+  /// Content tag chip label (server tag id: self_compassion)
+  ///
+  /// In en, this message translates to:
+  /// **'Self-compassion'**
+  String get tagSelfCompassion;
+
+  /// Content tag chip label (server tag id: gratitude)
+  ///
+  /// In en, this message translates to:
+  /// **'Gratitude'**
+  String get tagGratitude;
+
+  /// Content tag chip label (server tag id: emotions)
+  ///
+  /// In en, this message translates to:
+  /// **'Difficult emotions'**
+  String get tagEmotions;
+
+  /// Content tag chip label (server tag id: pain)
+  ///
+  /// In en, this message translates to:
+  /// **'Pain'**
+  String get tagPain;
+
+  /// Content tag chip label (server tag id: confidence)
+  ///
+  /// In en, this message translates to:
+  /// **'Confidence'**
+  String get tagConfidence;
+
+  /// Content tag chip label (server tag id: relationships)
+  ///
+  /// In en, this message translates to:
+  /// **'Relationships'**
+  String get tagRelationships;
+
+  /// Content tag chip label (server tag id: grief)
+  ///
+  /// In en, this message translates to:
+  /// **'Grief'**
+  String get tagGrief;
+
+  /// Content tag chip label (server tag id: habit_building)
+  ///
+  /// In en, this message translates to:
+  /// **'Habit building'**
+  String get tagHabitBuilding;
+
+  /// Content tag chip label (server tag id: breathing)
+  ///
+  /// In en, this message translates to:
+  /// **'Breathing'**
+  String get tagBreathing;
+
+  /// Content tag chip label (server tag id: body_scan)
+  ///
+  /// In en, this message translates to:
+  /// **'Body scan'**
+  String get tagBodyScan;
+
+  /// Content tag chip label (server tag id: loving_kindness)
+  ///
+  /// In en, this message translates to:
+  /// **'Loving-kindness'**
+  String get tagLovingKindness;
+
+  /// Content tag chip label (server tag id: open_awareness)
+  ///
+  /// In en, this message translates to:
+  /// **'Open awareness'**
+  String get tagOpenAwareness;
+
+  /// Content tag chip label (server tag id: visualization)
+  ///
+  /// In en, this message translates to:
+  /// **'Visualisation'**
+  String get tagVisualization;
+
+  /// Content tag chip label (server tag id: mantra)
+  ///
+  /// In en, this message translates to:
+  /// **'Mantra'**
+  String get tagMantra;
+
+  /// Content tag chip label (server tag id: walking)
+  ///
+  /// In en, this message translates to:
+  /// **'Walking'**
+  String get tagWalking;
+
+  /// Content tag chip label (server tag id: reflection)
+  ///
+  /// In en, this message translates to:
+  /// **'Reflection'**
+  String get tagReflection;
+
+  /// Content tag chip label (server tag id: sound)
+  ///
+  /// In en, this message translates to:
+  /// **'Sound'**
+  String get tagSound;
+
+  /// Content tag chip label (server tag id: guided_meditation)
+  ///
+  /// In en, this message translates to:
+  /// **'Guided meditation'**
+  String get tagGuidedMeditation;
+
+  /// Content tag chip label (server tag id: talk)
+  ///
+  /// In en, this message translates to:
+  /// **'Talks'**
+  String get tagTalk;
+
+  /// Content tag chip label (server tag id: sleep_story)
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep stories'**
+  String get tagSleepStory;
+
+  /// Content tag chip label (server tag id: music)
+  ///
+  /// In en, this message translates to:
+  /// **'Music'**
+  String get tagMusic;
+
+  /// Content tag chip label (server tag id: nature_sounds)
+  ///
+  /// In en, this message translates to:
+  /// **'Nature sounds'**
+  String get tagNatureSounds;
+
+  /// Content tag chip label (server tag id: course_lesson)
+  ///
+  /// In en, this message translates to:
+  /// **'Course lessons'**
+  String get tagCourseLesson;
+
+  /// Content tag chip label (server tag id: beginners)
+  ///
+  /// In en, this message translates to:
+  /// **'For beginners'**
+  String get tagBeginners;
+
+  /// Content tag chip label (server tag id: experienced)
+  ///
+  /// In en, this message translates to:
+  /// **'Experienced'**
+  String get tagExperienced;
+
+  /// Content tag chip label (server tag id: teens_students)
+  ///
+  /// In en, this message translates to:
+  /// **'Teens & students'**
+  String get tagTeensStudents;
+
+  /// Content tag chip label (server tag id: teachers)
+  ///
+  /// In en, this message translates to:
+  /// **'Teachers'**
+  String get tagTeachers;
+
+  /// Content tag chip label (server tag id: workplace)
+  ///
+  /// In en, this message translates to:
+  /// **'Work'**
+  String get tagWorkplace;
+
+  /// Content tag chip label (server tag id: kids)
+  ///
+  /// In en, this message translates to:
+  /// **'Kids'**
+  String get tagKids;
+
+  /// Content tag chip label (server tag id: morning)
+  ///
+  /// In en, this message translates to:
+  /// **'Morning'**
+  String get tagMorning;
+
+  /// Content tag chip label (server tag id: evening)
+  ///
+  /// In en, this message translates to:
+  /// **'Evening'**
+  String get tagEvening;
+
+  /// Content tag chip label (server tag id: sos)
+  ///
+  /// In en, this message translates to:
+  /// **'SOS'**
+  String get tagSos;
+
+  /// Content tag chip label (server tag id: on_the_go)
+  ///
+  /// In en, this message translates to:
+  /// **'On the go'**
+  String get tagOnTheGo;
+
+  /// Content tag chip label (server tag id: crisis)
+  ///
+  /// In en, this message translates to:
+  /// **'Times of crisis'**
+  String get tagCrisis;
+
+  /// Content tag chip label (server tag id: spanish)
+  ///
+  /// In en, this message translates to:
+  /// **'Español'**
+  String get tagSpanish;
+
+  /// Empty state on a tag page
+  ///
+  /// In en, this message translates to:
+  /// **'No sessions with this tag yet'**
+  String get tagNoTracks;
+
+  /// No description provided for @sessionBells.
+  ///
+  /// In en, this message translates to:
+  /// **'Session bells'**
+  String get sessionBells;
+
+  /// No description provided for @sessionBellsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'A bell at the beginning, middle and end'**
+  String get sessionBellsDescription;
+
+  /// Eyebrow on the home hero when nothing in the pack has been played yet, e.g. START HERE · Getting started
+  ///
+  /// In en, this message translates to:
+  /// **'Start here'**
+  String get upNextStartHere;
+
+  /// Screen-reader label start for the home-screen Streak widget. {value} is filled in by the widget, e.g. '7 days'.
+  ///
+  /// In en, this message translates to:
+  /// **'Meditation streak: {value}'**
+  String widgetStreakSummary(String value);
+
+  /// Screen-reader label start for the home-screen Consistency widget. {value} is filled in by the widget, e.g. '67%'.
+  ///
+  /// In en, this message translates to:
+  /// **'Consistency score: {value}'**
+  String widgetConsistencySummary(String value);
+
+  /// Screen-reader part of the home-screen stat widgets before today's meditation is done
+  ///
+  /// In en, this message translates to:
+  /// **'Not meditated yet today'**
+  String get widgetNotMeditatedToday;
+
+  /// Screen-reader part of the home-screen stat widgets describing the visible calendar. Both numbers are filled in by the widget; {total} is always 5 or more.
+  ///
+  /// In en, this message translates to:
+  /// **'Meditated on {done} of the last {total} days'**
+  String widgetRecentDays(String done, String total);
+
+  /// Pack progress spoken by the home-screen Continue widget, e.g. 3 of 7. Both numbers are filled in by the widget.
+  ///
+  /// In en, this message translates to:
+  /// **'{completed} of {total}'**
+  String widgetUpNextProgress(String completed, String total);
+
+  /// Spoken by the home-screen Continue widget once every session in the pack is done
+  ///
+  /// In en, this message translates to:
+  /// **'Pack complete'**
+  String get widgetPackComplete;
+
+  /// Title on the home-screen Continue widget once the pack is finished; tapping opens the app
+  ///
+  /// In en, this message translates to:
+  /// **'Choose what\'s next'**
+  String get widgetChooseWhatsNext;
+
+  /// Short label on the home hero swipe tile for Remove from Home (tiles are narrow)
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get removeFromHomeShort;
+
+  /// Swipe action on the home hero that stops showing this pack there (Home falls back to Getting started)
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from Home'**
+  String get removeFromHome;
+
+  /// Snackbar after removing a pack from the home hero; offers Undo
+  ///
+  /// In en, this message translates to:
+  /// **'Removed from Home.'**
+  String get removedFromHome;
+
+  /// Pack screen play button when nothing in the pack has been played; also puts the pack on Home
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get packStart;
+
+  /// Pack screen play button once some sessions are done; also puts the pack on Home
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get packContinue;
+
+  /// Snackbar after the pack screen Start/Continue button puts a new pack on Home; offers Undo
+  ///
+  /// In en, this message translates to:
+  /// **'Added to Home so you can pick up where you left off.'**
+  String get packAddedToHome;
+
+  /// Line under the Shop title on the native shop screen
+  ///
+  /// In en, this message translates to:
+  /// **'Every purchase helps keep Medito free for everyone.'**
+  String get shopSubtitle;
+
+  /// First filter chip on the shop screen: every product, no collection filter
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get shopAllCollection;
+
+  /// Product card price when sizes cost different amounts; price is already formatted with currency, e.g. 'From $28'
+  ///
+  /// In en, this message translates to:
+  /// **'From {price}'**
+  String shopFromPrice(String price);
+
+  /// Badge/label on a product or size that can't be bought right now
+  ///
+  /// In en, this message translates to:
+  /// **'Sold out'**
+  String get shopSoldOut;
+
+  /// Primary button on the product page
+  ///
+  /// In en, this message translates to:
+  /// **'Add to bag'**
+  String get shopAddToBag;
+
+  /// Product page button label for a moment after adding
+  ///
+  /// In en, this message translates to:
+  /// **'Added to bag'**
+  String get shopAddedToBag;
+
+  /// Product page primary button while no size is chosen
+  ///
+  /// In en, this message translates to:
+  /// **'Select a size'**
+  String get shopSelectSize;
+
+  /// Label above the colour swatches on the product page
+  ///
+  /// In en, this message translates to:
+  /// **'Colour'**
+  String get shopColour;
+
+  /// Label above the size pills on the product page
+  ///
+  /// In en, this message translates to:
+  /// **'Size'**
+  String get shopSize;
+
+  /// Label above option pills for products without colour or size, e.g. gift card amounts
+  ///
+  /// In en, this message translates to:
+  /// **'Option'**
+  String get shopOption;
+
+  /// Title of the shopping bag sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Your bag'**
+  String get shopBagTitle;
+
+  /// Empty state title in the shopping bag sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Your bag is empty'**
+  String get shopBagEmpty;
+
+  /// Empty state body in the shopping bag sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Anything you add will wait here until you\'re ready.'**
+  String get shopBagEmptyBody;
+
+  /// Button in the empty bag that opens the shop
+  ///
+  /// In en, this message translates to:
+  /// **'Browse the shop'**
+  String get shopBrowse;
+
+  /// Bag sheet: sum of item prices before shipping and tax
+  ///
+  /// In en, this message translates to:
+  /// **'Subtotal'**
+  String get shopSubtotal;
+
+  /// Bag sheet note under the subtotal
+  ///
+  /// In en, this message translates to:
+  /// **'Shipping and taxes are calculated at checkout.'**
+  String get shopShippingNote;
+
+  /// Bag sheet button that opens the secure checkout page
+  ///
+  /// In en, this message translates to:
+  /// **'Checkout'**
+  String get shopCheckout;
+
+  /// Screen-reader hint on the bag's Checkout button: checkout continues on the shop website
+  ///
+  /// In en, this message translates to:
+  /// **'Opens secure checkout in your browser'**
+  String get shopCheckoutHint;
+
+  /// Bag sheet card shown after the user returned from checkout; offers to clear the bag
+  ///
+  /// In en, this message translates to:
+  /// **'Already placed your order?'**
+  String get shopCheckoutPrompt;
+
+  /// Button that removes everything from the shopping bag
+  ///
+  /// In en, this message translates to:
+  /// **'Clear bag'**
+  String get shopClearBag;
+
+  /// Note near the bottom of a product page
+  ///
+  /// In en, this message translates to:
+  /// **'Medito is a nonprofit. Every purchase supports free meditation for everyone.'**
+  String get shopSupportNote;
+
+  /// Error state on the shop and product pages
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t load the shop right now.'**
+  String get shopLoadError;
+
+  /// Fallback button on shop error states; opens shop.medito.app
+  ///
+  /// In en, this message translates to:
+  /// **'Open in browser'**
+  String get shopOpenInBrowser;
+
+  /// Bag sheet: remove a line from the bag
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get shopRemoveItem;
+
+  /// Accessibility label for the + button in the bag
+  ///
+  /// In en, this message translates to:
+  /// **'Increase quantity'**
+  String get shopIncreaseQuantity;
+
+  /// Accessibility label for the − button in the bag
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease quantity'**
+  String get shopDecreaseQuantity;
+
+  /// Accessibility label for the bag icon; also snackbar action after adding an item
+  ///
+  /// In en, this message translates to:
+  /// **'View bag'**
+  String get shopViewBag;
+
+  /// Fallback title for a product info section with no title
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get shopMoreDetails;
+
+  /// Count of units in the shopping bag, under the bag title
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
+  String shopBagItemCount(int count);
+
+  /// Last tile of the home shop carousel; opens the full shop
+  ///
+  /// In en, this message translates to:
+  /// **'See all'**
+  String get shopSeeAll;
+
+  /// Bag sheet: heading over a row of cheap add-on products (stickers)
+  ///
+  /// In en, this message translates to:
+  /// **'Add a little something'**
+  String get shopAddOnsTitle;
+
+  /// Product page: link next to the size picker that opens the size chart
+  ///
+  /// In en, this message translates to:
+  /// **'Size guide'**
+  String get shopSizeGuide;
+
+  /// Under the size chart on the product page
+  ///
+  /// In en, this message translates to:
+  /// **'Garment measurements laid flat, from the supplier. They can vary by up to 2 in (5 cm), so compare with a tee you own.'**
+  String get shopSizeChartNote;
+
+  /// Size chart column: garment length
+  ///
+  /// In en, this message translates to:
+  /// **'Length'**
+  String get shopMeasureLength;
+
+  /// Size chart column: garment chest width, laid flat
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get shopMeasureWidth;
+
+  /// Size chart column: sleeve length
+  ///
+  /// In en, this message translates to:
+  /// **'Sleeve'**
+  String get shopMeasureSleeve;
+
+  /// Size chart unit toggle: inches (abbreviation)
+  ///
+  /// In en, this message translates to:
+  /// **'in'**
+  String get shopInches;
+
+  /// Size chart unit toggle: centimetres (abbreviation)
+  ///
+  /// In en, this message translates to:
+  /// **'cm'**
+  String get shopCentimetres;
+
+  /// Size chart unit as spoken by a screen reader after a measurement, e.g. '28 inches' (the visible label is the abbreviation 'in')
+  ///
+  /// In en, this message translates to:
+  /// **'inches'**
+  String get shopUnitInches;
+
+  /// Size chart unit as spoken by a screen reader after a measurement, e.g. '71 centimetres'
+  ///
+  /// In en, this message translates to:
+  /// **'centimetres'**
+  String get shopUnitCentimetres;
+
+  /// Screen-reader position in a product's swipeable photo gallery
+  ///
+  /// In en, this message translates to:
+  /// **'Photo {index} of {count}'**
+  String shopPhotoPosition(int index, int count);
+
+  /// Title of the home Timer screen and of a timer session in the player
+  ///
+  /// In en, this message translates to:
+  /// **'Timer'**
+  String get timerTitle;
+
+  /// Timer screen mode toggle: counts up until the user ends the session
+  ///
+  /// In en, this message translates to:
+  /// **'Stopwatch'**
+  String get timerModeStopwatch;
+
+  /// Label under the hours wheel on the Timer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Hours'**
+  String get timerHoursLabel;
+
+  /// Label under the minutes wheel on the Timer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Minutes'**
+  String get timerMinutesLabel;
+
+  /// Body of the card explaining Stopwatch mode on the Timer screen
+  ///
+  /// In en, this message translates to:
+  /// **'The time counts up from zero. Tap stop when you\'re done and the session is saved.'**
+  String get timerStopwatchCaption;
+
+  /// Timer screen primary button
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get timerStart;
+
+  /// Player button that ends a timer session early (or finishes a stopwatch) and records it
+  ///
+  /// In en, this message translates to:
+  /// **'End session'**
+  String get timerEndSession;
+
+  /// Caption under the elapsed time in a stopwatch session
+  ///
+  /// In en, this message translates to:
+  /// **'elapsed'**
+  String get timerElapsed;
+
+  /// Snackbar when a timer session is ended before one minute
+  ///
+  /// In en, this message translates to:
+  /// **'Sessions under a minute aren\'t saved'**
+  String get timerTooShort;
+
+  /// History row for a timer session, e.g. 'Timer · 20 min'
+  ///
+  /// In en, this message translates to:
+  /// **'Timer · {duration}'**
+  String timerHistoryTitle(String duration);
+
+  /// Screen reader label of a duration chip on the Timer screen
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, =1{1 minute} other{{minutes} minutes}}'**
+  String timerPresetSemantics(int minutes);
+
+  /// Background sound row offline when the sound was never downloaded, so it cannot play
+  ///
+  /// In en, this message translates to:
+  /// **'Not downloaded. Connect to play'**
+  String get soundNeedsConnection;
+
+  /// Title of the card explaining Stopwatch mode on the Timer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Sit for as long as you like'**
+  String get timerStopwatchTitle;
+
+  /// Offline screen link that opens the Timer, which works without a connection
+  ///
+  /// In en, this message translates to:
+  /// **'Open timer'**
+  String get openTimer;
+
+  /// Screen-reader label for the player's download button while a download is in progress (value is the percentage)
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading'**
+  String get downloadingAudio;
+
+  /// Screen-reader announcement when the player's download finishes
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded'**
+  String get audioDownloaded;
+
+  /// Screen-reader label for the player's seek bar
+  ///
+  /// In en, this message translates to:
+  /// **'Playback position'**
+  String get playbackPosition;
+
+  /// Screen-reader value for the seek bar, e.g. '3 minutes 12 seconds of 10 minutes'. Both placeholders are spoken durations
+  ///
+  /// In en, this message translates to:
+  /// **'{position} of {duration}'**
+  String playbackPositionValue(String position, String duration);
+
+  /// Hours part of a duration read by screen readers, e.g. '1 hour 5 minutes'
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 hour} other{{count} hours}}'**
+  String spokenHours(int count);
+
+  /// Minutes part of a duration read by screen readers, e.g. '3 minutes 12 seconds'
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 minute} other{{count} minutes}}'**
+  String spokenMinutes(int count);
+
+  /// Seconds part of a duration read by screen readers, e.g. '3 minutes 12 seconds'
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 second} other{{count} seconds}}'**
+  String spokenSeconds(int count);
+
+  /// Screen-reader status for a day on the streak row / calendar when the user meditated that day, read after the weekday
+  ///
+  /// In en, this message translates to:
+  /// **'Meditated'**
+  String get dayMeditated;
+
+  /// Screen-reader status for a day on the streak row / calendar with no meditation
+  ///
+  /// In en, this message translates to:
+  /// **'Not meditated'**
+  String get dayNotMeditated;
+
+  /// Tooltip / screen-reader label of the button that clears the email field on the sign-in screen
+  ///
+  /// In en, this message translates to:
+  /// **'Clear email'**
+  String get clearEmail;
+
+  /// Screen-reader label of the stats calendar's previous-month arrow
+  ///
+  /// In en, this message translates to:
+  /// **'Previous month'**
+  String get previousMonth;
+
+  /// Screen-reader label of the stats calendar's next-month arrow
+  ///
+  /// In en, this message translates to:
+  /// **'Next month'**
+  String get nextMonth;
+
+  /// Screen-reader count on a search filter tab, read after the tab name
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 result} other{{count} results}}'**
+  String searchResultsCount(int count);
+
+  /// Tooltip / screen-reader label of an icon button that clears a text field
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clearField;
+
+  /// Screen-reader reading of a sale price with the struck-through original price, e.g. '£25, was £30'
+  ///
+  /// In en, this message translates to:
+  /// **'{price}, was {compareAt}'**
+  String shopPriceWas(String price, String compareAt);
+
+  /// Screen-reader reading of the quantity number between the bag's minus and plus buttons
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity: {count}'**
+  String shopQuantity(int count);
+
+  /// Screen-reader label of the link icon on pack rows that open a web page
+  ///
+  /// In en, this message translates to:
+  /// **'External link'**
+  String get externalLink;
+
+  /// Screen-reader suffix on the Home streak circle once today's meditation is done
+  ///
+  /// In en, this message translates to:
+  /// **'Meditated today'**
+  String get meditatedToday;
+
+  /// Button that closes an end screen shown on the next launch and returns to Home
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get endScreenDone;
+
+  /// Top line of an end screen shown on the next launch because the app was closed before it could appear (e.g. the user fell asleep). The session ended between 6pm yesterday and 5am today.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back. You finished “{title}” last night.'**
+  String endScreenRestoredLastNight(String title);
+
+  /// As endScreenRestoredLastNight, for a session that ended earlier today
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back. You finished “{title}” earlier today.'**
+  String endScreenRestoredEarlierToday(String title);
+
+  /// As endScreenRestoredLastNight, for a session that ended yesterday during the day
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back. You finished “{title}” yesterday.'**
+  String endScreenRestoredYesterday(String title);
+
+  /// As endScreenRestoredLastNight, for a Timer session of {minutes} minutes
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back. You finished a {minutes}-minute timer last night.'**
+  String endScreenRestoredTimerLastNight(int minutes);
+
+  /// As endScreenRestoredEarlierToday, for a Timer session
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back. You finished a {minutes}-minute timer earlier today.'**
+  String endScreenRestoredTimerEarlierToday(int minutes);
+
+  /// As endScreenRestoredYesterday, for a Timer session
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back. You finished a {minutes}-minute timer yesterday.'**
+  String endScreenRestoredTimerYesterday(int minutes);
+
+  /// Voice and length the Home hero will play, under the session title, e.g. Will · 10 min
+  ///
+  /// In en, this message translates to:
+  /// **'{guide} · {minutes} min'**
+  String upNextVariant(String guide, int minutes);
+
+  /// Length the Home hero will play when the session has a single voice, e.g. 10 min
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String upNextVariantMinutes(int minutes);
+
+  /// Screen-reader hint on the Home hero's voice · length line, which opens a picker
+  ///
+  /// In en, this message translates to:
+  /// **'Change voice or length'**
+  String get upNextVariantEdit;
+
+  /// Title of the sheet for picking the voice and length opened from the Home hero
+  ///
+  /// In en, this message translates to:
+  /// **'Voice and length'**
+  String get variantSheetTitle;
+
+  /// Note under the voice and length sheet title: the choice becomes the default
+  ///
+  /// In en, this message translates to:
+  /// **'Saved as your default for sessions you start from Home.'**
+  String get variantSheetNote;
+
+  /// Section label for the guide voice options
+  ///
+  /// In en, this message translates to:
+  /// **'Voice'**
+  String get variantVoice;
+
+  /// Section label for the session length options
+  ///
+  /// In en, this message translates to:
+  /// **'Length'**
+  String get variantLength;
+
+  /// Button on Manage defaults that clears the saved voice and length
+  ///
+  /// In en, this message translates to:
+  /// **'Clear defaults'**
+  String get clearDefaults;
+
+  /// Snackbar after the saved voice and length are cleared
+  ///
+  /// In en, this message translates to:
+  /// **'Defaults cleared'**
+  String get defaultsCleared;
+
+  /// No description provided for @sessionBellTiming.
+  ///
+  /// In en, this message translates to:
+  /// **'Bell timing'**
+  String get sessionBellTiming;
+
+  /// No description provided for @sessionBellBeginningMiddleEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Beginning, middle and end'**
+  String get sessionBellBeginningMiddleEnd;
+
+  /// No description provided for @sessionBellBeginningEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Beginning and end'**
+  String get sessionBellBeginningEnd;
+
+  /// No description provided for @sessionBellEveryMinute.
+  ///
+  /// In en, this message translates to:
+  /// **'Every minute'**
+  String get sessionBellEveryMinute;
+
+  /// No description provided for @sessionBellEveryMinuteDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'A bell at the beginning, every minute and at the end'**
+  String get sessionBellEveryMinuteDescription;
+
+  /// No description provided for @sessionBellBeginning.
+  ///
+  /// In en, this message translates to:
+  /// **'Beginning'**
+  String get sessionBellBeginning;
+
+  /// No description provided for @sessionBellMiddle.
+  ///
+  /// In en, this message translates to:
+  /// **'Middle'**
+  String get sessionBellMiddle;
+
+  /// No description provided for @sessionBellEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get sessionBellEnd;
+
+  /// Section header above the interval-bell chips in the Timer bells sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Every few minutes'**
+  String get sessionBellEveryXMinutes;
+
+  /// Chip in the interval-bell row that disables recurring bells
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get sessionBellIntervalOff;
+
+  /// Interval-bell chip label, e.g. 'Every 5 min'
+  ///
+  /// In en, this message translates to:
+  /// **'Every {minutes} min'**
+  String sessionBellIntervalMinutes(int minutes);
+
+  /// Option to download all sessions in a pack
+  ///
+  /// In en, this message translates to:
+  /// **'Download all'**
+  String get downloadAll;
+
+  /// Status text while batch downloading tracks in a pack
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading {completed} of {total}'**
+  String downloadingPack(int completed, int total);
+
+  /// Action to cancel ongoing pack downloads
+  ///
+  /// In en, this message translates to:
+  /// **'Stop downloading'**
+  String get stopDownloading;
+
+  /// Action to remove downloaded files for a pack
+  ///
+  /// In en, this message translates to:
+  /// **'Delete downloads'**
+  String get deletePackDownloads;
+
+  /// Snackbar confirming downloaded files for the pack were removed
+  ///
+  /// In en, this message translates to:
+  /// **'Downloads removed'**
+  String get packDownloadsDeleted;
+
+  /// Status text when all tracks in a pack are downloaded
+  ///
+  /// In en, this message translates to:
+  /// **'All sessions downloaded'**
+  String get allDownloaded;
+
+  /// Accessibility label for the overflow menu button on the pack screen
+  ///
+  /// In en, this message translates to:
+  /// **'More options'**
+  String get overflowMenu;
+
+  /// Action to download tracks in this pack that are not already saved offline
+  ///
+  /// In en, this message translates to:
+  /// **'Download remaining tracks'**
+  String get downloadRemaining;
+
+  /// Offline download status in the pack menu
+  ///
+  /// In en, this message translates to:
+  /// **'{count} of {total} tracks downloaded'**
+  String packDownloadedCount(int count, int total);
+
+  /// Label beneath a pack track available offline
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded'**
+  String get trackDownloaded;
+
+  /// No description provided for @sessionOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Session options'**
+  String get sessionOptions;
+
+  /// No description provided for @openSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Open session'**
+  String get openSession;
+
+  /// No description provided for @editSessionDateTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit date & time'**
+  String get editSessionDateTime;
+
+  /// No description provided for @editSessionExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct when this session took place. Your listening time stays the same.'**
+  String get editSessionExplanation;
+
+  /// No description provided for @editSessionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update this session. Please try again.'**
+  String get editSessionError;
 }
 
 class _AppLocalizationsDelegate
@@ -4376,7 +6082,7 @@ class _AppLocalizationsDelegate
 
   @override
   bool isSupported(Locale locale) =>
-      <String>['en', 'es'].contains(locale.languageCode);
+      <String>['de', 'en', 'es'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
@@ -4385,6 +6091,8 @@ class _AppLocalizationsDelegate
 AppLocalizations lookupAppLocalizations(Locale locale) {
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
+    case 'de':
+      return AppLocalizationsDe();
     case 'en':
       return AppLocalizationsEn();
     case 'es':

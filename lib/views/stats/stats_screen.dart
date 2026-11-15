@@ -1,3 +1,5 @@
+import 'package:medito/widgets/adaptive/adaptive_page_body.dart';
+import 'package:medito/widgets/inputs/medito_segmented_tabs.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/constants/constants.dart';
@@ -5,7 +7,6 @@ import 'package:medito/constants/icons/medito_icons.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/models/local_all_stats.dart';
 import 'package:medito/providers/stats_provider.dart';
-import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/providers/streak_circle_display_provider.dart';
 import 'package:medito/widgets/dialogs/medito_dialog.dart';
 import 'package:medito/widgets/dialogs/medito_dialog_buttons.dart';
@@ -70,26 +71,36 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
       appBar: MeditoAppBarSmall(
         hasBackButton: false,
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
-          child: AnimatedBuilder(
-            animation: _tabController,
-            builder: (context, _) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: padding16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildTabItem(
-                      0,
+          preferredSize: const Size.fromHeight(64),
+          // The page has no visible title: name the route and give screen
+          // readers a heading to land on.
+          child: Semantics(
+            container: true,
+            explicitChildNodes: true,
+            header: true,
+            namesRoute: true,
+            label: AppLocalizations.of(context)!.stats,
+            child: AdaptivePageBody(
+              maxWidth: 640,
+              child: AnimatedBuilder(
+                animation: _tabController,
+                builder: (context, _) => Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    padding16,
+                    padding16,
+                    padding16,
+                    0,
+                  ),
+                  child: MeditoSegmentedTabs(
+                    labels: [
                       AppLocalizations.of(context)!.stats,
-                    ),
-                  ),
-                  Expanded(
-                    child: _buildTabItem(
-                      1,
                       AppLocalizations.of(context)!.history,
-                    ),
+                    ],
+                    selectedIndex: _tabController.index,
+                    position: _tabController.animation,
+                    onChanged: _tabController.animateTo,
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -98,47 +109,11 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
       bottomNavigationBar: SingleBackButtonActionBar(
         onBackPressed: () => Navigator.pop(context),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [_buildStatsTab(), _buildHistoryTab()],
-      ),
-    );
-  }
-
-  Widget _buildTabItem(int index, String label) {
-    final theme = Theme.of(context);
-    final isSelected = _tabController.index == index;
-    final selectedColor = theme.colorScheme.onSurface;
-    final unselectedColor = theme.colorScheme.onSurface.withOpacityValue(0.5);
-
-    return InkWell(
-      onTap: () => _tabController.animateTo(index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: isSelected
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.outline.withOpacityValue(0.2),
-              width: isSelected ? 2 : 1,
-            ),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontFamily: dmSans,
-                color: isSelected ? selectedColor : unselectedColor,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              ),
-            ),
-          ],
+      body: AdaptivePageBody(
+        maxWidth: 640,
+        child: TabBarView(
+          controller: _tabController,
+          children: [_buildStatsTab(), _buildHistoryTab()],
         ),
       ),
     );
@@ -157,13 +132,16 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
             children: [
               const SizedBox(height: 16),
               statsAsync.when(
-                loading: () => const Center(
+                loading: () => Center(
                   child: Padding(
-                    padding: EdgeInsets.all(32.0),
+                    padding: const EdgeInsets.all(32.0),
                     child: SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        semanticsLabel: AppLocalizations.of(context)!.loading,
+                      ),
                     ),
                   ),
                 ),
@@ -172,29 +150,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
                     final stats = statsAsync.value!;
                     return _statsList(context, stats, ref);
                   } else {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32.0),
-                        child: Semantics(
-                          label: AppLocalizations.of(context)!.refresh,
-                          button: true,
-                          child: InkWell(
-                            onTap: () =>
-                                ref.read(statsProvider.notifier).refresh(),
-                            borderRadius: BorderRadius.circular(24),
-                            focusColor: Theme.of(
-                              context,
-                            ).colorScheme.primary.withValues(alpha: 0.18),
-                            child: ExcludeSemantics(
-                              child: MeditoIcon(
-                                assetName: MeditoIcons.help,
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
+                    return _buildLoadError(context);
                   }
                 },
                 data: (stats) {
@@ -222,17 +178,22 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
             children: [
               const SizedBox(height: 16),
               statsAsync.when(
-                loading: () => const Center(
+                loading: () => Center(
                   child: Padding(
-                    padding: EdgeInsets.all(32.0),
+                    padding: const EdgeInsets.all(32.0),
                     child: SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        semanticsLabel: AppLocalizations.of(context)!.loading,
+                      ),
                     ),
                   ),
                 ),
-                error: (_, _) => const SizedBox.shrink(),
+                error: (_, _) => statsAsync.hasValue
+                    ? MeditationCalendarWidget(stats: statsAsync.value!)
+                    : _buildLoadError(context),
                 data: (stats) {
                   if (stats.updated == 0) return const SizedBox.shrink();
                   return MeditationCalendarWidget(stats: stats);
@@ -246,6 +207,32 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
     );
   }
 
+  /// Said and shown instead of a blank tab (or a lone icon) when stats
+  /// could not be loaded.
+  Widget _buildLoadError(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.all(32.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            l10n.statsLoadError,
+            textAlign: TextAlign.center,
+            style: context.text.body.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => ref.read(statsProvider.notifier).refresh(),
+            child: Text(l10n.statsErrorRetry),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatRow(
     BuildContext context,
     String title,
@@ -253,20 +240,25 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
     bool hasUnderline = true,
     VoidCallback? onTap,
   }) {
-    return RowItemWidget(
-      icon: MeditoRemoteIcon(icon: title),
-      iconColor: Theme.of(context).colorScheme.onSurface,
-      trailingIconSize: 20,
-      title: value,
-      subTitle: title,
-      hasUnderline: hasUnderline,
-      isTrailingIcon: onTap != null,
-      trailingIcon: Icons.info_outline,
+    // Read name first ("Consistency Score: 85%"); the visual order puts the
+    // value first. Tappable rows keep their tap through the exclusion.
+    return Semantics(
+      container: true,
+      excludeSemantics: true,
+      label: '$title: $value',
+      button: onTap != null,
       onTap: onTap,
-      titleStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
-        fontSize: 20,
-        fontWeight: FontWeight.w600,
-        fontFamily: dmSans,
+      child: RowItemWidget(
+        icon: MeditoRemoteIcon(icon: title),
+        iconColor: Theme.of(context).colorScheme.onSurface,
+        trailingIconSize: 20,
+        title: value,
+        subTitle: title,
+        hasUnderline: hasUnderline,
+        isTrailingIcon: onTap != null,
+        trailingIcon: Icons.info_outline,
+        onTap: onTap,
+        titleStyle: context.text.title,
       ),
     );
   }
@@ -282,7 +274,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
       var minuteText = minutes == 1
           ? AppLocalizations.of(context)!.minute
           : AppLocalizations.of(context)!.minutes;
-      return '$hours $hourText ${minutes.toString().padLeft(2, '0')} $minuteText';
+      return '$hours $hourText $minutes $minuteText';
     } else {
       var minuteText = minutes == 1
           ? AppLocalizations.of(context)!.minute
@@ -292,15 +284,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
   }
 
   Column _statsList(BuildContext context, LocalAllStats stats, WidgetRef ref) {
-    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
-      data: (value) => value.isAndroidTv,
-      orElse: () => false,
-    );
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
@@ -344,7 +330,6 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
             ],
           ),
         ),
-        if (!isTv)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 16),
           child: SizedBox(
@@ -360,7 +345,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
               ),
               label: Text(
                 AppLocalizations.of(context)!.share,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                style: context.text.label.copyWith(
                   color: Theme.of(context).colorScheme.onPrimary,
                 ),
               ),
@@ -391,7 +376,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
             ),
             label: Text(
               AppLocalizations.of(context)!.restorePreviousStats,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              style: context.text.caption.copyWith(
                 color: Theme.of(
                   context,
                 ).colorScheme.onSurface.withOpacityValue(0.7),
@@ -414,10 +399,13 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
           final displayTypeAsync = ref.watch(streakCircleDisplayProvider);
 
           return displayTypeAsync.when(
-            loading: () => const SizedBox(
+            loading: () => SizedBox(
               width: 16,
               height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                semanticsLabel: AppLocalizations.of(context)!.loading,
+              ),
             ),
             error: (_, _) => const SizedBox.shrink(),
             data: (displayType) {
@@ -437,7 +425,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
                 child: InkWell(
                   onTap: handleToggle,
                   borderRadius: BorderRadius.circular(8),
-                  child: Padding(
+                  child: Container(
+                    // 48px tall like other touch targets; the row was ~30px.
+                    constraints: const BoxConstraints(minHeight: 48),
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -449,7 +439,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
                           child: Checkbox(
                             value: isStreakSelected,
                             onChanged: (_) => handleToggle(),
-                            activeColor: context.brandPurple,
+                            activeColor: context.brandAccent,
                             checkColor: Theme.of(context).colorScheme.onPrimary,
                             side: BorderSide(
                               color: Theme.of(
@@ -468,8 +458,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen>
                             AppLocalizations.of(
                               context,
                             )!.alwaysShowStreakOnHomepage,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(fontSize: 14, fontFamily: dmSans),
+                            style: context.text.muted.bodySmall,
                           ),
                         ),
                       ],

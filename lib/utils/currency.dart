@@ -8,8 +8,22 @@ import 'package:intl/intl.dart';
 /// to ¥1000 it yields 10.00, understating the figure a hundredfold — which on a
 /// payment sheet means showing someone a different price than they are charged.
 const zeroDecimalCurrencies = {
-  'bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga',
-  'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf',
+  'bif',
+  'clp',
+  'djf',
+  'gnf',
+  'jpy',
+  'kmf',
+  'krw',
+  'mga',
+  'pyg',
+  'rwf',
+  'ugx',
+  'vnd',
+  'vuv',
+  'xaf',
+  'xof',
+  'xpf',
 };
 
 bool isZeroDecimalCurrency(String currency) =>
@@ -67,4 +81,32 @@ String formatCurrencyAmount(int amount, String currency) {
   );
 
   return format.format(value);
+}
+
+/// Symbols that several currencies print the same way, mapped to the one
+/// currency a listener would assume. Screen readers say "$5" as "5 dollars"
+/// whether it's US, Canadian or Colombian pesos.
+const _ambiguousSymbolDefaults = {r'$': 'USD', '¥': 'JPY'};
+
+/// [formatCurrencyAmount] for screen readers: where the symbol is shared by
+/// several currencies (`$` for CAD/AUD/MXN/COP/CLP/UYU…, `¥` for CNY), it is
+/// swapped for the ISO code, e.g. `COP 20,000`. Every other amount is returned
+/// exactly as displayed.
+String spokenCurrencyAmount(int amount, String currency) {
+  final visible = formatCurrencyAmount(amount, currency);
+  final code = currency.trim().toUpperCase();
+  final symbol = NumberFormat.simpleCurrency(name: code).currencySymbol;
+  final assumed = _ambiguousSymbolDefaults[symbol];
+  if (assumed == null || assumed == code) return visible;
+
+  final at = visible.indexOf(symbol);
+  if (at < 0) return visible;
+  final before = visible.substring(0, at);
+  final after = visible.substring(at + symbol.length);
+  // "$5" has no gap between symbol and number; "COP5" would be read as one
+  // word, so add a non-breaking space when the number follows directly.
+  final gap = after.isNotEmpty && RegExp(r'^\d').hasMatch(after)
+      ? ' '
+      : '';
+  return '$before$code$gap$after';
 }

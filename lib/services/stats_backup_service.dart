@@ -230,6 +230,18 @@ class StatsBackupService {
     }
   }
 
+  /// Removes every backup on the device, whichever client id it belongs to.
+  /// Used after account deletion: the server also deletes other accounts
+  /// sharing the email (earlier forked client ids), so their snapshots go too.
+  Future<void> clearAll() async {
+    for (var i = 0; i < _maxBackups; i++) {
+      await _prefs.remove(_getBackupKey(i));
+    }
+    await _prefs.remove(_backupIndexKey);
+    await _prefs.remove(_richestSlotKey);
+    await _prefs.remove(_richestTotalKey);
+  }
+
   bool _sameContent(LocalAllStats a, LocalAllStats b) =>
       a.totalTracksCompleted == b.totalTracksCompleted &&
       a.totalTimeListened == b.totalTimeListened &&
@@ -288,4 +300,15 @@ class StatsBackupService {
   }
 
   String _getBackupKey(int index) => '$_backupKeyPrefix$index';
+
+  /// Synchronously counts how many of the ring's backup slots are populated.
+  /// Used by the debug screen to flag "the restore list is empty / full"
+  /// without decoding every snapshot.
+  int countBackupSlots() {
+    var count = 0;
+    for (var i = 0; i < _maxBackups; i++) {
+      if (_prefs.getString(_getBackupKey(i)) != null) count++;
+    }
+    return count;
+  }
 }

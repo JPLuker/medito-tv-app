@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // ignore: depend_on_referenced_packages
@@ -23,20 +24,26 @@ import 'package:medito/providers/theme_provider.dart';
 import 'package:medito/repositories/auth/auth_repository.dart';
 import 'package:medito/routes/routes.dart';
 import 'package:medito/services/notifications/firebase_notifications_service.dart';
+import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:medito/constants/strings/shared_preference_constants.dart';
+import 'package:medito/utils/notification_permission_flow.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:medito/services/analytics/crashlytics_service.dart';
+import 'package:medito/services/analytics/firebase_analytics_service.dart';
 import 'package:medito/services/analytics/meta_sdk_service.dart';
 import 'package:medito/services/history/app_history_service.dart';
+import 'package:medito/services/home_widget_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:medito/src/audio_pigeon.g.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:medito/providers/player/ios_audio_handler.dart';
+import 'package:medito/utils/app_open_tracker.dart';
 import 'package:medito/utils/audio_session_tracker.dart';
 import 'package:medito/utils/logger.dart';
 import 'package:medito/utils/stats_updater.dart';
 import 'package:medito/views/splash_view.dart';
+import 'package:medito/widgets/launch_splash.dart';
 import 'package:medito/services/network/http_api_service.dart';
 import 'package:medito/services/deep_link_service.dart';
 import 'package:medito/services/device_capabilities_service.dart';
@@ -52,6 +59,7 @@ import 'package:medito/mock/mock_auth_api_service.dart';
 import 'package:medito/mock/mock_donation_api_service.dart';
 import 'package:medito/providers/stripe/payment_providers.dart';
 import 'package:medito/providers/stripe/payment_service_provider.dart';
+import 'package:medito/constants/theme/medito_text.dart';
 
 // Completer used as both the guard and the barrier for duplicate main() calls.
 // It is set synchronously before any await, so a second call always finds it non-null.
@@ -83,6 +91,14 @@ void main() async {
   DevicePreview.enable(enabled: DebugOptions.enableDevicePreview);
 
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Google Sans ships under the SIL Open Font License 1.1, which requires the
+  // license notice to travel with the app. Register it so it's included in the
+  // in-app licenses page (Advanced > Licenses / showLicensePage).
+  LicenseRegistry.addLicense(() async* {
+    final ofl = await rootBundle.loadString('assets/fonts/google-sans/OFL.txt');
+    yield LicenseEntryWithLineBreaks(const ['Google Sans'], ofl);
+  });
 
   if (isMockMode) {
     AppLogger.d('MAIN', 'Mock mode: skipping Firebase, Stripe, Meta SDK');
@@ -138,6 +154,13 @@ void main() async {
       }
     }
   }
+
+  // Users who declined the reminder permission before the fix still read as
+  // "reminders on"; see repairReminderFlagOnce.
+  await repairReminderFlagOnce(
+    prefs,
+    isGranted: () async => (await Permission.notification.status).isGranted,
+  );
 
   if (!isMockMode) {
     // Initialize Firebase (non-blocking when offline).
@@ -245,9 +268,27 @@ class _ParentWidgetState extends ConsumerState<ParentWidget>
     super.initState();
     _setUpSystemUi();
     WidgetsBinding.instance.addObserver(this);
-    // If a previous run was force-quit mid-session and sent no event, recover
-    // it as an audio_session_abandoned now (before any new session starts).
-    unawaited(AudioSessionTracker.instance.replayIfAbandoned());
+    unawaited(_recoverPreviousSession());
+    unawaited(AppOpenTracker.instance.onColdStart());
+    unawaited(ref.read(firebaseMessagingProvider).registerOpenTracking(ref));
+    unawaited(FirebaseAnalyticsService.applyRemindersOnProperty());
+  }
+
+  /// If a previous run was force-quit mid-session and sent no event, recover
+  /// it as an audio_session_abandoned now (before any new session starts).
+  /// Completions that finished while the app was dead must win over the
+  /// replay, or one session is reported both completed and abandoned. iOS
+  /// holds them in a queue Dart can drain first; Android pushes them from
+  /// MainActivity.onResume at its own pace, so the replay waits for them.
+  Future<void> _recoverPreviousSession() async {
+    if (Platform.isIOS) {
+      await processPendingCompletedTracks();
+      await AudioSessionTracker.instance.replayIfAbandoned();
+    } else {
+      await AudioSessionTracker.instance.replayIfAbandoned(
+        completionGrace: const Duration(seconds: 10),
+      );
+    }
   }
 
   void _setUpSystemUi() {
@@ -299,10 +340,43 @@ class _ParentWidgetState extends ConsumerState<ParentWidget>
 
     return authRepo.when(
       loading: () => const MaterialApp(
-        home: Scaffold(body: Center(child: CircularProgressIndicator())),
+        debugShowCheckedModeBanner: false,
+        home: LaunchSplashFrame(child: LaunchSplash()),
       ),
+      // Same delegates as the main app, so the message is localized; the raw
+      // error stays underneath for support screenshots.
       error: (error, stack) => MaterialApp(
-        home: Scaffold(body: Center(child: Text('Error initializing: $error'))),
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      AppLocalizations.of(context)!.errorUnknownMessage,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '$error',
+                      textAlign: TextAlign.center,
+                      style: context.text.muted.caption,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
       data: (_) {
         // Initialize deep link service once we have context
@@ -327,6 +401,9 @@ class _ParentWidgetState extends ConsumerState<ParentWidget>
         );
 
         final locale = ref.watch(localeProvider);
+        // Keep the widgets' "day"/"days" unit in the app's language. No-op
+        // unless the locale changed.
+        HomeWidgetService.setLocale(locale);
         final themeMode = ref.watch(themeProvider);
 
         // Update system UI to match current theme
@@ -351,11 +428,13 @@ class _ParentWidgetState extends ConsumerState<ParentWidget>
                 GlobalWidgetsLocalizations.delegate,
                 GlobalCupertinoLocalizations.delegate,
               ],
-              supportedLocales: const [Locale('en'), Locale('es')],
+              supportedLocales: AppLocalizations.supportedLocales,
               initialRoute: '/',
               routes: {
                 '/': (context) => const SplashView(),
-                SignUpLogInPage.routeName: (context) => const SignUpLogInPage(),
+                SignUpLogInPage.routeName: (context) => const SignUpLogInPage(
+                  source: AnalyticsEventConstants.sourceDeeplink,
+                ),
               },
             ),
           ),
@@ -369,9 +448,13 @@ class _ParentWidgetState extends ConsumerState<ParentWidget>
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       _onAppForegrounded();
+      unawaited(AppOpenTracker.instance.onForegrounded());
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {
+      if (state != AppLifecycleState.inactive) {
+        AppOpenTracker.instance.onBackgrounded();
+      }
       // Analytics: leaving the app abandons a paused session. A session that is
       // actively playing keeps going in the background (screen-off mid-
       // meditation is normal), so the tracker only fires when not playing.
@@ -393,6 +476,8 @@ class _ParentWidgetState extends ConsumerState<ParentWidget>
       // Badge clearing is best-effort and must never block resume.
     }
     ref.read(statsProvider.notifier).refresh();
+    // Notification permission can be revoked in system settings while away.
+    unawaited(FirebaseAnalyticsService.applyRemindersOnProperty());
 
     // Diagnose token state for debug purposes
     _diagnoseSecurity();

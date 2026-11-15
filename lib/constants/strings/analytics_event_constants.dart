@@ -28,6 +28,14 @@ class AnalyticsEventConstants {
   /// Event logged once when the app is first opened
   static const String appFirstOpen = 'app_first_open';
 
+  /// Event logged on a cold start, or a resume after 30+ min in the
+  /// background (GA4's session timeout). Carries [paramLaunchType] and
+  /// [paramNetworkType]; the baseline for network_type on session starts.
+  static const String appOpen = 'app_open';
+
+  /// How the app was opened for [appOpen]: 'cold' | 'resume'.
+  static const String paramLaunchType = 'launch_type';
+
   // Payment and donation events
   /// Event logged when a one-time donation is successfully completed
   static const String donationOnetime = 'donation_onetime';
@@ -211,6 +219,13 @@ class AnalyticsEventConstants {
   /// Event logged when user submits post-meditation feedback
   static const String postMeditationFeedback = 'post_meditation_feedback';
 
+  /// Rate option available on an eligible Settings visit, once per screen
+  /// instance. This is availability, not a viewport impression or a rating.
+  static const String settingsRateAvailable = 'settings_rate_available';
+
+  /// User chose the Settings store link; does not imply a submitted rating.
+  static const String settingsRateTap = 'settings_rate_tap';
+
   // Audio session events
   /// Event logged when an audio session is completed and stats are updated
   static const String audioSessionCompleted = 'audio_session_completed';
@@ -242,6 +257,11 @@ class AnalyticsEventConstants {
   /// Parameter for elapsed playback time in whole seconds when abandoning.
   static const String paramElapsedSeconds = 'elapsed_seconds';
 
+  /// Connection type when a session starts: wifi | mobile | ethernet | none |
+  /// other | unknown. A permission-free proxy for "at home" (we never read
+  /// the SSID, which would need location permission).
+  static const String paramNetworkType = 'network_type';
+
   // Error and token events
   /// Event logged when unexpected logout occurs due to missing refresh token
   static const String unexpectedLogoutRefreshTokenMissing =
@@ -251,11 +271,13 @@ class AnalyticsEventConstants {
   static const String secureStoragePersistentFailure =
       'secure_storage_persistent_failure';
 
-  /// Event logged when token backup storage is attempted
+  /// Event logged when token backup storage is attempted.
+  /// No longer sent since Sep 2026 (was pure volume); kept for old builds' data.
   static const String tokenBackupStorageAttempt =
       'token_backup_storage_attempt';
 
-  /// Event logged with result of token backup storage attempt
+  /// Event logged with result of token backup storage attempt.
+  /// Since Sep 2026 only 'failure' is sent; older builds also sent 'success'.
   static const String tokenBackupStorageResult = 'token_backup_storage_result';
 
   /// Event logged when token is retrieved from backup storage
@@ -303,6 +325,32 @@ class AnalyticsEventConstants {
 
   /// Paywall source identifier for announcement
   static const String paywallSourceAnnouncement = 'announcement';
+
+  /// Fired once per session the first time a server-driven home announcement
+  /// renders, so we can count impressions per announcement and segment by
+  /// [paramLaunchSource] (did they see it after a deep link, a push, a daily
+  /// reminder, a cold start, or a resume).
+  static const String announcementImpression = 'announcement_impression';
+
+  /// Fired when the user taps Dismiss on a home announcement.
+  static const String announcementDismissed = 'announcement_dismissed';
+
+  /// Fired when the user taps the CTA on a home announcement. The paywall
+  /// source for donation CTAs is already [paywallSourceAnnouncement]; this
+  /// event covers non-donation CTAs too and carries [paramLaunchSource].
+  static const String announcementCtaTapped = 'announcement_cta_tapped';
+
+  /// The server's announcement id (admin-dashboard record).
+  static const String paramAnnouncementId = 'announcement_id';
+
+  /// The announcement's CTA type as sent by the server (e.g. 'donation',
+  /// 'route', 'url'). 'none' when there is no CTA.
+  static const String paramAnnouncementCtaType = 'announcement_cta_type';
+
+  /// The reason the app most recently foregrounded or routed before this
+  /// event: cold | resume | deep_link | push | smart_reminder. Written by
+  /// [LaunchSourceTracker]. "Latest wins" within a session.
+  static const String paramLaunchSource = 'launch_source';
 
   // Analytics parameter names
   /// Parameter name for donation/payment amount
@@ -408,8 +456,13 @@ class AnalyticsEventConstants {
   /// Parameter name for revenue (used by Meta)
   static const String paramRevenue = 'revenue';
 
-  /// Parameter name for currency (used by Meta)
+  /// Parameter name for currency: ISO code, upper case on the GA4 donation
+  /// events (also used by Meta)
   static const String paramCurrency = 'currency';
+
+  /// GA4's standard monetary value, in major units (10.0 for $10). Google Ads
+  /// reads value + currency when GA4 events are imported as conversions.
+  static const String paramValue = 'value';
 
   // Up Next widget events
   /// Event logged when user taps the Up Next widget to start a session
@@ -418,16 +471,39 @@ class AnalyticsEventConstants {
   /// Event logged when user swipes to skip the Up Next session
   static const String upNextSkipped = 'up_next_skipped';
 
+  /// User opened the Up Next pack from the card's swipe menu.
+  static const String upNextPackOpened = 'up_next_pack_opened';
+
   /// The pinned pack is finished and the completed state was shown.
+  /// Once per pack per install; before Sep 2026 it fired on every Home mount.
   static const String upNextPackCompleted = 'up_next_pack_completed';
 
   /// The completed-state CTA was accepted and the next pack pinned.
   static const String upNextNextPackPinned = 'up_next_next_pack_pinned';
 
   /// The user finished the last pack on the path (or the megapack).
+  /// Once per pack per install; before Sep 2026 it fired on every Home mount.
   static const String upNextPathCompleted = 'up_next_path_completed';
 
-  /// Parameter name for the session/track ID in up next events
+  /// The Up Next card was on screen. Fires once each time the card is built
+  /// (a Home mount, or the card moving on to a new session), so it counts Home
+  /// visits with the card visible, not distinct users — read it as distinct
+  /// users per day. It is the denominator [upNextTapped] never had.
+  /// Params: [paramUpNextState] ('session' | 'completed'), [paramUpNextStyle],
+  /// [paramSessionId] (session state only), plus the usual pack params.
+  static const String upNextShown = 'up_next_shown';
+
+  /// How the card is presented: 'card' (its own row) or 'hero' (laid over the
+  /// Home image). Also added to the other up_next_* events.
+  static const String paramUpNextStyle = 'style';
+
+  /// What the card showed: 'session' (next track to play) or 'completed'
+  /// (the pinned pack is finished).
+  static const String paramUpNextState = 'state';
+
+  /// Parameter name for the session/track ID in up next events. On the
+  /// Start/Continue button it is the track that button plays, the same id
+  /// [upNextTapped] reports, so the two join on it.
   static const String paramSessionId = 'session_id';
 
   /// Parameter name for the pack ID in up next events
@@ -454,12 +530,31 @@ class AnalyticsEventConstants {
 
   static const String paramPackTotalSessions = 'pack_total_sessions';
 
-  // Pin events
-  /// Event logged when user pins a pack as Up Next from the pack screen
+  // Your Path (Up Next) pack selection from the pack screen
+  /// The user set a pack as Your Path via the pack screen button.
+  /// Params: [paramPackId], [paramPreviousPackId].
   static const String packPinned = 'pack_pinned';
 
-  /// Event logged when user unpins a pack from Up Next on the pack screen
+  /// The user removed the pack from Your Path via the pack screen sheet.
+  /// Params: [paramPackId].
   static const String packUnpinned = 'pack_unpinned';
+
+  /// The pack screen's Start/Continue play button was tapped — every tap, not
+  /// just the ones that change Home (that is [packPinned], which stays silent
+  /// when the pack is already pinned and so hid the common Continue case).
+  /// Params: [paramPackId], [paramSessionId] (the track it plays),
+  /// [paramButtonLabel], [paramAlreadyPinned], [paramSessionIndexInPack],
+  /// [paramPackTotalSessions], [paramPackSequencePosition], [paramUpNextMode].
+  static const String packPathButtonTapped = 'pack_path_button_tapped';
+
+  /// 'start' (nothing finished yet) or 'continue'.
+  static const String paramButtonLabel = 'label';
+
+  /// 'true' when the pack was already what Home continues.
+  static const String paramAlreadyPinned = 'already_pinned';
+
+  /// Pack that was Your Path before this one replaced it.
+  static const String paramPreviousPackId = 'previous_pack_id';
 
   // Home-screen widget events (iOS + Android)
   /// Event logged when the user taps a home-screen widget. Detected via the
@@ -470,24 +565,22 @@ class AnalyticsEventConstants {
   /// (Android only — iOS doesn't expose a programmatic pin API).
   static const String homeWidgetPinRequested = 'home_widget_pin_requested';
 
-  /// Parameter naming the widget kind: `up_next`, `streak`, `consistency`.
+  /// Event logged when the iOS "how to add a widget" sheet is opened from
+  /// Settings (iOS has no pin API, so this stands in for the Android pin).
+  static const String homeWidgetInstructionsShown =
+      'home_widget_instructions_shown';
+
+  /// Parameter naming the widget kind: `up_next`, `streak`, `consistency`,
+  /// or the Lock Screen's `lock_streak` / `lock_consistency`.
   static const String paramWidgetType = 'widget_type';
+
+  /// Parameter for where the tapped widget sits (iOS): `home_screen`,
+  /// `standby` or `lock_screen`. Absent on Android and older builds.
+  static const String paramWidgetPlacement = 'placement';
 
   /// Sentinel value for the `source` deep-link query param that identifies
   /// the link as coming from a home-screen widget tap.
   static const String widgetDeepLinkSource = 'home_widget';
-
-  // Your Path explainer strip events
-  /// Event logged when the Your Path explainer strip is shown to the user
-  static const String yourPathExplainerShown = 'your_path_explainer_shown';
-
-  /// Event logged when the Your Path explainer strip is dismissed
-  /// Parameter: dismissMethod — 'got_it' (tapped button) or 'auto' (timed out)
-  static const String yourPathExplainerDismissed =
-      'your_path_explainer_dismissed';
-
-  /// Parameter for how the explainer was dismissed ('got_it' or 'auto')
-  static const String paramDismissMethod = 'dismiss_method';
 
   // Onboarding question/result events
   /// Event logged when the new onboarding question flow is started
@@ -499,10 +592,6 @@ class AnalyticsEventConstants {
   static const String onboardingExperienceAnswered =
       'onboarding_experience_answered';
 
-  /// Event logged when the user answers the intent question
-  /// Parameter: paramAnswer ('learn_properly', 'build_habit', 'stress_sleep_emotions')
-  static const String onboardingIntentAnswered = 'onboarding_intent_answered';
-
   /// Parameter for the selected answer in onboarding question events
   static const String paramAnswer = 'answer';
 
@@ -512,9 +601,38 @@ class AnalyticsEventConstants {
   /// test — can be segmented by experience level in BigQuery.
   static const String userPropExperienceLevel = 'experience_level';
 
-  /// Parameter carrying the free-text response from the onboarding attribution
-  /// question when the user picks the "other" path and types their own answer.
-  static const String paramOtherText = 'other_text';
+  /// GA4 user properties sizing the audience for a watch app: whether the
+  /// phone has a paired Apple Watch / Wear OS watch set up, and whether the
+  /// Medito watch app is on it ('true' / 'false'). Set on every Home launch.
+  static const String userPropHasPairedWatch = 'has_paired_watch';
+  static const String userPropWatchAppInstalled = 'watch_app_installed';
+
+  /// GA4 user property listing the home-screen widget kinds the user has
+  /// placed, sorted and comma-joined ('consistency,up_next'), or 'none'.
+  /// 'lock' is the iOS Lock Screen widget.
+  /// Set on every Home launch so passive (never-tapped) widgets are visible.
+  static const String userPropHomeWidgets = 'home_widgets';
+
+  /// GA4 user property for the Zen Mode setting ('on' / 'off'). Set on every
+  /// launch and whenever the user toggles it, so adoption can be read from
+  /// BigQuery and other metrics segmented by it.
+  static const String userPropZenMode = 'zen_mode';
+
+  /// GA4 user property for whether daily reminders can actually reach the
+  /// user: 'on' (enabled and notification permission granted), 'blocked'
+  /// (enabled in the app but permission off in system settings), or 'off'.
+  /// Set on every launch and foreground, and when the user toggles reminders.
+  static const String userPropRemindersOn = 'reminders_on';
+
+  /// Logged once per iOS install with Apple's AdServices answer for whether
+  /// the install came from an Apple Ads campaign. Params: attributed
+  /// ('true' / 'false'); when attributed also campaign_id, ad_group_id,
+  /// keyword_id, claim_type ('Click' / 'Impression'), conversion_type
+  /// ('Download' / 'Redownload'), country_or_region. Attributed installs also
+  /// get utm_source 'apple-search' / utm_medium 'asa' (unless a deep link
+  /// already set UTMs), which flow into GA4 user properties and Stripe
+  /// metadata like deep-link UTMs do.
+  static const String appleAdsAttribution = 'apple_ads_attribution';
 
   /// Event logged when the new onboarding question flow is completed
   /// Parameter: paramResultState — 'state_a', 'state_b', or 'state_c'
@@ -523,15 +641,6 @@ class AnalyticsEventConstants {
 
   /// Parameter for the result state shown on the onboarding result screen
   static const String paramResultState = 'result_state';
-
-  /// Event logged when the user abandons the new onboarding question flow before completion
-  static const String onboardingQuestionFlowAbandoned =
-      'onboarding_question_flow_abandoned';
-
-  /// Event logged when the user answers the attribution question ("how did you hear about us?")
-  /// Parameter: paramAnswer ('google_ad', 'social_ad', 'friend', 'therapist', 'app_store', 'play_store', 'other')
-  static const String onboardingAttributionAnswered =
-      'onboarding_attribution_answered';
 
   /// Event logged when the end-screen donation card first becomes visible in
   /// its ASK state (the amount/CTA card, not the post-donation thank-you).
@@ -575,15 +684,45 @@ class AnalyticsEventConstants {
   static const String endScreenDonationCardInfoOpened =
       'end_screen_donation_card_info_opened';
 
+  /// Event logged when a finished session's end screen is rebuilt on launch
+  /// because the app was killed before it could open (session ended with the
+  /// screen off). The end screen's own events follow as usual.
+  static const String endScreenRestored = 'end_screen_restored';
+
   /// Parameter naming which donate CTA was tapped when the CMS supplies more
   /// than one button (0-based).
   static const String paramButtonIndex = 'button_index';
+
+  /// Parameter on [endScreenDonationCardShown] in the `end_screen_inline_pay`
+  /// experiment: 'true' when variant B actually rendered the inline chips +
+  /// pay button, 'false' when it fell back to the control CTA (paywall config
+  /// unavailable or no monthly ladder). Lets the readout separate "B as
+  /// designed" from "B degraded to A".
+  static const String paramInlineRendered = 'inline_rendered';
+
+  /// paywall_id for the inline end-screen pay flow (variant B), so its
+  /// donation_* / payment_failed events are distinguishable from the webview
+  /// ('paywall_webview') and onboarding native page ('paywall_native').
+  static const String paywallIdEndScreenInline = 'paywall_end_screen_inline';
+
+  /// Parameter on [endScreenDonationCardLoadFailed]: the failure class, e.g.
+  /// 'network_offline', 'network_hostLookup', 'timeout', 'server',
+  /// 'unauthorized'. Added because the Android resume-time failure (Sep 2026)
+  /// could not be diagnosed from the bare event.
+  static const String paramErrorKind = 'error_kind';
 
   /// Parameter distinguishing the donation card's render state: 'ask' (first
   /// or repeat ask) vs 'thanks' (post-donation "Donate again").
   static const String paramCardState = 'card_state';
 
-  /// Event logged when the end-screen smart-reminders card first becomes
+  /// On [endScreenDonationCardSuppressed]:
+  /// why the ask is suppressed — 'donor' (this install completed a donation)
+  /// or 'hidden' ("Hide for now" from the info dialog, no donation on
+  /// record). Without it, repeat-donation rates among real donors were
+  /// diluted by snoozers (Sep 2026 read: 1,414 thanked users, mixed).
+  static const String paramSnoozeReason = 'snooze_reason';
+
+  /// Event logged when the end-screen daily-reminders card first becomes
   /// visible to the user (i.e. shouldShowReminderPromptProvider is true).
   static const String endScreenReminderPromptShown =
       'end_screen_reminder_prompt_shown';
@@ -598,7 +737,29 @@ class AnalyticsEventConstants {
   static const String endScreenReminderPromptDismissed =
       'end_screen_reminder_prompt_dismissed';
 
-  /// Event logged when the user taps "Turn on smart reminders" but the OS
+  /// Event logged when the end-screen "save your progress" account-conversion
+  /// card first becomes visible (shouldShowAccountPromptProvider is true).
+  static const String endScreenAccountPromptShown =
+      'end_screen_account_prompt_shown';
+
+  /// Event logged when the user taps the primary CTA on the account-conversion
+  /// card, opening the sign-in sheet. Pair with [onboardingSignupCompleted]
+  /// carrying [paramSource] = [sourceEndScreen] to measure conversion.
+  static const String endScreenAccountPromptTapped =
+      'end_screen_account_prompt_tapped';
+
+  /// Event logged when the user taps "Turn on reminders", the time-choice
+  /// sheet (or the custom time picker it leads to) opens, and they close it
+  /// without picking a time. Before this the card scheduled "same time
+  /// tomorrow" silently; now the sheet is a step the funnel can lose people at.
+  /// Continues = shown - dismissed. Successful picks arrive as
+  /// [notificationsEnabled] with [paramReminderSlot], same as Settings.
+  static const String endScreenReminderSheetShown =
+      'end_screen_reminder_sheet_shown';
+  static const String endScreenReminderSheetDismissed =
+      'end_screen_reminder_sheet_dismissed';
+
+  /// Event logged when the user taps "Turn on daily reminders" but the OS
   /// permission dialog returns denied.
   static const String endScreenReminderOsDenied =
       'end_screen_reminder_os_denied';
@@ -633,30 +794,32 @@ class AnalyticsEventConstants {
   static const String endScreenReminderEnableFailed =
       'end_screen_reminder_enable_failed';
 
-  /// Event logged when the user enables smart reminders/notifications.
+  /// Event logged when the user enables daily reminders/notifications.
   /// Parameter: paramSource ('end_screen', 'settings')
   static const String notificationsEnabled = 'notifications_enabled';
 
-  /// Event logged when the user disables smart reminders/notifications.
+  /// Event logged when the user disables daily reminders/notifications.
   /// Parameter: paramSource ('settings')
   static const String notificationsDisabled = 'notifications_disabled';
 
   /// Event logged when a notification is TAPPED. Nothing in the app logged
-  /// this before, and the smart-reminder series shipped a bare ISO date string
+  /// this before, and the daily-reminder series shipped a bare ISO date string
   /// as its payload, which `json.decode` rejected — so the tap was swallowed,
   /// never navigated and never measured. Every question about whether the
   /// reminders work has had to be answered by inference instead.
   ///
-  /// Params: [paramSource] ('smart_reminder' | 'push'), plus
+  /// Params: [paramSource] ('smart_reminder' (legacy value, kept for analytics continuity) | 'push'), plus
   /// [paramNotificationDay] for the reminder series so open rate can be read
   /// per day of the sequence (the series escalates its copy by day).
   static const String notificationOpened = 'notification_opened';
 
-  /// Which day of the smart-reminder series was tapped (1-15, or 30).
+  /// Which day of the daily-reminder series was tapped (1-15, or 30).
   static const String paramNotificationDay = 'notification_day';
 
-  /// Source value for a tap on a locally-scheduled smart reminder.
-  static const String sourceSmartReminder = 'smart_reminder';
+  /// Source value for a tap on a locally-scheduled daily reminder. The
+  /// string is unchanged from the old "smart reminders" name so historical
+  /// BigQuery rows stay comparable.
+  static const String sourceLocalReminder = 'smart_reminder';
 
   /// Source value for a tap on a remote push (FCM campaign).
   static const String sourcePush = 'push';
@@ -670,6 +833,12 @@ class AnalyticsEventConstants {
 
   /// Source value for notifications enabled from the settings screen
   static const String sourceSettings = 'settings';
+
+  /// Source value for account creation started from the onboarding splash.
+  static const String sourceSplash = 'splash';
+
+  /// Source value for account creation reached via a magic-link / deep link.
+  static const String sourceDeeplink = 'deeplink';
 
   // "Silence phone during meditation" (Android Do Not Disturb) setting.
   /// The user picked On or Off in the settings sheet and the value actually
@@ -707,18 +876,137 @@ class AnalyticsEventConstants {
   /// Parameter name for the shortcut destination type (e.g. pack, track, link)
   static const String paramShortcutType = 'shortcut_type';
 
-  // Favourite events
-  /// Event logged when user adds a track to favourites from the track screen
+  /// The user tapped a card in the home Featured row. Until this existed the
+  /// row's only signal was first_action_after_onboarding (target 'carousel'),
+  /// so its ongoing use could not be compared with the shortcuts'.
+  /// Parameters: paramCarouselItemId, paramCarouselItemTitle,
+  /// paramCarouselItemType, paramCarouselPosition.
+  static const String carouselItemTapped = 'carousel_item_tapped';
+
+  static const String paramCarouselItemId = 'carousel_item_id';
+  static const String paramCarouselItemTitle = 'carousel_item_title';
+
+  /// Destination type of the card (e.g. pack, track, link).
+  static const String paramCarouselItemType = 'carousel_item_type';
+
+  /// 1-based position of the card in the row.
+  static const String paramCarouselPosition = 'carousel_position';
+
+  /// The user moved to a different main tab. screen_view cannot answer "who
+  /// opens Explore": every tab is built at launch, so Home, Explore and
+  /// Settings all log a screen_view for nearly every user. Also fires when
+  /// the back button returns to Home from another tab.
+  /// Parameters: paramTab, paramFromTab ('home', 'explore', 'search',
+  /// 'settings').
+  static const String tabSelected = 'tab_selected';
+
+  static const String paramTab = 'tab';
+  static const String paramFromTab = 'from_tab';
+
+  /// The user started a session from the home Timer screen. The session
+  /// itself then logs audio_session_started/completed/abandoned with an
+  /// audioFileId of `timer-<mode>-<ms>`. Parameters: timer_mode
+  /// (countdown/stopwatch), duration_minutes (0 for stopwatch), sound_id.
+  static const String timerStarted = 'timer_started';
+  static const String paramTimerMode = 'timer_mode';
+  static const String paramDurationMinutes = 'duration_minutes';
+  static const String paramSoundId = 'sound_id';
+  static const String paramSessionBells = 'session_bells';
+
+  /// How the countdown length on [timerStarted] was set: preset (a chip),
+  /// wheel (scrolled), remembered (last session's, untouched) or default
+  /// (first visit, untouched). Absent for a stopwatch.
+  static const String paramLengthSource = 'length_source';
+
+  /// The Timer screen opened. Parameter: source — shortcut (home tile),
+  /// offline (Home's no-connection screen), history (a timer row in History)
+  /// or deeplink (anything else that routes to the timer).
+  static const String timerOpened = 'timer_opened';
+  static const String sourceShortcut = 'shortcut';
+  static const String sourceOffline = 'offline';
+  static const String sourceHistory = 'history';
+
+  /// Guide reported on the audio_session_* events of a Timer session.
+  static const String timerGuide = 'timer';
+
+  /// User switches session bells on/off in the sound sheet. Parameters:
+  /// enabled (1/0), is_timer (1/0).
+  static const String sessionBellsToggled = 'session_bells_toggled';
+
+  /// The user tapped End session in a timer. Parameters: timer_mode,
+  /// elapsed_seconds ([paramElapsedSeconds]), recorded (1 if it was long
+  /// enough to save, else 0).
+  static const String timerEnded = 'timer_ended';
+  static const String paramRecorded = 'recorded';
+
+  /// The user opened a tag's track list (TagView).
+  /// Parameters: 'tag_id', 'tag_group'.
+  static const String tagOpened = 'tag_opened';
+
+  // Search events
+  /// One search the user committed to: they opened a result, submitted, cleared
+  /// the field, or stopped typing for 3s (see SearchQueryLogger). Before Oct
+  /// 2026 it fired on every 500ms pause, so older data is full of half-typed
+  /// words. Parameters: paramSearchTerm (trimmed, lowercased, '[redacted]' if it
+  /// looked like an email or phone number), paramSearchTermLength,
+  /// paramHasResults ('true'/'false'; absent if results were still loading).
+  static const String searchPerformed = 'search_performed';
+
+  /// A committed search with zero packs and zero tracks, i.e. a
+  /// content/discovery gap. Sent alongside [searchPerformed] with the same
+  /// term. Parameters: paramSearchTerm.
+  static const String searchNoResults = 'search_no_results';
+
+  /// Whether a committed search found anything: 'true' or 'false'.
+  static const String paramHasResults = 'has_results';
+
+  /// The query text the user searched for.
+  static const String paramSearchTerm = 'search_term';
+
+  /// The length of the query text (useful for spotting abandoned partial
+  /// searches independent of the term itself).
+  static const String paramSearchTermLength = 'search_term_length';
+
+  // Favourite events. Defined long before they were wired up: nothing logged
+  // them until Oct 2026, so there is no favourites history in BigQuery before
+  // that release.
+  /// User added a track to favourites from the track screen.
+  /// Parameter: [paramTrackId].
   static const String trackFavourited = 'track_favourited';
 
-  /// Event logged when user removes a track from favourites on the track screen
+  /// User removed a track from favourites on the track screen.
+  /// Parameter: [paramTrackId].
   static const String trackUnfavourited = 'track_unfavourited';
 
-  /// Event logged when user adds a pack to favourites from the pack screen
+  /// User added a pack to favourites from the pack screen.
+  /// Parameter: [paramPackId].
   static const String packFavourited = 'pack_favourited';
 
-  /// Event logged when user removes a pack from favourites on the pack screen
+  /// User removed a pack from favourites on the pack screen.
+  /// Parameter: [paramPackId].
   static const String packUnfavourited = 'pack_unfavourited';
+
+  /// User started downloading all sessions in a pack.
+  /// Parameter: [paramPackId].
+  static const String packBatchDownloadStarted = 'pack_batch_download_started';
+
+  /// Batch download of all sessions in a pack completed.
+  /// Parameter: [paramPackId].
+  static const String packBatchDownloadCompleted =
+      'pack_batch_download_completed';
+
+  /// Batch download of sessions in a pack was cancelled.
+  /// Parameter: [paramPackId].
+  static const String packBatchDownloadCancelled =
+      'pack_batch_download_cancelled';
+
+  /// User deleted all downloaded sessions of a pack.
+  /// Parameter: [paramPackId].
+  static const String packBatchDownloadsDeleted =
+      'pack_batch_downloads_deleted';
+
+  /// Track id (not the audio file id) on the favourite events.
+  static const String paramTrackId = 'track_id';
 
   // Quote share events
   /// Event logged when the user opens the quote share screen by tapping the
@@ -741,4 +1029,113 @@ class AnalyticsEventConstants {
   /// screen (e.g. 'Midnight', 'Cream'). Lets us see which backgrounds people
   /// actually pick.
   static const String paramQuoteSharePalette = 'palette';
+
+  // Player and background sound options.
+  /// User chooses a playback speed. Parameter: speed (multiplier).
+  static const String playerSpeedChanged = 'player_speed_changed';
+
+  /// User changes repeat mode. Parameter: repeat_mode (none, once, infinite).
+  static const String playerRepeatChanged = 'player_repeat_changed';
+
+  /// User requests a download from the player; does not imply success. Parameters: track_id, file_id.
+  static const String playerDownloadTapped = 'player_download_tapped';
+
+  /// User confirms deleting a player download. Parameters: track_id, file_id.
+  static const String playerDownloadDeleteConfirmed =
+      'player_download_delete_confirmed';
+
+  /// User opens the background sound screen from the player.
+  static const String playerBackgroundSoundsOpened =
+      'player_background_sounds_opened';
+
+  /// User taps background sounds on a track that disables them. Parameter: track_id.
+  static const String playerBackgroundSoundsUnavailable =
+      'player_background_sounds_unavailable';
+
+  /// User taps a background sound, including None; does not imply playback success. Parameters: sound_id, sound_title.
+  static const String backgroundSoundSelected = 'background_sound_selected';
+
+  /// User retries a failed background sound. Parameters: sound_id, sound_title.
+  static const String backgroundSoundRetryTapped =
+      'background_sound_retry_tapped';
+
+  /// User finishes a background volume slider gesture. Parameter: volume (0–100).
+  static const String backgroundSoundVolumeChanged =
+      'background_sound_volume_changed';
+
+  // Native shop (Fourthwall Storefront API). `source` says where the user
+  // came from: home_header, home_card, settings, deeplink, shop_grid,
+  // bag_add_on.
+
+  /// Shop grid opened. Params: source.
+  static const String shopViewed = 'shop_viewed';
+
+  /// Native product page opened. Params: product_slug, source, and — when the
+  /// caller already had the product (grid, Home tile, bag add-on) —
+  /// product_name, value (lowest variant price) and currency.
+  static const String shopProductViewed = 'shop_product_viewed';
+
+  /// "Add to bag" tapped on a product page. Params: product_slug,
+  /// variant_id, quantity, value, currency.
+  static const String shopAddToBag = 'shop_add_to_bag';
+
+  /// "Checkout" tapped in the bag; opens Fourthwall's hosted checkout.
+  /// Params: line_items (lines), quantity (units), value, currency.
+  static const String shopCheckoutStarted = 'shop_checkout_started';
+
+  /// The bag sheet opened. Without it "added but never opened the bag" was
+  /// indistinguishable from "opened the bag and left".
+  /// Params: source (where the bag button was tapped: shop_grid, product_page,
+  /// home_card), line_items (lines), quantity (units), value, currency.
+  static const String shopBagViewed = 'shop_bag_viewed';
+
+  /// A line was taken out of the bag (minus at quantity 1).
+  /// Params: product_slug, variant_id, quantity (units removed).
+  static const String shopBagItemRemoved = 'shop_bag_item_removed';
+
+  /// A bag line's quantity was changed with the stepper, not removed.
+  /// Params: product_slug, variant_id, from, to.
+  static const String shopBagQuantityChanged = 'shop_bag_quantity_changed';
+
+  /// The bag's "we sent you to checkout" card rendered — the user is back in
+  /// the app after a checkout trip. Fires once per time the bag is opened in
+  /// that state, so it can repeat until the bag is cleared. Hosted checkout
+  /// gives no completion signal; this and [shopBagCleared] are the proxy.
+  /// Params: line_items, quantity, value, currency.
+  static const String shopCheckoutReturned = 'shop_checkout_returned';
+
+  /// The bag was emptied in one go. Params: reason ('checkout_return'),
+  /// line_items, quantity, value, currency.
+  static const String shopBagCleared = 'shop_bag_cleared';
+
+  /// A shop screen showed its load-failure view (an impression that could never
+  /// convert). Params: surface ('grid' | 'product'), error_kind (same labels as
+  /// the donation card), product_slug on the product surface.
+  static const String shopLoadFailed = 'shop_load_failed';
+
+  /// A collection chip was tapped on the shop grid (not the one already
+  /// selected). Params: collection (slug).
+  static const String shopCollectionSelected = 'shop_collection_selected';
+
+  static const String sourceHomeHeader = 'home_header';
+  static const String sourceProductPage = 'product_page';
+  static const String sourceHomeCard = 'home_card';
+  static const String sourceShopGrid = 'shop_grid';
+  static const String sourceBagAddOn = 'bag_add_on';
+
+  // Retired events. Nothing in this codebase sends these any more, but they
+  // still arrive in BigQuery from older installed builds, so they are listed
+  // here (not as constants) to explain them when they turn up in a query.
+  //
+  // - onboarding_attribution_answered, onboarding_intent_answered: questions
+  //   removed from onboarding 2026-05-18 (a1f254fc).
+  // - your_path_explainer_shown / _dismissed: Your Path strip, removed
+  //   2026-09-16 (7a2cd300). "shown" re-fired on every Home build for anyone
+  //   who never tapped "Got it", so it was never a reach metric.
+  // - media_permission_banner_shown: 2606.x builds only.
+  // - screen_view_with_params: 26.4.x-26.5.x builds only.
+  // - audio_started, fcmSave, connectivity_error, user_initialization_*:
+  //   3.x builds only.
+  // - token_backup_storage_attempt (and result='success'): no longer sent
+  //   since Sep 2026; see [tokenBackupStorageResult].
 }

@@ -8,7 +8,6 @@ import 'package:medito/constants/constants.dart';
 import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:medito/models/models.dart';
 import 'package:medito/providers/providers.dart';
-import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/routes/routes.dart';
 import 'package:medito/utils/utils.dart';
 
@@ -21,6 +20,7 @@ class ShortcutsItemsWidget extends ConsumerWidget {
 
   static const _kItemBorderWidth = 0.5;
   static const _kItemBorderRadius = kHomeTileRadius;
+  static const _kItemMinHeight = 48.0;
 
   final List<ShortcutsModel> data;
 
@@ -49,130 +49,99 @@ class ShortcutsItemsWidget extends ConsumerWidget {
       [element.path.toString().getIdFromPath()],
       context,
       ref: ref,
+      timerSource: AnalyticsEventConstants.sourceShortcut,
     );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    var size = MediaQuery.of(context).size;
-    var isWideScreen = size.width > 600;
-    final columns = isWideScreen ? 8 : 4;
-    const horizontalPadding = padding16;
-    const spacing = padding12;
-    const runSpacing = 10.0;
-    final totalSpacing = (columns - 1) * spacing;
-    final totalPadding = horizontalPadding * 2;
-    final containerSize = (size.width - totalPadding - totalSpacing) / columns;
-    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
-      data: (value) => value.isAndroidTv,
-      orElse: () => false,
-    );
-    final visibleData = isTv
-        ? data.where((item) => !_isPhoneOnlyAction(item.type, item.path)).toList()
-        : data;
-
-    if (visibleData.isEmpty) return const SizedBox.shrink();
+    // Two columns of wide tiles (four on tablets), icon and label side by
+    // side. The label sits inside its own tap target with half the screen to
+    // itself, so "Challenges" and "Emergency" neither shrink nor crowd their
+    // neighbours the way captions under four narrow squares did.
+    final columns = MediaQuery.sizeOf(context).width > 600 ? 4 : 2;
+    const spacing = 10.0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: padding16),
-      child: Wrap(
-        spacing: spacing,
-        runSpacing: runSpacing,
-        alignment: WrapAlignment.start,
-        children: visibleData
-            .map(
-              (e) => _buildShortcutItem(
-                context,
-                ref,
-                e,
-                containerSize,
-                containerSize,
+      child: Column(
+        children: [
+          for (var start = 0; start < data.length; start += columns) ...[
+            if (start > 0) const SizedBox(height: spacing),
+            // Tiles in a row share the tallest one's height, so a label that
+            // wraps at large text sizes doesn't leave a ragged row.
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = start; i < start + columns; i++) ...[
+                    if (i > start) const SizedBox(width: spacing),
+                    Expanded(
+                      child: i < data.length
+                          ? _buildShortcutItem(context, ref, data[i])
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ],
               ),
-            )
-            .toList(),
+            ),
+          ],
+        ],
       ),
     );
-  }
-
-  bool _isPhoneOnlyAction(String? type, String? path) {
-    return type == TypeConstants.url ||
-        type == TypeConstants.link ||
-        type == TypeConstants.email ||
-        type == 'donation' ||
-        (type == TypeConstants.route && path == RouteConstants.donation);
   }
 
   Widget _buildShortcutItem(
     BuildContext context,
     WidgetRef ref,
     ShortcutsModel e,
-    double width,
-    double height,
   ) {
-    final backgroundColor = Theme.of(context).cardColor;
-    final iconColor = Theme.of(context).colorScheme.onSurface;
-    final textColor = Theme.of(context).colorScheme.onSurface;
-
-    final iconSize = (width * 0.5).clamp(24.0, 32.0);
-
-    final squareButton = HomeGradientBorder(
-      backgroundColor: backgroundColor,
-      borderRadius: _kItemBorderRadius,
-      borderWidth: _kItemBorderWidth,
-      child: SizedBox(
-        width: width,
-        height: width,
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-            onTap: () => _handleChipPress(context, ref, e),
-            borderRadius: BorderRadius.circular(_kItemBorderRadius),
-            focusColor: Theme.of(
-              context,
-            ).colorScheme.primary.withValues(alpha: 0.18),
-            child: Center(
-              child: MeditoRemoteIcon(
-                icon: e.icon ?? '',
-                size: iconSize,
-                color: iconColor,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
 
     return Semantics(
       label: e.title,
       button: true,
       excludeSemantics: true,
-      child: SizedBox(
-        width: width,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            squareButton,
-            GestureDetector(
-              onTap: () => _handleChipPress(context, ref, e),
+      // excludeSemantics drops the child's tap action, so give it here.
+      onTap: () => _handleChipPress(context, ref, e),
+      child: HomeGradientBorder(
+        backgroundColor: theme.cardColor,
+        borderRadius: _kItemBorderRadius,
+        borderWidth: _kItemBorderWidth,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: () => _handleChipPress(context, ref, e),
+            borderRadius: BorderRadius.circular(_kItemBorderRadius),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: _kItemMinHeight),
               child: Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    e.title ?? '',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontFamily: teachers,
-                      fontSize: 12,
-                      color: textColor.withOpacityValue(0.7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    MeditoRemoteIcon(
+                      icon: e.icon ?? '',
+                      size: 24,
+                      color: onSurface,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        e.title ?? '',
+                        style: context.text.label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

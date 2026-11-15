@@ -1,0 +1,76 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:medito/constants/constants.dart';
+import 'package:medito/l10n/app_localizations.dart';
+
+/// Both Flutter startup stages use a full-window frame. Android can carry
+/// keyboard insets from the launcher/previous activity into the first frames;
+/// resizing for those insets would move the logo up and then back down.
+class LaunchSplashFrame extends StatelessWidget {
+  const LaunchSplashFrame({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    resizeToAvoidBottomInset: false,
+    extendBody: true,
+    backgroundColor: Colors.black,
+    body: child,
+  );
+}
+
+/// Matches the native launch screens, regardless of the saved app theme.
+class LaunchSplash extends StatelessWidget {
+  const LaunchSplash({super.key});
+
+  static const systemUiStyle = SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarBrightness: Brightness.dark,
+    statusBarIconBrightness: Brightness.light,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarDividerColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.light,
+    systemStatusBarContrastEnforced: false,
+    systemNavigationBarContrastEnforced: false,
+  );
+
+  /// main.dart shows this before the app's localizations are set up, so fall
+  /// back to the device language there.
+  static AppLocalizations _l10n(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    if (l10n != null) return l10n;
+    final locale = WidgetsBinding.instance.platformDispatcher.locale;
+    return lookupAppLocalizations(
+      AppLocalizations.delegate.isSupported(locale)
+          ? locale
+          : const Locale('en'),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = _l10n(context);
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: systemUiStyle,
+      child: ColoredBox(
+        color: Colors.black,
+        child: SizedBox.expand(
+          child: Center(
+            // Semantics only: the logo still matches the native launch screen.
+            child: Semantics(
+              label: '${l10n.appName}, ${l10n.loading}',
+              child: SvgPicture.asset(
+                AssetConstants.icLogo,
+                width: 168,
+                height: 168,
+                excludeFromSemantics: true,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

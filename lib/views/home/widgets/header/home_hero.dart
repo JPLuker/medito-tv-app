@@ -2,23 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/constants/styles/widget_styles.dart';
 import 'package:medito/providers/home/up_next_provider.dart';
+import 'package:medito/providers/pack/pack_provider.dart';
 import 'package:medito/widgets/network_image_widget.dart';
 
 import '../stats/streak_circle.dart';
 
-/// Cover of the pinned pack, or null while it loads or has none. Shared by
-/// [HomeHero] and the home list, which hands its first section to the hero
-/// whenever there is an image to lay it over.
 /// How far the hero image bleeds above its box. At rest this sits above the
 /// viewport (clipped); on pull-to-refresh the scroll view offsets down and
 /// this pre-painted band fills the gap with more image instead of the page
 /// background.
 const double _kOverscrollBleed = 260.0;
 
+/// Cover of the pinned pack, or null while it loads or has none. Shared by
+/// [HomeHero] and the home list, which hands its first section to the hero
+/// whenever there is an image to lay it over.
 final homeHeroCoverProvider = Provider.autoDispose<String?>((ref) {
-  final cover = ref
-      .watch(upNextProvider)
-      .whenOrNull(data: (data) => data.pack.coverUrl);
+  // Artwork depends only on the pinned pack, not session completion or the
+  // next unfinished pack. Those can reload when returning from the player.
+  final pack = ref
+      .watch(packDataProvider(packId: ref.watch(upNextPackIdProvider)))
+      .value;
+  final cover = pack?.coverUrl;
   return (cover == null || cover.isEmpty) ? null : cover;
 });
 
@@ -31,19 +35,35 @@ final homeHeroCoverProvider = Provider.autoDispose<String?>((ref) {
 /// and the first section renders below it on the page as usual. With no
 /// cover at all it is just the pill row.
 class HomeHero extends ConsumerWidget {
-  const HomeHero({super.key, required this.onStatsButtonTap, this.child});
+  const HomeHero({
+    super.key,
+    required this.onStatsButtonTap,
+    this.child,
+    this.announcement,
+    this.onImageTap,
+  });
 
   final VoidCallback onStatsButtonTap;
+
+  /// Tap on the bare image (not on [child], the announcement or the pill).
+  /// Home passes Up Next's play action when Up Next is the overlaid section.
+  final VoidCallback? onImageTap;
 
   /// The section laid over the image. Rendered inside an on-image theme:
   /// white text, dark translucent cards, no page-coloured fades.
   final Widget? child;
 
+  /// Announcement card, shown above [child] over the image (below the streak
+  /// pill). Only used when there is an overlaid section; in banner mode the
+  /// home list places it under the hero instead. Collapses itself when there
+  /// is nothing to show.
+  final Widget? announcement;
+
   /// Space reserved for the status bar and streak pill above [child].
   static const _headerReserve = 72.0;
 
   /// Banner mode: pill row plus room for the fade into the page.
-  static const _bannerHeight = 92.0;
+  static const _bannerHeight = 132.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -54,8 +74,8 @@ class HomeHero extends ConsumerWidget {
     final header = Padding(
       padding: EdgeInsets.fromLTRB(
         padding16,
-        topInset + padding12,
-        padding16,
+        topInset + (size.width >= 600 ? 24 : padding12),
+        size.width >= 600 ? 32 : padding16,
         0,
       ),
       // Just the streak pill, top right; the section title carries the hero.
@@ -75,8 +95,11 @@ class HomeHero extends ConsumerWidget {
     }
 
     final overlay = child != null;
+    // Overlay covers sit a little under half the screen: enough for a large
+    // image, without leaving a big empty band above the section on sparse
+    // covers.
     final minHeight = overlay
-        ? (size.height * 0.5).clamp(380.0, 480.0)
+        ? (size.height * 0.42).clamp(340.0, 420.0)
         : topInset + _bannerHeight;
 
     // Status bar glyphs follow the theme: the top of the image is darkened
@@ -89,18 +112,43 @@ class HomeHero extends ConsumerWidget {
         alignment: Alignment.bottomCenter,
         children: [
           Positioned.fill(
-            child: _HeroBackdrop(coverUrl: coverUrl, banner: !overlay),
+            child: GestureDetector(
+              onTap: onImageTap,
+              // The section over the image already exposes the action.
+              excludeFromSemantics: true,
+              child: _HeroBackdrop(coverUrl: coverUrl, banner: !overlay),
+            ),
           ),
-          // Floor for the stack height: with an overlay a short section
-          // still gets a big image; as a banner this is the whole height.
-          SizedBox(height: minHeight, width: double.infinity),
+          // As a banner this is the whole height.
+          if (!overlay) SizedBox(height: minHeight, width: double.infinity),
           if (overlay)
             Padding(
               padding: EdgeInsets.only(
                 top: topInset + _headerReserve,
                 bottom: padding8,
               ),
-              child: _OnImageTheme(child: child!),
+              // Floor for the stack height, so a short section still gets a
+              // big image. It wraps the announcement too: a card fills the
+              // image's empty band above the section instead of stacking on
+              // top of the floor (which left a gap under the card the height
+              // of that band). Both sit on the bottom edge, so dismissing the
+              // card leaves exactly the no-announcement layout.
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: (minHeight - topInset - _headerReserve - padding8)
+                      .clamp(0.0, double.infinity),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Own colours, so kept outside the on-image theme.
+                    ?announcement,
+                    _OnImageTheme(child: child!),
+                  ],
+                ),
+              ),
             ),
           Positioned(top: 0, left: 0, right: 0, child: header),
         ],
@@ -146,7 +194,12 @@ class _HeroBackdrop extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              NetworkImageWidget(url: coverUrl, shouldCache: true),
+              NetworkImageWidget(
+                url: coverUrl,
+                shouldCache: true,
+                fadeInDuration: Duration.zero,
+                fadeOutDuration: Duration.zero,
+              ),
               // Pixel-anchored to the top of the bleed: dark across the whole
               // bleed and the status-bar/pill area, then faded to nothing.
               Align(
@@ -172,39 +225,56 @@ class _HeroBackdrop extends StatelessWidget {
             ],
           ),
         ),
-        // Box-anchored lower scrim: transparent at the top (the bleed layer
-        // handles that), darkening toward the section in overlay mode.
-        if (!banner)
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                stops: const [0.0, 0.45, 1.0],
-                colors: [
-                  base.withValues(alpha: 0.0),
-                  base.withValues(alpha: isDark ? 0.5 : 0.6),
-                  base.withValues(alpha: isDark ? 0.8 : 0.96),
-                ],
-              ),
-            ),
-          ),
-        // Page seam so the image never ends on a hard edge.
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: banner ? 36 : 56,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [page.withValues(alpha: 0), page],
-              ),
-            ),
+        // Box-anchored lower scrim.
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: banner
+                // Banner mode: the whole lower half eases the image into the
+                // page over a long, soft ramp rather than a short hard seam.
+                ? LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: const [0.0, 0.3, 0.55, 0.78, 1.0],
+                    colors: [
+                      page.withValues(alpha: 0.0),
+                      page.withValues(alpha: 0.12),
+                      page.withValues(alpha: 0.4),
+                      page.withValues(alpha: 0.78),
+                      page,
+                    ],
+                  )
+                // Overlay mode: transparent at the top (the bleed layer
+                // handles that), darkening toward the section.
+                : LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: const [0.0, 0.45, 1.0],
+                    colors: [
+                      base.withValues(alpha: 0.0),
+                      base.withValues(alpha: isDark ? 0.5 : 0.6),
+                      base.withValues(alpha: isDark ? 0.8 : 0.96),
+                    ],
+                  ),
           ),
         ),
+        // Overlay mode keeps a short seam so the image never ends on a hard
+        // edge; banner mode's full-height ramp already reaches the page.
+        if (!banner)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 56,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [page.withValues(alpha: 0), page],
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

@@ -18,69 +18,54 @@ class TrackCardWidget extends StatelessWidget {
   final void Function()? onTap;
   @override
   Widget build(BuildContext context) {
-    var textTheme = Theme.of(context).textTheme;
-
     return HomeGradientBorder(
       backgroundColor: Theme.of(context).cardColor,
       borderRadius: 14,
       borderWidth: 0.5,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          focusColor: Theme.of(
-            context,
-          ).colorScheme.primary.withValues(alpha: 0.16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        // Without the role the card reads as plain text.
+        child: Semantics(
+          button: true,
+          child: InkWell(
+            onTap: onTap,
             child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: subTitle != null
-                      ? MainAxisAlignment.start
-                      : MainAxisAlignment.center,
-                  children: [
-                    _title(textTheme, title: title),
-                    if (subTitle != null) height4,
-                    _description(textTheme, subtitle: subTitle),
-                  ],
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: subTitle != null
+                        ? MainAxisAlignment.start
+                        : MainAxisAlignment.center,
+                    children: [
+                      _title(context, title: title),
+                      if (subTitle != null) height4,
+                      _description(context, subtitle: subTitle),
+                    ],
+                  ),
                 ),
-              ),
-              width12,
-              _getCoverUrl(),
-            ],
+                width12,
+                _getCoverUrl(),
+              ],
+            ),
           ),
         ),
       ),
-    ),
     );
   }
 
-  Text _title(TextTheme textTheme, {required String title}) {
-    return Text(
-      title,
-      style: textTheme.displayLarge?.copyWith(
-        fontFamily: sourceSerif,
-        height: 0,
-      ),
-    );
+  Text _title(BuildContext context, {required String title}) {
+    return Text(title, style: context.text.title);
   }
 
-  Widget _description(TextTheme textTheme, {String? subtitle}) {
+  Widget _description(BuildContext context, {String? subtitle}) {
     if (subtitle != null) {
       return Text(
         subtitle,
         overflow: TextOverflow.ellipsis,
         maxLines: 2,
-        style: textTheme.titleMedium?.copyWith(
-          letterSpacing: 0,
-          fontSize: 14,
-          height: 1.4,
-        ),
+        style: context.text.muted.bodySmall,
       );
     }
 

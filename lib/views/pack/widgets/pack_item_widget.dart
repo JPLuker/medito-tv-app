@@ -3,9 +3,12 @@ import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/models/models.dart';
 import 'package:medito/utils/utils.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:medito/providers/meditation/download_track_provider.dart';
 import 'package:flutter_svg/svg.dart';
+import 'package:medito/views/pack/widgets/pack_complete_badge.dart';
 
-class PackItemWidget extends StatelessWidget {
+class PackItemWidget extends ConsumerWidget {
   const PackItemWidget({super.key, required this.item, this.onSetComplete});
 
   final PackItemsModel item;
@@ -16,8 +19,16 @@ class PackItemWidget extends StatelessWidget {
   final Future<bool> Function(bool complete)? onSetComplete;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     var hasSubtitle = item.subtitle.isNotNullAndNotEmpty();
+    final isDownloaded =
+        item.type == TypeConstants.track &&
+        (ref
+                .watch(downloadedTracksProvider)
+                .asData
+                ?.value
+                .any((track) => track.id == item.id) ??
+            false);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -36,24 +47,36 @@ class PackItemWidget extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (item.title.isNotNullAndNotEmpty())
-                        Text(
-                          item.title,
-                          style: Theme.of(context).textTheme.headlineMedium
-                              ?.copyWith(fontFamily: dmSans, fontSize: 16),
-                        ),
-                      if (hasSubtitle)
-                        Flexible(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              item.subtitle ?? '',
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(
-                                    fontFamily: dmMono,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
+                        Text(item.title, style: context.text.subtitle),
+                      if (hasSubtitle || isDownloaded)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            children: [
+                              if (hasSubtitle)
+                                Flexible(
+                                  child: Text(
+                                    item.subtitle!,
+                                    style: context.text.muted.bodySmall,
                                   ),
-                            ),
+                                ),
+                              if (hasSubtitle && isDownloaded)
+                                const SizedBox(width: 6),
+                              if (isDownloaded)
+                                Tooltip(
+                                  message: AppLocalizations.of(
+                                    context,
+                                  )!.trackDownloaded,
+                                  child: Icon(
+                                    Icons.download_done,
+                                    size: 14,
+                                    color: context.text.muted.color,
+                                    semanticLabel: AppLocalizations.of(
+                                      context,
+                                    )!.trackDownloaded,
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                     ],
@@ -70,13 +93,37 @@ class PackItemWidget extends StatelessWidget {
 
   Widget _getTrailing(BuildContext context) {
     if (item.type == TypeConstants.link) {
-      return SvgPicture.asset(AssetConstants.icLink);
+      // Tells link rows apart from sessions, which otherwise sound the same.
+      // A plain label merges into the row; a labelled SvgPicture was its own
+      // stop.
+      return Semantics(
+        label: AppLocalizations.of(context)!.externalLink,
+        child: SvgPicture.asset(
+          AssetConstants.icLink,
+          excludeFromSemantics: true,
+        ),
+      );
     }
 
     if (item.type == TypeConstants.track && onSetComplete != null) {
       return _CompletionToggle(
         isCompleted: item.isCompleted ?? false,
         onSetComplete: onSetComplete!,
+      );
+    }
+
+    if (item.type == TypeConstants.pack && item.isCompleted == true) {
+      // Same 48px slot and left gap as the track toggle, so ticks line up.
+      return const Padding(
+        padding: EdgeInsets.only(left: 8),
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: PackCompleteBadge(),
+          ),
+        ),
       );
     }
 
@@ -158,49 +205,53 @@ class _CompletionToggleState extends State<_CompletionToggle> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
 
+    // A checkbox reading its state ("Completed, checked"), with the action in
+    // the hint; the old action-as-label contradicted it ("Mark incomplete,
+    // checked").
     return Semantics(
-      button: true,
       checked: _shown,
-      label: _shown ? l10n.markTrackIncomplete : l10n.markTrackComplete,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: _handleTap,
-          borderRadius: BorderRadius.circular(24),
-          focusColor: Theme.of(
-            context,
-          ).colorScheme.primary.withValues(alpha: 0.16),
-          child: Padding(
-            padding: const EdgeInsets.only(left: 8),
-            child: SizedBox(
-              width: 48,
-              height: 48,
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _shown ? context.brandPurple : Colors.transparent,
-                      border: Border.all(
-                        color: _shown
-                            ? context.brandPurple
-                            : Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.4),
-                        width: 2,
-                      ),
+      label: l10n.completed,
+      onTap: _handleTap,
+      onTapHint: _shown ? l10n.markTrackIncomplete : l10n.markTrackComplete,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _handleTap,
+        // 48x48 hit area (platform minimum) with a left gap from the title.
+        // The circle is right-aligned within it so it stays visually where it
+        // was while the touch target extends left and vertically.
+        child: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _shown ? context.brandAccent : Colors.transparent,
+                    border: Border.all(
+                      color: _shown
+                          ? context.brandAccent
+                          : Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.4),
+                      width: 2,
                     ),
-                    child: _shown
-                        ? Icon(
-                            Icons.check,
-                            size: 16,
-                            color: context.onBrandPurple,
-                          )
-                        : null,
                   ),
+                  // Glyph in the accent's own foreground: the accent is
+                  // near-white in dark mode, so plain white disappeared.
+                  child: _shown
+                      ? Icon(
+                          Icons.check,
+                          size: 16,
+                          color: context.onBrandAccent,
+                        )
+                      : null,
                 ),
               ),
             ),

@@ -25,7 +25,6 @@ class TypeConstants {
   // New constants for path view
   static const String article = 'article';
   static const String session = 'session';
-  static const String journalEntry = 'journal';
   static const String meditationOutsideApp = 'meditation_outside_app';
   static const String addedManually = 'added_manually';
 
@@ -42,10 +41,17 @@ class RouteConstants {
   static const String donation = 'donation';
   static const String stats = 'stats';
   static const String analytics = 'analytics';
+
+  /// Native home Timer (countdown / stopwatch).
+  static const String timer = 'timer';
+
+  /// Native shop. `shop` opens the grid, `shop:<product-slug>` a product.
+  static const String shop = 'shop';
 }
 
 class LocaleConstants {
   static const String system = 'system';
   static const String english = 'en';
   static const String spanish = 'es';
+  static const String german = 'de';
 }

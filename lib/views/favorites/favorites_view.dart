@@ -1,3 +1,4 @@
+import 'package:medito/widgets/adaptive/adaptive_page_body.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/constants/constants.dart';
@@ -41,6 +42,7 @@ class FavoritesView extends ConsumerStatefulWidget {
 class FavoritesViewState extends ConsumerState<FavoritesView> {
   FavoritesFilter _currentFilter = FavoritesFilter.all;
   final _scrollController = ScrollController();
+  final _refreshKey = GlobalKey<RefreshIndicatorState>();
 
   @override
   void dispose() {
@@ -61,16 +63,35 @@ class FavoritesViewState extends ConsumerState<FavoritesView> {
       appBar: MeditoAppBarSmall(
         title: AppLocalizations.of(context)!.favorites,
         hasBackButton: true,
+        // Pull-to-refresh can't be done with a screen reader; offer a button
+        // instead while one is running.
+        actions: MediaQuery.accessibleNavigationOf(context)
+            ? [
+                IconButton(
+                  tooltip: AppLocalizations.of(context)!.refresh,
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () => _refreshKey.currentState?.show(),
+                ),
+              ]
+            : null,
       ),
       bottomNavigationBar: SingleBackButtonActionBar(
         onBackPressed: () => Navigator.pop(context),
       ),
-      body: RefreshIndicator(
-        onRefresh: _onRefresh,
-        child: favoritesState.when(
-          data: (favorites) => _buildFavoritesContent(favorites, statsState),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => _buildErrorState(),
+      body: AdaptivePageBody(
+        maxWidth: 760,
+        child: RefreshIndicator(
+          key: _refreshKey,
+          onRefresh: _onRefresh,
+          child: favoritesState.when(
+            data: (favorites) => _buildFavoritesContent(favorites, statsState),
+            loading: () => Center(
+              child: CircularProgressIndicator(
+                semanticsLabel: AppLocalizations.of(context)!.loading,
+              ),
+            ),
+            error: (error, stack) => _buildErrorState(),
+          ),
         ),
       ),
     );
@@ -102,14 +123,14 @@ class FavoritesViewState extends ConsumerState<FavoritesView> {
         children: [
           Text(
             AppLocalizations.of(context)!.someThingWentWrong,
-            style: Theme.of(context).textTheme.bodyLarge,
+            style: context.text.bodySmall,
           ),
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: _onRefresh,
             child: Text(
               AppLocalizations.of(context)!.retry,
-              style: Theme.of(context).textTheme.titleMedium,
+              style: context.text.muted.bodySmall,
             ),
           ),
         ],
@@ -145,16 +166,14 @@ class FavoritesViewState extends ConsumerState<FavoritesView> {
           children: [
             Text(
               _currentFilter.emptyStateMessage(context),
-              style: Theme.of(context).textTheme.bodyLarge,
+              style: context.text.bodySmall,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               AppLocalizations.of(context)!.addItemsToFavoritesMessage,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.color?.withOpacityValue(0.7),
+              style: context.text.body.copyWith(
+                color: context.text.muted.color?.withOpacityValue(0.7),
               ),
               textAlign: TextAlign.center,
             ),
@@ -173,18 +192,21 @@ class FavoritesViewState extends ConsumerState<FavoritesView> {
         final item = favorites[index];
         return Material(
           color: Colors.transparent,
-          child: InkWell(
-            onTap: () => _onItemTap(item, context),
-            child: Column(
-              children: [
-                PackItemWidget(item: _buildPackItemModel(item, statsState)),
-                if (index < favorites.length - 1)
-                  Divider(
-                    color: Theme.of(context).colorScheme.outline,
-                    thickness: 0.5,
-                    height: 1,
-                  ),
-              ],
+          child: Semantics(
+            button: true,
+            child: InkWell(
+              onTap: () => _onItemTap(item, context),
+              child: Column(
+                children: [
+                  PackItemWidget(item: _buildPackItemModel(item, statsState)),
+                  if (index < favorites.length - 1)
+                    Divider(
+                      color: Theme.of(context).colorScheme.outline,
+                      thickness: 0.5,
+                      height: 1,
+                    ),
+                ],
+              ),
             ),
           ),
         );
@@ -222,7 +244,7 @@ class FavoritesViewState extends ConsumerState<FavoritesView> {
     return ChoiceChip(
       label: Text(
         filter.label(context),
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+        style: context.text.body.copyWith(
           color: isSelected
               ? Theme.of(context).colorScheme.onPrimary
               : Theme.of(context).colorScheme.onSurface,

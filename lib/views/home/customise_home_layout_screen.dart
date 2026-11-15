@@ -1,3 +1,4 @@
+import 'package:medito/widgets/adaptive/adaptive_page_body.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,7 @@ import 'package:medito/providers/providers.dart';
 import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:medito/services/analytics/firebase_analytics_service.dart';
 import 'package:medito/widgets/medito_icon.dart';
+import 'package:medito/constants/theme/medito_text.dart';
 
 class CustomiseHomeLayoutScreen extends ConsumerStatefulWidget {
   const CustomiseHomeLayoutScreen({super.key});
@@ -51,45 +53,55 @@ class CustomiseHomeLayoutScreenState
           automaticallyImplyLeading: false,
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           elevation: 0,
+          // Names the screen for screen readers too.
+          title: Text(AppLocalizations.of(context)!.customiseHomeLayout),
         ),
-        body: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(
-                'Tap and hold to drag items into your preferred order',
-                style: Theme.of(context).textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: ReorderableListView.builder(
-                  itemCount: order.length,
-                  itemBuilder: (context, index) {
-                    var widgetType = order[index];
-
-                    return ListTile(
-                      key: ValueKey(widgetType.name),
-                      leading: MeditoIcon(
-                        assetName: MeditoIcons.dragHandle,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                      title: Text(_getTitleForType(widgetType)),
-                    );
-                  },
-                  onReorderItem: (oldIndex, newIndex) {
-                    var newOrder = List.of(order);
-                    var item = newOrder.removeAt(oldIndex);
-                    newOrder.insert(newIndex, item);
-                    notifier.updateOrder(newOrder);
-                  },
+        bottomNavigationBar: SingleBackButtonActionBar(
+          onBackPressed: _logOrderAndPop,
+        ),
+        body: AdaptivePageBody(
+          maxWidth: 760,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Text(
+                  AppLocalizations.of(context)!.customiseHomeLayoutHint,
+                  style: context.text.muted.body,
+                  textAlign: TextAlign.center,
                 ),
               ),
-            ),
-            SingleBackButtonActionBar(onBackPressed: _logOrderAndPop),
-          ],
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: ReorderableListView.builder(
+                    itemCount: order.length,
+                    itemBuilder: (context, index) {
+                      var widgetType = order[index];
+
+                      return ListTile(
+                        key: ValueKey(widgetType.name),
+                        leading: MeditoIcon(
+                          assetName: MeditoIcons.dragHandle,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                        title: Text(_getTitleForType(widgetType)),
+                      );
+                    },
+                    onReorderItem: (oldIndex, newIndex) {
+                      var newOrder = List.of(order);
+                      var item = newOrder.removeAt(oldIndex);
+                      newOrder.insert(newIndex, item);
+                      notifier.updateOrder(newOrder);
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

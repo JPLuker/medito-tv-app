@@ -1,7 +1,9 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:medito/constants/strings/shared_preference_constants.dart';
 import 'package:medito/utils/audio_session_tracker.dart';
+import 'package:medito/utils/network_type.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Captures what the tracker would have logged, in order.
@@ -23,6 +25,7 @@ void main() {
     AudioSessionTracker.logSink = (name, params) async {
       events.add(_LoggedEvent(name, params));
     };
+    NetworkType.source = () async => [ConnectivityResult.wifi];
     tracker.resetForTesting();
   });
 
@@ -62,6 +65,48 @@ void main() {
         of(
           AnalyticsEventConstants.audioSessionStarted,
         ).first.params[AnalyticsEventConstants.paramAudioFileGuide],
+        'unknown',
+      );
+    });
+
+    Future<Object?> networkTypeFor(
+      Future<List<ConnectivityResult>> Function() source,
+    ) async {
+      NetworkType.source = source;
+      events.clear();
+      tracker.resetForTesting();
+      await tracker.onStarted(fileId: 'f1', guide: 'g', durationMs: 1000);
+      return of(
+        AnalyticsEventConstants.audioSessionStarted,
+      ).first.params[AnalyticsEventConstants.paramNetworkType];
+    }
+
+    test('network_type: physical link wins over vpn', () async {
+      expect(
+        await networkTypeFor(
+          () async => [ConnectivityResult.vpn, ConnectivityResult.wifi],
+        ),
+        'wifi',
+      );
+      expect(
+        await networkTypeFor(
+          () async => [ConnectivityResult.vpn, ConnectivityResult.mobile],
+        ),
+        'mobile',
+      );
+      expect(
+        await networkTypeFor(() async => [ConnectivityResult.vpn]),
+        'other',
+      );
+      expect(
+        await networkTypeFor(() async => [ConnectivityResult.none]),
+        'none',
+      );
+    });
+
+    test('network_type: lookup failure still logs the event', () async {
+      expect(
+        await networkTypeFor(() async => throw Exception('no channel')),
         'unknown',
       );
     });
@@ -105,6 +150,59 @@ void main() {
         expect(await persisted(), isNull);
       },
     );
+
+    test('a stopwatch abandon reports elapsed time, not a percent', () async {
+      await tracker.onStarted(
+        fileId: 'timer-stopwatch-0',
+        guide: AnalyticsEventConstants.timerGuide,
+        durationMs: 5 * 60 * 60 * 1000,
+      );
+      tracker.onPositionUpdate(
+        positionMs: 12 * 60 * 1000,
+        durationMs: 5 * 60 * 60 * 1000,
+        isPlaying: false,
+        isCompleted: false,
+      );
+      await tracker.onStopped();
+      final abandoned = of(
+        AnalyticsEventConstants.audioSessionAbandoned,
+      ).single;
+      expect(
+        abandoned.params.containsKey(
+          AnalyticsEventConstants.paramPercentCompleted,
+        ),
+        isFalse,
+      );
+      expect(
+        abandoned.params[AnalyticsEventConstants.paramElapsedSeconds],
+        720,
+      );
+      expect(
+        abandoned.params[AnalyticsEventConstants.paramAudioFileGuide],
+        AnalyticsEventConstants.timerGuide,
+      );
+    });
+
+    test('a countdown timer abandon keeps its percent', () async {
+      await tracker.onStarted(
+        fileId: 'timer-countdown-600000',
+        guide: AnalyticsEventConstants.timerGuide,
+        durationMs: 600000,
+      );
+      tracker.onPositionUpdate(
+        positionMs: 300000,
+        durationMs: 600000,
+        isPlaying: false,
+        isCompleted: false,
+      );
+      await tracker.onStopped();
+      expect(
+        of(
+          AnalyticsEventConstants.audioSessionAbandoned,
+        ).single.params[AnalyticsEventConstants.paramPercentCompleted],
+        50,
+      );
+    });
 
     test('percent is clamped to 90 even past ~95%', () async {
       await tracker.onStarted(fileId: 'f1', guide: 'g', durationMs: 1000);
@@ -222,8 +320,8 @@ void main() {
       // fresh process (only the persisted record survives).
       SharedPreferences.setMockInitialValues({
         SharedPreferenceConstants.incompleteAudioSession:
-            '{"fileId":"f9","guide":"Sky","durationMs":1000,'
-            '"startMs":111,"lastPositionMs":300}',
+            '{"fileId":"f9","guide":"Sky","durationMs":60000,'
+            '"startMs":111,"lastPositionMs":18000}',
       });
       tracker.resetForTesting();
       events.clear();
@@ -244,9 +342,78 @@ void main() {
       expect(await persisted(), isNull);
     });
 
+    test('record that reached the end is not an abandon', () async {
+      SharedPreferences.setMockInitialValues({
+        SharedPreferenceConstants.incompleteAudioSession:
+            '{"fileId":"f9","guide":"Sky","durationMs":60000,'
+            '"startMs":111,"lastPositionMs":57000}',
+      });
+      tracker.resetForTesting();
+      events.clear();
+
+      await tracker.replayIfAbandoned();
+
+      expect(of(AnalyticsEventConstants.audioSessionAbandoned), isEmpty);
+      expect(await persisted(), isNull);
+    });
+
     test('no record => no event', () async {
       await tracker.replayIfAbandoned();
       expect(events, isEmpty);
+    });
+
+    group('with a completion grace (Android)', () {
+      const record =
+          '{"fileId":"f9","guide":"Sky","durationMs":60000,'
+          '"startMs":111,"lastPositionMs":18000}';
+      const grace = Duration(milliseconds: 50);
+
+      setUp(() {
+        SharedPreferences.setMockInitialValues({
+          SharedPreferenceConstants.incompleteAudioSession: record,
+        });
+        tracker.resetForTesting();
+        events.clear();
+      });
+
+      test(
+        'late completion for the same file suppresses the abandon',
+        () async {
+          final replay = tracker.replayIfAbandoned(completionGrace: grace);
+          await pumpEventQueue(); // let it read the record and start waiting
+          await tracker.onCompleted(fileId: 'f9');
+          await replay;
+
+          expect(of(AnalyticsEventConstants.audioSessionAbandoned), isEmpty);
+        },
+      );
+
+      test('no completion within the grace still fires the abandon', () async {
+        await tracker.replayIfAbandoned(completionGrace: grace);
+
+        expect(of(AnalyticsEventConstants.audioSessionAbandoned), hasLength(1));
+      });
+
+      test('completion for a different file does not suppress it', () async {
+        final replay = tracker.replayIfAbandoned(completionGrace: grace);
+        await pumpEventQueue(); // let it read the record and start waiting
+        await tracker.onCompleted(fileId: 'other');
+        await replay;
+
+        expect(of(AnalyticsEventConstants.audioSessionAbandoned), hasLength(1));
+      });
+
+      test('a session started during the grace is not reported', () async {
+        final replay = tracker.replayIfAbandoned(completionGrace: grace);
+        await pumpEventQueue(); // let it read the record and start waiting
+        await tracker.onStarted(fileId: 'new', guide: 'Will', durationMs: 1000);
+        await replay;
+
+        final ab = of(AnalyticsEventConstants.audioSessionAbandoned);
+        expect(ab, hasLength(1));
+        expect(ab.first.params[AnalyticsEventConstants.paramAudioFileId], 'f9');
+        expect(await persisted(), contains('"fileId":"new"'));
+      });
     });
   });
 }

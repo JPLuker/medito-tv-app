@@ -1,12 +1,18 @@
 import 'package:medito/constants/constants.dart';
+import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:medito/models/home/announcement/announcement_model.dart';
+import 'package:medito/providers/donation/announcement_donation_experiment.dart';
+import 'package:medito/providers/shared_preference/shared_preference_provider.dart';
+import 'package:medito/views/donation/supporter_donation_screen.dart';
 import 'package:medito/views/home/home_styles.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/routes/routes.dart';
-import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/services/analytics/firebase_analytics_service.dart';
+import 'package:medito/utils/launch_source_tracker.dart';
 import 'package:medito/utils/utils.dart';
 import 'package:medito/widgets/widgets.dart';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -15,14 +21,21 @@ class AnnouncementWidget extends ConsumerStatefulWidget {
     super.key,
     required this.announcement,
     this.onPressedDismiss,
+    this.onCtaPressed,
   });
 
   final AnnouncementModel announcement;
   final void Function()? onPressedDismiss;
+  final VoidCallback? onCtaPressed;
 
   @override
   ConsumerState<AnnouncementWidget> createState() => _AnnouncementWidgetState();
 }
+
+/// Announcement ids already logged this app lifetime. Prevents a scroll /
+/// rebuild / hot reload from inflating impressions; a cold restart or a
+/// background→foreground round-trip legitimately gets a new impression.
+final Set<String> _loggedImpressions = <String>{};
 
 class _AnnouncementWidgetState extends ConsumerState<AnnouncementWidget>
     with SingleTickerProviderStateMixin {
@@ -33,17 +46,23 @@ class _AnnouncementWidgetState extends ConsumerState<AnnouncementWidget>
   @override
   void initState() {
     super.initState();
+    _logImpression();
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+    // Reverse curves are the mirrors of the forward ones: reversing through
+    // an ease-out plays it backwards, so the dismiss would start slow and
+    // speed up into the collapse. The mirrors decelerate on the way out too.
     _sizeAnimation = CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
     );
     _fadeAnimation = CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeOut,
+      reverseCurve: Curves.easeIn,
     );
     _animationController.forward();
   }
@@ -55,9 +74,54 @@ class _AnnouncementWidgetState extends ConsumerState<AnnouncementWidget>
   }
 
   void _handleDismiss() {
+    FirebaseAnalyticsService().logEvent(
+      name: AnalyticsEventConstants.announcementDismissed,
+      parameters: _baseParams(),
+    );
     _animationController.reverse().then((_) {
       widget.onPressedDismiss?.call();
     });
+  }
+
+  bool _isDonationCta() {
+    final type = widget.announcement.ctaType;
+    final path = widget.announcement.ctaPath;
+    return type == 'donation' ||
+        (type == TypeConstants.route && path == RouteConstants.donation);
+  }
+
+  Map<String, Object> _baseParams() {
+    final params = <String, Object>{
+      AnalyticsEventConstants.paramAnnouncementId: widget.announcement.id ?? '',
+      AnalyticsEventConstants.paramAnnouncementCtaType:
+          widget.announcement.ctaType ?? 'none',
+      AnalyticsEventConstants.paramLaunchSource:
+          LaunchSourceTracker.instance.current,
+    };
+    // Only tag the arm on donation surfaces, and only read it — assignment
+    // happens at CTA tap so users who never see a donation card aren't
+    // pulled into the experiment.
+    if (_isDonationCta()) {
+      final arm = AnnouncementDonationExperiment.peek(
+        ref.read(sharedPreferencesProvider),
+      );
+      if (arm != null) {
+        params[AnalyticsEventConstants.paramExperimentName] =
+            AnnouncementDonationExperiment.experimentName;
+        params[AnalyticsEventConstants.paramVariantId] = arm;
+      }
+    }
+    return params;
+  }
+
+  void _logImpression() {
+    final id = widget.announcement.id;
+    if (id == null || id.isEmpty) return;
+    if (!_loggedImpressions.add(id)) return;
+    FirebaseAnalyticsService().logEvent(
+      name: AnalyticsEventConstants.announcementImpression,
+      parameters: _baseParams(),
+    );
   }
 
   @override
@@ -66,14 +130,9 @@ class _AnnouncementWidgetState extends ConsumerState<AnnouncementWidget>
       return const SizedBox.shrink();
     }
 
-    final rawBgColor = ColorConstants.getColorFromString(
-      widget.announcement.colorBackground,
-    );
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark
-        ? rawBgColor
-        : Color.lerp(rawBgColor, Colors.black, 0.08) ?? rawBgColor;
-
+    // The retheme uses one flat card surface everywhere; the announcement
+    // follows it instead of the server-supplied colours, which read as a
+    // heavy block against the rest of the home screen.
     return SizeTransition(
       sizeFactor: _sizeAnimation,
       alignment: AlignmentDirectional.topStart,
@@ -86,26 +145,17 @@ class _AnnouncementWidgetState extends ConsumerState<AnnouncementWidget>
             right: padding16,
             bottom: padding16,
           ),
-          child: Container(
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(kHomeCardRadius),
-            ),
-            padding: const EdgeInsets.only(
-              left: padding20,
-              right: padding20,
-              bottom: padding12,
-              top: padding20,
-            ),
-            child: Column(
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [_text(context)],
-                ),
-                height16,
-                _actionBtn(context),
-              ],
+          child: _GlassCard(
+            child: Padding(
+              padding: const EdgeInsets.only(
+                left: padding20,
+                right: padding20,
+                bottom: padding12,
+                top: padding20,
+              ),
+              child: Column(
+                children: [_text(context), height16, _actionBtn(context)],
+              ),
             ),
           ),
         ),
@@ -114,48 +164,27 @@ class _AnnouncementWidgetState extends ConsumerState<AnnouncementWidget>
   }
 
   Row _actionBtn(BuildContext context) {
-    var textColor = ColorConstants.getColorFromString(
-      widget.announcement.colorText,
-    );
-    var bgColor = ColorConstants.getColorFromString(
-      widget.announcement.colorBackground,
-    );
+    final theme = Theme.of(context);
 
     var actionWidgets = <Widget>[
       TextButton(
         onPressed: _handleDismiss,
         child: Text(
           AppLocalizations.of(context)!.dismiss,
-          style: Theme.of(
-            context,
-          ).textTheme.headlineMedium?.copyWith(color: textColor),
+          style: context.text.subtitle.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+          ),
         ),
       ),
       width4,
     ];
 
-    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
-      data: (value) => value.isAndroidTv,
-      orElse: () => false,
-    );
-    final ctaType = widget.announcement.ctaType;
-    final ctaPath = widget.announcement.ctaPath;
-    final isPhoneOnlyCta =
-        ctaType == TypeConstants.url ||
-        ctaType == TypeConstants.link ||
-        ctaType == TypeConstants.email ||
-        ctaType == 'donation' ||
-        (ctaType == TypeConstants.route && ctaPath == RouteConstants.donation);
-
-    if (ctaPath != null && !(isTv && isPhoneOnlyCta)) {
+    if (widget.announcement.ctaPath != null) {
+      // Themed ElevatedButton: accent fill with the accent's own foreground.
       actionWidgets.add(
         ElevatedButton(
-          onPressed: () => _handleCtaTitlePress(context),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: textColor,
-            foregroundColor: bgColor,
-            padding: const EdgeInsets.all(8),
-          ),
+          onPressed: widget.onCtaPressed ?? () => _handleCtaTitlePress(context),
+          style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(8)),
           child: Text(widget.announcement.ctaTitle ?? ''),
         ),
       );
@@ -167,35 +196,55 @@ class _AnnouncementWidgetState extends ConsumerState<AnnouncementWidget>
     );
   }
 
-  Flexible _text(BuildContext context) {
-    var textColor = ColorConstants.getColorFromString(
-      widget.announcement.colorText,
+  Widget _text(BuildContext context) {
+    var markDownTheme = context.text.body.copyWith(
+      color: Theme.of(context).colorScheme.onSurface,
     );
 
-    var markDownTheme = Theme.of(
-      context,
-    ).textTheme.bodyMedium?.copyWith(color: textColor);
-
-    return Flexible(
-      child: MarkdownWidget(
-        body: widget.announcement.text ?? '',
-        selectable: true,
-        textAlign: WrapAlignment.start,
-        a: markDownTheme?.copyWith(
-          decoration: TextDecoration.underline,
-          fontWeight: FontWeight.w700,
-        ),
-        p: markDownTheme?.copyWith(fontWeight: FontWeight.w500),
-      ),
+    return MarkdownWidget(
+      body: widget.announcement.text ?? '',
+      // Not selectable: TalkBack exposed the selectable text as a
+      // long-clickable read-only field instead of plain text.
+      selectable: false,
+      textAlign: WrapAlignment.start,
+      a: markDownTheme.copyWith(decoration: TextDecoration.underline),
+      p: markDownTheme,
     );
   }
 
   void _handleCtaTitlePress(BuildContext context) async {
     var path = widget.announcement.ctaPath;
     var type = widget.announcement.ctaType;
-    var isDonation =
-        type == 'donation' ||
-        (type == TypeConstants.route && path == RouteConstants.donation);
+    final isDonation = _isDonationCta();
+
+    // Assign the donation-CTA arm NOW (first tap, persisted) so the tap
+    // event, the Stripe metadata, and the navigation decision all agree.
+    final prefs = ref.read(sharedPreferencesProvider);
+    if (isDonation) {
+      AnnouncementDonationExperiment.resolveVariant(prefs);
+    }
+
+    FirebaseAnalyticsService().logEvent(
+      name: AnalyticsEventConstants.announcementCtaTapped,
+      parameters: _baseParams(),
+    );
+
+    if (isDonation) {
+      final arm = AnnouncementDonationExperiment.peek(prefs);
+      if (arm == AnnouncementDonationExperiment.variantNative) {
+        await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => SupporterDonationScreen(
+              campaignMetadata: AnnouncementDonationExperiment.paymentMetadata(
+                prefs,
+              ),
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
     await handleNavigation(
       type,
       [path.toString().getIdFromPath(), path],
@@ -204,6 +253,43 @@ class _AnnouncementWidgetState extends ConsumerState<AnnouncementWidget>
       sourceRouteName: isDonation
           ? FirebaseAnalyticsService.paywallSourceAnnouncement
           : null,
+      donationCampaignMetadata: isDonation
+          ? AnnouncementDonationExperiment.paymentMetadata(prefs)
+          : const {},
+    );
+  }
+}
+
+/// Frosted, translucent card for the announcement, so the hero image shows
+/// softly through it instead of a solid block.
+class _GlassCard extends StatelessWidget {
+  const _GlassCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final radius = BorderRadius.circular(kHomeCardRadius);
+    return ClipRRect(
+      borderRadius: radius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.cardColor.withValues(alpha: 0.72),
+            borderRadius: radius,
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.12)
+                  : Colors.black.withValues(alpha: 0.08),
+              width: 0.5,
+            ),
+          ),
+          child: child,
+        ),
+      ),
     );
   }
 }

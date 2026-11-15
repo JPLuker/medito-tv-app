@@ -9,13 +9,15 @@ import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/providers/notification/reminder_provider.dart';
 import 'package:medito/providers/providers.dart';
 import 'package:medito/services/reminders/reminder_slots.dart';
-import 'package:medito/services/reminders/smart_reminders_service.dart';
+import 'package:medito/services/reminders/daily_reminders_service.dart';
 import 'package:medito/utils/notification_permission_flow.dart';
 import 'package:medito/utils/permission_handler.dart';
 import 'package:medito/views/home/widgets/bottom_sheet/row_item_widget.dart';
 import 'package:medito/views/home/widgets/home_gradient_border.dart';
+import 'package:medito/views/settings/widgets/announce_setting.dart';
 import 'package:medito/widgets/medito_icon.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:medito/constants/theme/medito_text.dart';
 
 /// What the user picked in [ReminderOptionsSheet].
 sealed class ReminderChoice {
@@ -36,7 +38,7 @@ class ReminderChoiceOff extends ReminderChoice {
 }
 
 /// Settings card for the daily reminder. Shows the current time (or "Off") and
-/// opens [ReminderOptionsSheet] on tap. Replaced the old Smart Reminders
+/// opens [ReminderOptionsSheet] on tap. Replaced the old Daily reminders
 /// switch, which silently picked "same time tomorrow"; this offers the same
 /// Morning / Evening / Night / custom choice as the onboarding chips.
 class ReminderTile extends ConsumerStatefulWidget {
@@ -67,7 +69,7 @@ class _ReminderTileState extends ConsumerState<ReminderTile> {
     }
   }
 
-  SmartRemindersService _service() => SmartRemindersService(
+  DailyRemindersService _service() => DailyRemindersService(
     prefs: ref.read(sharedPreferencesProvider),
     reminders: ref.read(reminderProvider),
   );
@@ -187,6 +189,14 @@ class _ReminderTileState extends ConsumerState<ReminderTile> {
       );
       await ref.read(reminderEnabledProvider.notifier).setEnabled(true);
       await ref.read(reminderTimeProvider.notifier).setTime(time);
+      if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        announceSettingChoice(
+          context,
+          l10n.reminderTitle,
+          _subtitle(l10n, true, time),
+        );
+      }
 
       unawaited(
         ref
@@ -212,6 +222,10 @@ class _ReminderTileState extends ConsumerState<ReminderTile> {
     try {
       await ref.read(reminderEnabledProvider.notifier).setEnabled(false);
       await _service().disable();
+      if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        announceSettingChoice(context, l10n.reminderTitle, l10n.reminderOff);
+      }
 
       unawaited(
         ref
@@ -307,58 +321,61 @@ class ReminderOptionsSheet extends StatelessWidget {
         hasUnderline: hasUnderline,
         isTrailingIcon: selected,
         trailingIcon: Icons.check_rounded,
+        selected: selected,
         onTap: () => Navigator.of(context).pop(choice),
       );
     }
 
     return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text(
-              l10n.reminderChipsQuestion,
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: onSurface,
-                fontWeight: FontWeight.w600,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Semantics(
+                header: true,
+                child: Text(
+                  l10n.reminderChipsQuestion,
+                  style: context.text.label.copyWith(color: onSurface),
+                ),
               ),
             ),
-          ),
-          for (final slot in ReminderSlot.values)
-            row(
-              icon: MeditoIcon(
-                assetName: switch (slot) {
-                  ReminderSlot.morning => MeditoIcons.sun,
-                  ReminderSlot.evening => MeditoIcons.bell,
-                  ReminderSlot.night => MeditoIcons.moon,
-                },
-                color: onSurface,
+            for (final slot in ReminderSlot.values)
+              row(
+                icon: MeditoIcon(
+                  assetName: switch (slot) {
+                    ReminderSlot.morning => MeditoIcons.sun,
+                    ReminderSlot.evening => MeditoIcons.bell,
+                    ReminderSlot.night => MeditoIcons.moon,
+                  },
+                  color: onSurface,
+                ),
+                title: slot.label(l10n),
+                subTitle: slot.time.format(context),
+                selected: slot == currentSlot,
+                choice: ReminderChoiceSlot(slot),
               ),
-              title: slot.label(l10n),
-              subTitle: slot.time.format(context),
-              selected: slot == currentSlot,
-              choice: ReminderChoiceSlot(slot),
-            ),
-          row(
-            icon: Icon(Icons.schedule_rounded, color: onSurface),
-            title: l10n.reminderSlotCustom,
-            subTitle: isCustom ? current!.format(context) : null,
-            selected: isCustom,
-            choice: const ReminderChoiceCustom(),
-            hasUnderline: enabled,
-          ),
-          if (enabled)
             row(
-              icon: Icon(Icons.notifications_off_outlined, color: onSurface),
-              title: l10n.reminderTurnOff,
-              selected: false,
-              choice: const ReminderChoiceOff(),
-              hasUnderline: false,
+              icon: Icon(Icons.schedule_rounded, color: onSurface),
+              title: l10n.reminderSlotCustom,
+              subTitle: isCustom ? current!.format(context) : null,
+              selected: isCustom,
+              choice: const ReminderChoiceCustom(),
+              hasUnderline: enabled,
             ),
-          const SizedBox(height: 8),
-        ],
+            if (enabled)
+              row(
+                icon: Icon(Icons.notifications_off_outlined, color: onSurface),
+                title: l10n.reminderTurnOff,
+                selected: false,
+                choice: const ReminderChoiceOff(),
+                hasUnderline: false,
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }

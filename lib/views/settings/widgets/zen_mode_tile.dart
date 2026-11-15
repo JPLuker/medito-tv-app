@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/providers/settings/settings_providers.dart';
 import 'package:medito/views/home/widgets/bottom_sheet/row_item_widget.dart';
+import 'package:medito/views/settings/widgets/announce_setting.dart';
 import 'package:medito/widgets/radio_option_card.dart';
 import 'package:medito/widgets/snackbar_widget.dart';
+import 'package:medito/constants/theme/medito_text.dart';
 
 /// Settings row for Zen Mode: shows On / Off and opens [ZenModeSheet] on tap.
 class ZenModeTile extends ConsumerWidget {
@@ -62,7 +64,16 @@ class ZenModeSheet extends ConsumerWidget {
 
     Future<void> choose(bool value) async {
       await ref.read(zenModeProvider.notifier).setEnabled(value);
-      if (context.mounted) Navigator.of(context).pop();
+      if (!context.mounted) return;
+      // Turning it on is confirmed by ZenModeTile's snackbar.
+      if (!value || enabled) {
+        announceSettingChoice(
+          context,
+          l10n.zenMode,
+          value ? l10n.zenModeOn : l10n.zenModeOff,
+        );
+      }
+      Navigator.of(context).pop();
     }
 
     return SafeArea(
@@ -72,11 +83,11 @@ class ZenModeSheet extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              l10n.zenMode,
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: onSurface,
-                fontWeight: FontWeight.w600,
+            Semantics(
+              header: true,
+              child: Text(
+                l10n.zenMode,
+                style: context.text.label.copyWith(color: onSurface),
               ),
             ),
             const SizedBox(height: 16),
@@ -96,8 +107,7 @@ class ZenModeSheet extends ConsumerWidget {
             const SizedBox(height: 12),
             Text(
               l10n.zenModeFootnote,
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w400,
+              style: context.text.caption.copyWith(
                 color: onSurface.withValues(alpha: 0.6),
               ),
             ),

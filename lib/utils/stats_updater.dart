@@ -1,3 +1,4 @@
+import '../models/timer/timer_session.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -7,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/types/type_constants.dart';
 import '../constants/strings/shared_preference_constants.dart';
 import '../providers/notification/reminder_provider.dart';
-import '../services/reminders/smart_reminders_service.dart';
+import '../services/reminders/daily_reminders_service.dart';
 import '../providers/stats_provider.dart';
 import '../providers/settings/settings_providers.dart';
 import '../routes/routes.dart';
@@ -18,6 +19,7 @@ import 'health_kit_manager.dart';
 import 'stats_manager.dart';
 import '../models/local_audio_completed.dart';
 import 'logger.dart';
+import 'pending_end_screen.dart';
 import '../services/home_widget_service.dart';
 import '../services/device_capabilities_service.dart';
 import '../services/analytics/firebase_analytics_service.dart';
@@ -66,19 +68,6 @@ Future<void> _refreshStatsAndUpNext() async {
   }
 }
 
-/// Test seam: when set, [_rescheduleSmartReminders] delegates to this function
-/// instead of constructing a real [SmartRemindersScheduler] +
-/// [ReminderProvider]. Lets unit tests assert that the reschedule path is
-/// taken (and with which anchor) without touching platform notification
-/// channels.
-@visibleForTesting
-Future<void> Function({required int endMs, required int durationMs})?
-smartReminderReschedulerOverride;
-
-/// Reschedules the Smart Reminder series so its anchor and the streak /
-/// consistency values baked into each day's copy reflect the latest session
-/// state. Safe to call from any stats-mutating path (real completions, manual
-/// adds, deletes); no-ops when Smart Reminders are disabled.
 Future<bool> _isAndroidTv() async {
   try {
     return (await DeviceCapabilitiesService().detect()).isAndroidTv;
@@ -87,13 +76,26 @@ Future<bool> _isAndroidTv() async {
   }
 }
 
-Future<void> _rescheduleSmartReminders({
+/// Test seam: when set, [_rescheduleReminders] delegates to this function
+/// instead of constructing a real [DailyRemindersScheduler] +
+/// [ReminderProvider]. Lets unit tests assert that the reschedule path is
+/// taken (and with which anchor) without touching platform notification
+/// channels.
+@visibleForTesting
+Future<void> Function({required int endMs, required int durationMs})?
+reminderReschedulerOverride;
+
+/// Reschedules the Daily reminder series so its anchor and the streak /
+/// consistency values baked into each day's copy reflect the latest session
+/// state. Safe to call from any stats-mutating path (real completions, manual
+/// adds, deletes); no-ops when Daily reminders are disabled.
+Future<void> _rescheduleReminders({
   required int endMs,
   required int durationMs,
 }) async {
   try {
     if (await _isAndroidTv()) {
-      AppLogger.d('STATS', 'Android TV: skipping Smart Reminder scheduling');
+      AppLogger.d('STATS', 'Android TV: skipping reminder scheduling');
       return;
     }
 
@@ -106,18 +108,18 @@ Future<void> _rescheduleSmartReminders({
         hasSaved;
 
     if (!enabled) {
-      AppLogger.d('STATS', 'Smart Reminders disabled; skipping scheduling');
+      AppLogger.d('STATS', 'Daily reminders disabled; skipping scheduling');
       return;
     }
 
-    final override = smartReminderReschedulerOverride;
+    final override = reminderReschedulerOverride;
     if (override != null) {
       await override(endMs: endMs, durationMs: durationMs);
-      AppLogger.d('STATS', 'Smart Reminder series scheduled (override)');
+      AppLogger.d('STATS', 'Daily reminder series scheduled (override)');
       return;
     }
 
-    final scheduler = SmartRemindersScheduler(
+    final scheduler = DailyRemindersScheduler(
       prefs: prefs,
       reminders: ReminderProvider(),
     );
@@ -129,7 +131,7 @@ Future<void> _rescheduleSmartReminders({
           ? AppLocalizations.of(context)
           : null,
     );
-    AppLogger.d('STATS', 'Smart Reminder series scheduled');
+    AppLogger.d('STATS', 'Daily reminder series scheduled');
 
     if (context != null && context.mounted) {
       try {
@@ -140,22 +142,28 @@ Future<void> _rescheduleSmartReminders({
       }
     }
   } catch (reminderError) {
-    AppLogger.e('STATS', 'Failed to schedule Smart Reminder', reminderError);
+    AppLogger.e('STATS', 'Failed to schedule Daily reminder', reminderError);
   }
 }
+
+// Completions already recorded by this engine, keyed by track + timestamp.
+// Android persists each completion natively and replays it on resume, so a
+// replay can race the live callback for the same session and record it (stats
+// and the audio_session_completed event) twice. Dropped again on failure so a
+// retry of a genuinely failed completion still goes through.
+final Set<String> _recordedCompletions = {};
 
 Future<bool> handleStats(
   Map<String, dynamic> payload, {
   StatsManager? statsManager, // For testing
 }) async {
+  final completionKey =
+      '${payload[TypeConstants.trackIdKey]}@${payload[TypeConstants.timestampIdKey]}';
+  if (!_recordedCompletions.add(completionKey)) {
+    AppLogger.d('STATS', 'Duplicate completion $completionKey ignored');
+    return true;
+  }
   try {
-    // First try to sync with HealthKit
-    await _syncHealthKit(payload).catchError((e) {
-      AppLogger.e('STATS', 'HealthKit sync error', e);
-      // Continue even if HealthKit sync fails
-    });
-
-    // Then update local stats
     statsManager ??= StatsManager()..initialize();
 
     var newAudioCompleted = LocalAudioCompleted(
@@ -174,7 +182,11 @@ Future<bool> handleStats(
     // Log Firebase analytics event for audio session completion
     try {
       final fileId = payload[TypeConstants.fileIdKey] as String?;
-      final guide = payload[TypeConstants.guideIdKey] as String?;
+      // Timer sessions report a fixed guide (native completion passes the
+      // empty artist), so they filter out of narrator stats in one place.
+      final guide = isTimerSessionId('${payload[TypeConstants.trackIdKey]}')
+          ? AnalyticsEventConstants.timerGuide
+          : payload[TypeConstants.guideIdKey] as String?;
 
       await FirebaseAnalyticsService().logEvent(
         name: AnalyticsEventConstants.audioSessionCompleted,
@@ -191,10 +203,24 @@ Future<bool> handleStats(
 
     // Tell the session tracker this session completed so it clears the
     // in-progress record and does not also fire audio_session_abandoned.
-    await AudioSessionTracker.instance.onCompleted();
+    await AudioSessionTracker.instance.onCompleted(
+      fileId: payload[TypeConstants.fileIdKey] as String?,
+    );
 
     // Refresh stats from local; upNextProvider rebuilds reactively.
     await _refreshStatsAndUpNext();
+
+    // After the refresh, so an end screen rebuilt from this completion (the
+    // app was killed before it could show) animates to the new stats.
+    try {
+      await PendingEndScreen.markCompleted(
+        await SharedPreferences.getInstance(),
+        fileId: payload[TypeConstants.fileIdKey] as String?,
+        timestampMs: payload[TypeConstants.timestampIdKey] as int,
+      );
+    } catch (e) {
+      AppLogger.w('STATS', 'Could not mark pending end screen: $e');
+    }
 
     // Update home widget with latest stats (fire-and-forget to avoid blocking)
     try {
@@ -212,14 +238,60 @@ Future<bool> handleStats(
       );
     }
 
-    await _rescheduleSmartReminders(
+    await _rescheduleReminders(
       endMs: payload[TypeConstants.timestampIdKey] as int,
       durationMs: payload[TypeConstants.durationIdKey] as int,
     );
 
+    // Last: the first sync can show the Health permission sheet, and nothing
+    // above (recording and posting the session) should wait for the user to
+    // answer it.
+    await _syncHealthKit(payload).catchError((e) {
+      AppLogger.e('STATS', 'HealthKit sync error', e);
+    });
+
     return true;
   } catch (e) {
+    _recordedCompletions.remove(completionKey);
     AppLogger.e('STATS', 'Failed to update stats', e);
+    return false;
+  }
+}
+
+// Timestamps of repeat play-throughs already recorded by this engine. Android
+// persists each repeat and replays it on resume, so a replay can race the live
+// callback for the same play-through.
+final Set<int> _recordedRepeatTimestamps = {};
+
+/// Records a repeated play-through (repeat once / forever) of a track whose
+/// first play-through was already recorded by [handleStats]. Adds its minutes
+/// to total time listened and writes it to Health, but does not count as a new
+/// session. Takes the same payload shape as [handleStats].
+Future<bool> handleRepeatPlaythrough(
+  Map<String, dynamic> payload, {
+  StatsManager? statsManager, // For testing
+}) async {
+  final timestamp = payload[TypeConstants.timestampIdKey] as int;
+  if (!_recordedRepeatTimestamps.add(timestamp)) return true;
+  try {
+    await _syncHealthKit(payload).catchError((e) {
+      AppLogger.e('STATS', 'HealthKit sync error', e);
+    });
+
+    statsManager ??= StatsManager()..initialize();
+    await statsManager.addRepeatListeningTime(
+      payload[TypeConstants.durationIdKey] as int,
+    );
+    AppLogger.d(
+      'STATS',
+      'Repeat play-through recorded for track ${payload[TypeConstants.trackIdKey]}',
+    );
+
+    await _refreshStatsAndUpNext();
+    return true;
+  } catch (e) {
+    _recordedRepeatTimestamps.remove(timestamp);
+    AppLogger.e('STATS', 'Failed to record repeat play-through', e);
     return false;
   }
 }
@@ -376,6 +448,38 @@ String _getManualSessionId(DateTime dateTime) {
   }
 }
 
+/// Corrects a history entry while preserving listening totals.
+Future<bool> editSessionDateTime({
+  required LocalAudioCompleted session,
+  required DateTime dateTime,
+  StatsManager? statsManager,
+}) async {
+  if (dateTime.isAfter(DateTime.now()) || isFreezeSession(session)) {
+    return false;
+  }
+  try {
+    statsManager ??= StatsManager();
+    final updated = session.copyWith(
+      timestamp: dateTime.millisecondsSinceEpoch,
+      id: isManualSession(session) ? _getManualSessionId(dateTime) : session.id,
+    );
+    final success = await statsManager.replaceAudioCompleted(
+      original: session,
+      replacement: updated,
+    );
+    if (!success) return false;
+    await _refreshStatsAndUpNext();
+    await _rescheduleReminders(
+      endMs: DateTime.now().millisecondsSinceEpoch,
+      durationMs: 0,
+    );
+    return true;
+  } catch (e) {
+    AppLogger.e('STATS', 'Failed to edit session', e);
+    return false;
+  }
+}
+
 /// Removes a previously recorded session from stats.
 ///
 /// Matches on id + timestamp so that duplicate ids on different days are
@@ -392,7 +496,7 @@ Future<bool> deleteSession({
     await _refreshStatsAndUpNext();
 
     final nowMs = DateTime.now().millisecondsSinceEpoch;
-    await _rescheduleSmartReminders(endMs: nowMs, durationMs: 0);
+    await _rescheduleReminders(endMs: nowMs, durationMs: 0);
 
     try {
       final updatedStats = await statsManager.localAllStats;
@@ -454,7 +558,7 @@ Future<bool> addManualSession({
     // Refresh stats from local; upNextProvider rebuilds reactively.
     await _refreshStatsAndUpNext();
 
-    await _rescheduleSmartReminders(endMs: timestamp, durationMs: durationMs);
+    await _rescheduleReminders(endMs: timestamp, durationMs: durationMs);
 
     // Update home widget with latest stats (fire-and-forget to avoid blocking)
     try {
@@ -547,10 +651,7 @@ Future<int> addManualSessions({
       );
     }
 
-    await _rescheduleSmartReminders(
-      endMs: latestTimestamp,
-      durationMs: durationMs,
-    );
+    await _rescheduleReminders(endMs: latestTimestamp, durationMs: durationMs);
   }
 
   return added;

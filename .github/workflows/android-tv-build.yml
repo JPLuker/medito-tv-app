@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/android-tv-support
+      - feature/android-tv-upstream-sync
   workflow_dispatch:
 
 concurrency:

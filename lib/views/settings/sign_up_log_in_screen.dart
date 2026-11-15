@@ -1,11 +1,14 @@
+import 'package:medito/widgets/adaptive/adaptive_page_body.dart';
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/constants/constants.dart';
+import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:medito/exceptions/app_error.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/providers/favorites/favorites_provider.dart';
@@ -13,6 +16,7 @@ import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/providers/me/me_provider.dart';
 import 'package:medito/providers/shared_preference/shared_preference_provider.dart';
 import 'package:medito/providers/stats_provider.dart';
+import 'package:medito/utils/receipt_email.dart';
 import 'package:medito/repositories/auth/auth_repository.dart';
 import 'package:medito/services/analytics/crashlytics_service.dart';
 import 'package:medito/services/analytics/firebase_analytics_service.dart';
@@ -21,6 +25,7 @@ import 'package:medito/services/network/header_service.dart';
 import 'package:medito/utils/logger.dart';
 import 'package:email_validator/email_validator.dart';
 import 'package:medito/widgets/dialogs/dialogs.dart';
+import 'package:medito/widgets/inputs/medito_text_field.dart';
 import 'package:medito/widgets/snackbar_widget.dart';
 import 'package:medito/utils/utils.dart';
 import 'package:medito/routes/routes.dart' as routes;
@@ -29,6 +34,7 @@ import 'package:medito/views/onboarding/onboarding_pager_screen.dart';
 import 'package:medito/views/bottom_navigation/bottom_navigation_bar_view.dart';
 import 'package:medito/views/root/root_page_view.dart';
 import 'package:medito/views/tv/tv_sign_up_log_in_page.dart';
+import 'package:medito/widgets/inputs/email_typo_hint.dart';
 import 'package:app_links/app_links.dart';
 
 import '../../providers/device_and_app_info/device_and_app_info_provider.dart';
@@ -37,9 +43,18 @@ import '../../providers/pack/pack_provider.dart';
 final dev = const AppLoggerAdapter('SIGN_UP');
 
 class SignUpLogInPage extends ConsumerWidget {
-  const SignUpLogInPage({super.key, this.fromSettings = false});
+  const SignUpLogInPage({
+    super.key,
+    this.fromSettings = false,
+    this.source = AnalyticsEventConstants.sourceSettings,
+  });
 
   final bool fromSettings;
+
+  /// Where this sign-in/sign-up was launched from. Tagged onto the
+  /// [onboardingSignupCompleted] event so we can see which surface drives
+  /// account creation. See [AnalyticsEventConstants] source values.
+  final String source;
   static const routeName = '/signup';
 
   @override
@@ -56,6 +71,9 @@ class SignUpLogInPage extends ConsumerWidget {
         '[SIGN_UP] User has email, navigating back or to home',
         level: 1000,
       );
+      // If opened from settings and user is already logged in, just pop.
+      // Otherwise, this case might not be reachable if auth guards are in place before this screen.
+      // However, to be safe, popping is a sensible default.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (Navigator.canPop(context)) {
           Navigator.pop(context);
@@ -64,30 +82,26 @@ class SignUpLogInPage extends ConsumerWidget {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Center(
-          child: CircularProgressIndicator(color: context.brandPurple),
+          child: CircularProgressIndicator(color: context.brandAccent),
         ),
-      );
+      ); // Show loading while popping
+    } else {
+      dev.log('[SIGN_UP] User has no email, showing sign-up form', level: 1000);
+      // Android TV / Google TV frames the same form for 10-foot viewing.
+      final isTv = ref
+          .watch(deviceCapabilitiesProvider)
+          .maybeWhen(data: (value) => value.isAndroidTv, orElse: () => false);
+      if (isTv) {
+        return TvSignUpLogInFrame(
+          child: SignUpLogInForm(
+            fromSettings: fromSettings,
+            source: source,
+            tvEmbedded: true,
+          ),
+        );
+      }
+      return SignUpLogInForm(fromSettings: fromSettings, source: source);
     }
-
-    dev.log('[SIGN_UP] User has no email, showing sign-up form', level: 1000);
-    final capabilities = ref.watch(deviceCapabilitiesProvider);
-    return capabilities.when(
-      data: (value) => value.isAndroidTv
-          ? TvSignUpLogInFrame(
-              child: SignUpLogInForm(
-                fromSettings: fromSettings,
-                tvEmbedded: true,
-              ),
-            )
-          : SignUpLogInForm(fromSettings: fromSettings),
-      loading: () => Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        body: Center(
-          child: CircularProgressIndicator(color: context.brandPurple),
-        ),
-      ),
-      error: (_, _) => SignUpLogInForm(fromSettings: fromSettings),
-    );
   }
 }
 
@@ -95,10 +109,16 @@ class SignUpLogInForm extends ConsumerStatefulWidget {
   const SignUpLogInForm({
     super.key,
     required this.fromSettings,
+    this.source = AnalyticsEventConstants.sourceSettings,
     this.tvEmbedded = false,
   });
 
   final bool fromSettings;
+  final String source;
+
+  /// True when hosted inside [TvSignUpLogInFrame] on Android TV / Google TV:
+  /// the frame supplies the page chrome, so the form renders without its own
+  /// Scaffold and app bar.
   final bool tvEmbedded;
 
   @override
@@ -107,6 +127,7 @@ class SignUpLogInForm extends ConsumerStatefulWidget {
 
 class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
   final _emailController = TextEditingController();
+  final _emailTypoConfirmation = EmailTypoConfirmation();
   final _otpController = TextEditingController();
   var _isLoading = false;
   var _isEmailValid = false;
@@ -123,7 +144,21 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
     super.initState();
     _emailController.addListener(_validateEmail);
     _otpController.addListener(_validateOtp);
+    _prefillReceiptEmail();
     _setupDeepLinkHandling();
+  }
+
+  /// A donor who typed an email for their Stripe receipt gets it offered
+  /// here, so "add your email" is one tap. It is only a suggestion: the
+  /// field stays editable and the account email may legitimately differ.
+  void _prefillReceiptEmail() {
+    if (_emailController.text.isNotEmpty) return;
+    try {
+      final stored = ReceiptEmail.read(ref.read(sharedPreferencesProvider));
+      if (stored != null) _emailController.text = stored;
+    } catch (e) {
+      dev.log('[SIGN_UP] Could not read receipt email: $e');
+    }
   }
 
   void _setupDeepLinkHandling() {
@@ -181,6 +216,12 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
   Future<void> _requestOtp() async {
     if (_isLoading || _isRateLimited) return;
 
+    // A mistyped domain sends the code nowhere and strands the user.
+    if (!await _emailTypoConfirmation.confirm(context, _emailController)) {
+      return;
+    }
+    if (!mounted) return;
+
     final hasLocalStats = await ref.read(statsManagerProvider).hasLocalStats();
 
     if (hasLocalStats) {
@@ -214,6 +255,9 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
     await _sendOtp();
   }
 
+  /// Requests an OTP for the entered email. If the device's stored client ID is
+  /// linked to a different email, asks whether to start a new account on this
+  /// device (clearing the stored ID) and retries once if the user agrees.
   Future<void> _sendOtp({bool allowNewAccount = true}) async {
     setState(() {
       _isLoading = true;
@@ -226,6 +270,7 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
       setState(() {
         _hasRequestedOtp = true;
       });
+      _announceCodeSent();
     } on RateLimitError catch (e) {
       showSnackBar(context, e.message);
       setState(() {
@@ -236,6 +281,9 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
     } on InactiveEmailError {
       showSnackBar(context, AppLocalizations.of(context)!.accountInactiveError);
     } on EmailMismatchError catch (e) {
+      // The stored client ID belongs to an account with a different email and
+      // the entered email is not registered. Never mint a new client ID
+      // silently: ask first, and only then forget the old ID and retry.
       if (!mounted) return;
       if (!allowNewAccount) {
         showSnackBar(context, e.message);
@@ -266,6 +314,11 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
           false;
       if (!startNew || !mounted) return;
 
+      // Leave the device clean: the old account's local stats must not be
+      // merged into the new account (they stay on the server under the old
+      // email), and with no stored client ID both requestOtp and verifyOtp
+      // generate a fresh one. If the person abandons the flow here, splash
+      // "Continue" then creates a plain new anonymous account.
       final statsManager = ref.read(statsManagerProvider);
       await statsManager.initialize();
       await statsManager.clearAllStats();
@@ -287,6 +340,17 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
         _isLoading = false;
       });
     }
+  }
+
+  /// The form swaps to code entry with no other cue for a screen reader.
+  void _announceCodeSent() {
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    SemanticsService.sendAnnouncement(
+      View.of(context),
+      '${l10n.otpInstructions} ${_emailController.text.trim()}',
+      Directionality.of(context),
+    );
   }
 
   void _startRetryTimer() {
@@ -318,6 +382,10 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
         level: 1000,
       );
 
+      // Remember which account this device was on, so we only wipe local
+      // stats when the server actually switches us to a different one. Read
+      // SharedPreferences directly: userIdProvider is a plain Provider whose
+      // dependencies never change, so it would return a stale cached value.
       final previousUserId = ref
           .read(sharedPreferencesProvider)
           .getString(SharedPreferenceConstants.userId);
@@ -337,8 +405,11 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
           level: 1000,
         );
         await _refreshUserInfo();
+        // userIdProvider caches its value; refresh it now that the server may
+        // have switched us to a different client ID.
         ref.invalidate(userIdProvider);
 
+        // Log the state of the auth repository after successful login
         final authRepo = ref.read(authRepositorySyncProvider);
         dev.log(
           '[SIGN_UP] User after successful login: ${authRepo.currentUser}',
@@ -349,6 +420,8 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
           level: 1000,
         );
 
+        // Set user ID for analytics immediately after successful sign-in
+        // This ensures user ID is set before any events are logged
         try {
           final userId = ref.read(userIdProvider);
           if (userId != null && userId.isNotEmpty) {
@@ -366,23 +439,40 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
           );
         }
 
+        // Log analytics event for completed signup. Tag the source so we can
+        // see which surface (splash, settings, end-screen prompt, deep link)
+        // actually drives account creation.
         await FirebaseAnalyticsService().logEvent(
           name: FirebaseAnalyticsService.eventOnboardingSignupCompleted,
+          parameters: {AnalyticsEventConstants.paramSource: widget.source},
         );
 
+        // Initialize first — clearAllStats touches SharedPreferences and
+        // will throw LateInitializationError if the singleton hasn't been
+        // initialized yet (e.g. user signs in straight from onboarding
+        // without ever loading the home screen).
         final statsManager = ref.read(statsManagerProvider);
         await statsManager.initialize();
         final newUserId = authRepo.currentUser?.id;
         if (newUserId != previousUserId) {
+          // Server moved us onto a different account: drop the local copy of
+          // the old one before pulling the new account's stats.
           await statsManager.clearAllStats();
         }
+        // Force sync to fetch the (possibly different) account's stats
         await statsManager.sync(force: true);
         ref.read(statsProvider.notifier).refresh();
         ref.invalidate(packProvider);
 
-        unawaited(
-          ref.read(favoritesNotifierProvider.notifier).syncWithServer(),
-        );
+        // Same for favourites: on a different account, drop the local list
+        // rather than pushing the old account's favourites into this one.
+        // Either way, rebuild so this account's server list is merged in
+        // (and anything the server lacks, e.g. favourites made while
+        // anonymous on this same account, is pushed up).
+        if (newUserId != previousUserId) {
+          await ref.read(favoritesNotifierProvider.notifier).clearLocal();
+        }
+        ref.invalidate(favoritesNotifierProvider);
 
         if (!mounted) return;
 
@@ -393,10 +483,10 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
         if (widget.fromSettings) {
           Navigator.of(context).pop();
         } else {
-          final isTv = await ref.read(deviceCapabilitiesProvider.future).then(
-                (value) => value.isAndroidTv,
-                onError: (_) => false,
-              );
+          // Onboarding is phone-only; TV goes straight to the main app.
+          final isTv = await ref
+              .read(deviceCapabilitiesProvider.future)
+              .then((value) => value.isAndroidTv, onError: (_) => false);
           if (!mounted) return;
 
           Navigator.of(context).pushAndRemoveUntil(
@@ -442,15 +532,18 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
   Future<void> _refreshUserInfo() async {
     dev.log('[SIGN_UP] Starting user info refresh', level: 1000);
 
+    // First invalidate the providers to clear their state
     ref.invalidate(meProvider);
     ref.invalidate(deviceAppAndUserInfoProvider);
 
+    // Log current auth state before header initialization
     final authRepo = ref.read(authRepositorySyncProvider);
     dev.log(
       '[SIGN_UP] Auth state before header init: ${authRepo.currentUser}',
       level: 1000,
     );
 
+    // Then initialize headers with device info (which now includes user's language preference)
     final deviceInfo = await ref.read(deviceAndAppInfoProvider.future);
     await HeaderService(deviceInfo).initialise();
 
@@ -464,10 +557,11 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
   Widget build(BuildContext context) {
     final inputTextStyle = TextStyle(
       color: Theme.of(context).colorScheme.onSurface,
-      fontSize: widget.tvEmbedded ? 20 : null,
     );
 
     if (widget.tvEmbedded) {
+      // No app bar on TV, so the step back to the email field is an explicit
+      // focusable button the remote can reach.
       return Material(
         color: Colors.transparent,
         child: SingleChildScrollView(
@@ -488,7 +582,7 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
                             });
                           },
                     icon: const Icon(Icons.arrow_back_rounded),
-                    label: const Text('Change email'),
+                    label: Text(AppLocalizations.of(context)!.goBack),
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -509,6 +603,7 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
         leading: _hasRequestedOtp
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
+                tooltip: AppLocalizations.of(context)!.goBack,
                 onPressed: () {
                   setState(() {
                     _hasRequestedOtp = false;
@@ -518,29 +613,28 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
               )
             : null,
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            32.0,
-            0,
-            32.0,
-            MediaQuery.of(context).viewInsets.bottom + 32.0,
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight:
-                  MediaQuery.of(context).size.height -
-                  MediaQuery.of(context).padding.top -
-                  kToolbarHeight -
-                  MediaQuery.of(context).viewInsets.bottom,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _hasRequestedOtp
-                    ? _buildOtpVerificationView(inputTextStyle)
-                    : _buildInitialView(inputTextStyle),
-              ],
+      body: AdaptivePageBody(
+        maxWidth: 600,
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: (constraints.maxHeight - 32).clamp(
+                    0,
+                    double.infinity,
+                  ),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _hasRequestedOtp
+                        ? _buildOtpVerificationView(inputTextStyle)
+                        : _buildInitialView(inputTextStyle),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -551,20 +645,14 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
   Widget _buildInitialView(TextStyle inputTextStyle) {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: widget.tvEmbedded
-          ? CrossAxisAlignment.stretch
-          : CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         _buildBenefitsText(AppLocalizations.of(context)!.createAccountBenefits),
-        widget.tvEmbedded ? height32 : height64,
+        height64,
         Text(
           AppLocalizations.of(context)!.emailVerificationText,
-          textAlign: widget.tvEmbedded ? TextAlign.left : TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            fontSize: widget.tvEmbedded ? 18 : 13,
-            height: 1.5,
-            fontWeight: FontWeight.normal,
-          ),
+          textAlign: TextAlign.center,
+          style: context.text.muted.bodySmall,
         ),
         height16,
         _buildEmailField(inputTextStyle),
@@ -580,8 +668,9 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
                   width: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
+                    semanticsLabel: AppLocalizations.of(context)!.loading,
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      context.onBrandPurple,
+                      context.onBrandAccent,
                     ),
                   ),
                 )
@@ -590,15 +679,14 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
                   AppLocalizations.of(
                     context,
                   )!.retryInSeconds(_retryAfterSeconds.toString()),
+                  semanticsLabel: AppLocalizations.of(
+                    context,
+                  )!.retryInSecondsSpoken(_retryAfterSeconds),
                 )
               : Text(AppLocalizations.of(context)!.sendMeMyPasswordText),
         ),
-        if (!widget.tvEmbedded &&
-            !ref.watch(deviceCapabilitiesProvider).maybeWhen(
-              data: (value) => value.isAndroidTv,
-              orElse: () => false,
-            ))
-          _buildPrivacyPolicyLink(),
+        // The policy links open a browser, which TV has no use for.
+        if (!widget.tvEmbedded) _buildPrivacyPolicyLink(),
         if (!widget.tvEmbedded) SizedBox.square(dimension: 100),
       ],
     );
@@ -607,34 +695,26 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
   Widget _buildOtpVerificationView(TextStyle inputTextStyle) {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: widget.tvEmbedded
-          ? CrossAxisAlignment.stretch
-          : CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text.rich(
           TextSpan(
             children: [
               TextSpan(
                 text: '${AppLocalizations.of(context)!.otpInstructions}\n',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontSize: widget.tvEmbedded ? 22 : 18,
-                  height: 1.5,
-                  fontWeight: FontWeight.normal,
+                style: context.text.body.copyWith(
                   color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               TextSpan(
                 text: _emailController.text,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontSize: widget.tvEmbedded ? 22 : 18,
-                  height: 1.5,
-                  fontWeight: FontWeight.bold,
+                style: context.text.title.copyWith(
                   color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ],
           ),
-          textAlign: widget.tvEmbedded ? TextAlign.left : TextAlign.center,
+          textAlign: TextAlign.center,
         ),
         height32,
         _buildOtpField(inputTextStyle),
@@ -648,35 +728,38 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
                   width: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
+                    semanticsLabel: AppLocalizations.of(context)!.loading,
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      context.onBrandPurple,
+                      context.onBrandAccent,
                     ),
                   ),
                 )
               : Text(AppLocalizations.of(context)!.verifyOtpButtonText),
         ),
         height16,
+        // onSurface + underline: the old light-blue link was ~1.2:1 on the
+        // light theme's white page. Default min size keeps a 48px target.
         TextButton(
           onPressed: _isLoading || _isRateLimited ? null : _requestOtp,
-          style: TextButton.styleFrom(
-            minimumSize: Size(0, widget.tvEmbedded ? 52 : 32),
-            tapTargetSize: widget.tvEmbedded
-                ? MaterialTapTargetSize.padded
-                : MaterialTapTargetSize.shrinkWrap,
-          ),
+          style: TextButton.styleFrom(padding: EdgeInsets.zero),
           child: Text(
             _isRateLimited
                 ? AppLocalizations.of(
                     context,
                   )!.resendCodeInSeconds(_retryAfterSeconds.toString())
                 : AppLocalizations.of(context)!.resendCode,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            semanticsLabel: _isRateLimited
+                ? AppLocalizations.of(
+                    context,
+                  )!.resendCodeInSecondsSpoken(_retryAfterSeconds)
+                : null,
+            style: context.text.label.copyWith(
               color: _isLoading || _isRateLimited
-                  ? Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.color?.withOpacityValue(0.38)
-                  : ColorConstants.brightSky,
-              fontSize: widget.tvEmbedded ? 18 : 14,
+                  ? context.text.muted.color?.withOpacityValue(0.38)
+                  : Theme.of(context).colorScheme.onSurface,
+              decoration: _isLoading || _isRateLimited
+                  ? null
+                  : TextDecoration.underline,
             ),
           ),
         ),
@@ -685,35 +768,20 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
   }
 
   Widget _buildEmailField(TextStyle inputTextStyle) {
-    return TextField(
+    final l10n = AppLocalizations.of(context)!;
+    final showError = !_isEmailValid && _emailController.text.isNotEmpty;
+    // In onboarding (opened from the splash) drop the keyboard straight in so
+    // the user can start typing; the Settings entry stays tap-to-focus.
+    final autofocus = widget.source == AnalyticsEventConstants.sourceSplash;
+    final field = MeditoTextField(
       controller: _emailController,
       enabled: !_hasRequestedOtp,
-      decoration:
-          getInputDecoration(
-            AppLocalizations.of(context)!.emailLabel,
-            _isEmailValid || _emailController.text.isEmpty,
-            AppLocalizations.of(context)!.invalidEmailError,
-          ).copyWith(
-            fillColor: Theme.of(context).colorScheme.surface,
-            filled: true,
-            suffixIcon: _emailController.text.isNotEmpty && !_hasRequestedOtp
-                ? IconButton(
-                    icon: Icon(
-                      Icons.clear,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withOpacityValue(0.6),
-                    ),
-                    onPressed: () {
-                      _emailController.clear();
-                      _validateEmail();
-                    },
-                  )
-                : null,
-          ),
-      onChanged: (_) => setState(() {}),
-      style: inputTextStyle,
+      autofocus: autofocus,
+      hintText: l10n.emailLabel,
+      errorText: showError ? l10n.invalidEmailError : null,
       keyboardType: TextInputType.emailAddress,
+      autofillHints: const [AutofillHints.email],
+      onChanged: (_) => setState(() {}),
       inputFormatters: [
         TextInputFormatter.withFunction(
           (oldValue, newValue) => TextEditingValue(
@@ -722,23 +790,45 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
           ),
         ),
       ],
+      suffixIcon: _emailController.text.isNotEmpty && !_hasRequestedOtp
+          ? IconButton(
+              tooltip: AppLocalizations.of(context)!.clearEmail,
+              icon: Icon(
+                Icons.clear,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withOpacityValue(0.6),
+              ),
+              onPressed: () {
+                _emailController.clear();
+                _validateEmail();
+              },
+            )
+          : null,
+    );
+    if (_hasRequestedOtp) return field;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        field,
+        EmailTypoHint(controller: _emailController),
+      ],
     );
   }
 
   Widget _buildOtpField(TextStyle inputTextStyle) {
-    return TextField(
+    final l10n = AppLocalizations.of(context)!;
+    final showError = !_isOtpValid && _otpController.text.isNotEmpty;
+    // Focus the code field on every path (it only appears after the user
+    // asked for a code), so the keyboard and screen reader land on it.
+    return MeditoTextField(
       controller: _otpController,
-      decoration:
-          getInputDecoration(
-            AppLocalizations.of(context)!.otpLabel,
-            _isOtpValid || _otpController.text.isEmpty,
-            AppLocalizations.of(context)!.invalidOtpError,
-          ).copyWith(
-            fillColor: Theme.of(context).colorScheme.surface,
-            filled: true,
-          ),
-      style: inputTextStyle,
+      autofocus: true,
+      hintText: l10n.otpLabel,
+      errorText: showError ? l10n.invalidOtpError : null,
       keyboardType: TextInputType.number,
+      autofillHints: const [AutofillHints.oneTimeCode],
       maxLength: 6,
     );
   }
@@ -750,15 +840,12 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
         child: Text.rich(
           TextSpan(
             text: AppLocalizations.of(context)!.byContinuingAgreeTo,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(
-                context,
-              ).textTheme.bodySmall?.color?.withOpacityValue(0.7),
-              fontSize: 12,
+            style: context.text.caption.copyWith(
+              color: context.text.muted.color?.withOpacityValue(0.7),
             ),
             children: [
               TextSpan(
-                text: 'Terms of Service',
+                text: AppLocalizations.of(context)!.termsOfService,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
                   decoration: TextDecoration.underline,
@@ -773,7 +860,7 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
               ),
               TextSpan(text: AppLocalizations.of(context)!.andText),
               TextSpan(
-                text: 'Privacy Policy',
+                text: AppLocalizations.of(context)!.privacyPolicy,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
                   decoration: TextDecoration.underline,
@@ -797,75 +884,14 @@ class SignUpLogInFormState extends ConsumerState<SignUpLogInForm> {
   ButtonStyle _getButtonStyle() {
     return ElevatedButton.styleFrom(
       foregroundColor: Theme.of(context).colorScheme.onPrimary,
-      backgroundColor: context.brandPurple,
-      disabledForegroundColor: context.onBrandPurple.withValues(alpha: 0.6),
-      disabledBackgroundColor: context.brandPurple.withOpacityValue(0.5),
-      minimumSize: Size(double.infinity, widget.tvEmbedded ? 62 : 48),
-      textStyle: widget.tvEmbedded
-          ? Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            )
-          : null,
-    );
-  }
-
-  InputDecoration getInputDecoration(
-    String hint,
-    bool isValid,
-    String? errorText,
-  ) {
-    final borderRadius = BorderRadius.all(
-      Radius.circular(widget.tvEmbedded ? 12 : 4),
-    );
-
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: TextStyle(
-        color: Theme.of(context).colorScheme.onSurface.withOpacityValue(0.6),
-        fontSize: widget.tvEmbedded ? 19 : null,
-      ),
-      contentPadding: widget.tvEmbedded
-          ? const EdgeInsets.symmetric(horizontal: 22, vertical: 21)
-          : null,
-      filled: true,
-      fillColor: Theme.of(context).colorScheme.surface,
-      enabledBorder: OutlineInputBorder(
-        borderRadius: borderRadius,
-        borderSide: const BorderSide(color: ColorConstants.softGrey),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: borderRadius,
-        borderSide: BorderSide(
-          color: context.brandPurple,
-          width: widget.tvEmbedded ? 3 : 1,
-        ),
-      ),
-      disabledBorder: OutlineInputBorder(
-        borderRadius: borderRadius,
-        borderSide: const BorderSide(color: ColorConstants.softGrey),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: borderRadius,
-        borderSide: const BorderSide(color: Colors.red),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: borderRadius,
-        borderSide: const BorderSide(color: Colors.red),
-      ),
-      errorText: !isValid && errorText != null ? errorText : null,
-      errorStyle: const TextStyle(color: Colors.red),
+      backgroundColor: context.brandAccent,
+      disabledForegroundColor: context.onBrandAccent.withValues(alpha: 0.6),
+      disabledBackgroundColor: context.brandAccent.withOpacityValue(0.5),
+      minimumSize: const Size(double.infinity, 48),
     );
   }
 
   Widget _buildBenefitsText(String text) {
-    return Text(
-      text,
-      textAlign: TextAlign.start,
-      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-        fontSize: widget.tvEmbedded ? 28 : 20,
-        height: 1.4,
-        fontWeight: FontWeight.w600,
-      ),
-    );
+    return Text(text, textAlign: TextAlign.start, style: context.text.title);
   }
 }

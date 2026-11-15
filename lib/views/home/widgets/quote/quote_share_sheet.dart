@@ -1,9 +1,11 @@
+import 'package:medito/widgets/adaptive/adaptive_page_body.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:medito/l10n/app_localizations.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -16,6 +18,7 @@ import 'package:medito/providers/providers.dart';
 import 'package:medito/views/player/widgets/bottom_actions/single_back_action_bar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:medito/constants/theme/medito_text.dart';
 
 /// A selectable background palette for the quote share card.
 ///
@@ -31,6 +34,8 @@ class _Palette {
     required this.lineColor,
   });
 
+  /// Analytics id (quote_share_palette); see [_paletteDisplayName] for the
+  /// user-facing name.
   final String name;
   final List<Color> gradient;
   final Color foreground;
@@ -106,6 +111,19 @@ const _palettes = <_Palette>[
     lineColor: Colors.white,
   ),
 ];
+
+String _paletteDisplayName(AppLocalizations l10n, _Palette palette) =>
+    switch (palette.name) {
+      'Midnight' => l10n.quotePaletteMidnight,
+      'Indigo' => l10n.quotePaletteIndigo,
+      'Ocean' => l10n.quotePaletteOcean,
+      'Forest' => l10n.quotePaletteForest,
+      'Sunset' => l10n.quotePaletteSunset,
+      'Rose' => l10n.quotePaletteRose,
+      'Cream' => l10n.quotePaletteCream,
+      'Slate' => l10n.quotePaletteSlate,
+      _ => palette.name,
+    };
 
 class QuoteShareScreen extends ConsumerStatefulWidget {
   const QuoteShareScreen({super.key, required this.data});
@@ -188,13 +206,14 @@ class _QuoteShareScreenState extends ConsumerState<QuoteShareScreen> {
       bottomNavigationBar: SingleBackButtonActionBar(
         onBackPressed: () => Navigator.of(context).pop(),
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-          child: Column(
-            children: [
-              Expanded(
-                child: Center(
+      body: AdaptivePageBody(
+        maxWidth: 488,
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+            child: Column(
+              children: [
+                Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 440),
                     child: RepaintBoundary(
@@ -203,46 +222,46 @@ class _QuoteShareScreenState extends ConsumerState<QuoteShareScreen> {
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              _PalettePicker(
-                palettes: _palettes,
-                selectedIndex: _paletteIndex,
-                onSelected: (i) => setState(() => _paletteIndex = i),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  key: _shareButtonKey,
-                  onPressed: _sharing ? null : _share,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: context.brandPurple,
-                    foregroundColor: context.onBrandPurple,
-                    padding: const EdgeInsets.symmetric(vertical: padding16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: _sharing
-                      ? SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: context.onBrandPurple,
-                          ),
-                        )
-                      : const Text(
-                          'Share',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                const SizedBox(height: 20),
+                _PalettePicker(
+                  palettes: _palettes,
+                  selectedIndex: _paletteIndex,
+                  onSelected: (i) => setState(() => _paletteIndex = i),
                 ),
-              ),
-            ],
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    key: _shareButtonKey,
+                    onPressed: _sharing ? null : _share,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: context.brandAccent,
+                      foregroundColor: context.onBrandAccent,
+                      padding: const EdgeInsets.symmetric(vertical: padding16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _sharing
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: context.onBrandAccent,
+                              semanticsLabel: AppLocalizations.of(
+                                context,
+                              )!.loading,
+                            ),
+                          )
+                        : Text(
+                            AppLocalizations.of(context)!.share,
+                            style: context.text.inherited.subtitle,
+                          ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -265,12 +284,12 @@ class _PalettePicker extends StatelessWidget {
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     return SizedBox(
-      height: 44,
+      height: 48,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
         itemCount: palettes.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 14),
+        // 6 plus each swatch's 4pt hit-box margin keeps the old 14pt gap.
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
         itemBuilder: (context, i) {
           final palette = palettes[i];
           final isSelected = i == selectedIndex;
@@ -304,36 +323,42 @@ class _PaletteSwatch extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: '${palette.name} background',
+      label: AppLocalizations.of(context)!.quoteBackgroundOption(
+        _paletteDisplayName(AppLocalizations.of(context)!, palette),
+      ),
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: palette.gradient,
-              stops: _Palette.stops,
+        // A 48pt target around the 40pt swatch.
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: palette.gradient,
+                stops: _Palette.stops,
+              ),
+              border: Border.all(
+                color: selected ? ringColor : ringColor.withValues(alpha: 0.15),
+                width: selected ? 2.5 : 1,
+              ),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: ringColor.withValues(alpha: 0.25),
+                        blurRadius: 8,
+                        spreadRadius: 0,
+                      ),
+                    ]
+                  : null,
             ),
-            border: Border.all(
-              color: selected ? ringColor : ringColor.withValues(alpha: 0.15),
-              width: selected ? 2.5 : 1,
-            ),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: ringColor.withValues(alpha: 0.25),
-                      blurRadius: 8,
-                      spreadRadius: 0,
-                    ),
-                  ]
-                : null,
           ),
         ),
       ),
@@ -350,74 +375,81 @@ class _ShareCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final seed = data.id.hashCode;
-    return AspectRatio(
-      aspectRatio: 1.0,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: palette.gradient,
-              stops: _Palette.stops,
+    // The card is exported as a fixed-size image, so it ignores the text
+    // size setting; long quotes shrink to fit instead of overflowing.
+    return MediaQuery.withNoTextScaling(
+      child: AspectRatio(
+        aspectRatio: 1.0,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: palette.gradient,
+                stops: _Palette.stops,
+              ),
             ),
-          ),
-          child: CustomPaint(
-            painter: _FlowLinesPainter(seed: seed, color: palette.lineColor),
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Row(
-                    children: [
-                      SvgPicture.asset(
-                        AssetConstants.icLogo,
-                        height: 36,
-                        colorFilter: ColorFilter.mode(
-                          palette.foreground,
-                          BlendMode.srcIn,
+            child: CustomPaint(
+              painter: _FlowLinesPainter(seed: seed, color: palette.lineColor),
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        SvgPicture.asset(
+                          AssetConstants.icLogo,
+                          height: 36,
+                          colorFilter: ColorFilter.mode(
+                            palette.foreground,
+                            BlendMode.srcIn,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'medito.app',
+                          style: context.text.bodySmall.copyWith(
+                            color: palette.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) => FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: SizedBox(
+                            width: constraints.maxWidth,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  data.quote,
+                                  textAlign: TextAlign.center,
+                                  style: context.text.title.copyWith(
+                                    color: palette.foreground,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                Text(
+                                  '— ${data.author}',
+                                  textAlign: TextAlign.center,
+                                  style: context.text.bodySmall.copyWith(
+                                    color: palette.secondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'medito.app',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: palette.secondary,
-                          letterSpacing: 0.5,
-                          fontFamily: dmSans,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  Text(
-                    data.quote,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 20,
-                      height: 1.55,
-                      color: palette.foreground,
-                      fontWeight: FontWeight.w300,
-                      fontStyle: FontStyle.italic,
-                      fontFamily: sourceSerif,
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    '— ${data.author}',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: palette.secondary,
-                      fontWeight: FontWeight.w400,
-                      fontFamily: dmSans,
-                    ),
-                  ),
-                  const Spacer(),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

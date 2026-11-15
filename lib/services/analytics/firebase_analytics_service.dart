@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:medito/providers/donation/announcement_donation_experiment.dart';
+import 'package:medito/providers/donation/supporter_appeal_experiment.dart';
 
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
@@ -10,6 +12,7 @@ import 'package:medito/services/app_tracking_transparency_service.dart';
 import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:medito/constants/strings/shared_preference_constants.dart';
 import 'package:medito/services/analytics/meta_sdk_service.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 // Lightweight stand-in so unit tests don't depend on firebase_core.
 class _NoopAnalytics {
@@ -140,6 +143,12 @@ class FirebaseAnalyticsService {
       // Initialize the analytics instance now that Firebase should be ready
       if (_runningInTest || isMockMode) {
         _analytics = _NoopAnalytics() as dynamic; // cast to satisfy type
+      } else if (isDevFlavor) {
+        // Dev builds must never post to prod analytics. Disabling collection
+        // persists natively, so automatic events (first_open, session_start)
+        // stop on later launches too.
+        await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(false);
+        _analytics = _NoopAnalytics() as dynamic;
       } else {
         _analytics = FirebaseAnalytics.instance;
       }
@@ -430,6 +439,12 @@ class FirebaseAnalyticsService {
     required String name,
     Map<String, Object>? parameters,
   }) async {
+    // GA4 reserves `items` for a list of item maps; on Android any other
+    // value makes Play services drop the whole event (iOS accepts it).
+    assert(
+      parameters?['items'] == null || parameters!['items'] is List,
+      '"items" must be a list of item maps; use another key for a count',
+    );
     if (_runningInTest) return;
     if (!_initialized) await initialize();
 
@@ -442,7 +457,21 @@ class FirebaseAnalyticsService {
           true;
 
       if (analyticsEnabled && _analytics != null) {
-        await _analytics.logEvent(name: name, parameters: parameters);
+        final isDonation = {
+          AnalyticsEventConstants.donationMonthly,
+          AnalyticsEventConstants.donationYearly,
+          AnalyticsEventConstants.donationOnetime,
+        }.contains(name);
+        await _analytics.logEvent(
+          name: name,
+          parameters: {
+            if (isDonation) ...{
+              ...SupporterAppealExperiment(prefs).paymentMetadata(),
+              ...AnnouncementDonationExperiment.paymentMetadata(prefs),
+            },
+            ...?parameters,
+          },
+        );
       } else if (kDebugMode && !analyticsEnabled) {
         AppLogger.d(
           'FIREBASE_ANALYTICS',
@@ -518,6 +547,12 @@ class FirebaseAnalyticsService {
 
   /// Set a user property for Firebase Analytics
   Future<void> setUserProperty({required String name, String? value}) async {
+    // Firebase rejects longer names at runtime (logged, not thrown), so the
+    // property would silently never be set.
+    assert(
+      name.length <= 24,
+      'Firebase user property names are limited to 24 characters: $name',
+    );
     if (_runningInTest) return;
     if (!_initialized) await initialize();
 
@@ -686,6 +721,65 @@ class FirebaseAnalyticsService {
       AppLogger.e(
         'FIREBASE_ANALYTICS',
         'Failed to re-apply stored experience level',
+        e,
+        stackTrace,
+      );
+    }
+  }
+
+  /// Re-asserts `zen_mode` from prefs on launch, so users who enabled Zen Mode
+  /// before the property existed (or before granting consent) are counted.
+  static Future<void> applyStoredZenMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    await setZenModeProperty(
+      prefs.getBool(SharedPreferenceConstants.zenModeEnabled) ?? false,
+    );
+  }
+
+  /// Sets `reminders_on` from the reminder pref and the OS notification
+  /// permission, which the user can revoke in system settings at any time.
+  static Future<void> applyRemindersOnProperty() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Same fallback as ReminderEnabledNotifier: users from before the
+      // explicit flag only have a saved time.
+      final enabled =
+          prefs.getBool(SharedPreferenceConstants.dailyReminderEnabled) ??
+          (prefs.getInt(SharedPreferenceConstants.savedHours) != null &&
+              prefs.getInt(SharedPreferenceConstants.savedMinutes) != null);
+      final granted = enabled && await Permission.notification.isGranted;
+      final analyticsService = FirebaseAnalyticsService();
+      await analyticsService.initialize();
+      await analyticsService.setUserProperty(
+        name: AnalyticsEventConstants.userPropRemindersOn,
+        value: !enabled
+            ? 'off'
+            : granted
+            ? 'on'
+            : 'blocked',
+      );
+    } catch (e, stackTrace) {
+      AppLogger.e(
+        'FIREBASE_ANALYTICS',
+        'Failed to set reminders_on user property',
+        e,
+        stackTrace,
+      );
+    }
+  }
+
+  static Future<void> setZenModeProperty(bool enabled) async {
+    try {
+      final analyticsService = FirebaseAnalyticsService();
+      await analyticsService.initialize();
+      await analyticsService.setUserProperty(
+        name: AnalyticsEventConstants.userPropZenMode,
+        value: enabled ? 'on' : 'off',
+      );
+    } catch (e, stackTrace) {
+      AppLogger.e(
+        'FIREBASE_ANALYTICS',
+        'Failed to set zen mode user property',
         e,
         stackTrace,
       );

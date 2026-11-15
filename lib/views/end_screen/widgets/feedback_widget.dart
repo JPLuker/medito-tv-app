@@ -1,96 +1,111 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/constants/constants.dart';
 import 'package:medito/services/analytics/firebase_analytics_service.dart';
 import 'package:medito/l10n/app_localizations.dart';
 
-class FeedbackWidget extends StatefulWidget {
+class FeedbackWidget extends ConsumerStatefulWidget {
   const FeedbackWidget({super.key});
 
   @override
-  State<FeedbackWidget> createState() => FeedbackWidgetState();
+  ConsumerState<FeedbackWidget> createState() => FeedbackWidgetState();
 }
 
-class FeedbackWidgetState extends State<FeedbackWidget> {
+class FeedbackWidgetState extends ConsumerState<FeedbackWidget> {
   bool _showThankYouMessage = false;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          spacing: 16,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              AppLocalizations.of(context)!.howDoYouFeel,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontFamily: teachers,
-                fontSize: 22,
-                fontWeight: FontWeight.normal,
-              ),
-            ),
-            _showThankYouMessage
-                ? _buildThanksMessage()
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    spacing: 16,
-                    children: [
-                      Semantics(
-                        button: true,
-                        label: AppLocalizations.of(
-                          context,
-                        )!.thanksForSharingSad,
-                        child: _buildEmotionButton(
-                          context,
-                          '☹️',
-                          AppLocalizations.of(context)!.thanksForSharing,
-                          _handleNegativeFeedback,
-                        ),
-                      ),
-                      Semantics(
-                        button: true,
-                        label: AppLocalizations.of(
-                          context,
-                        )!.thanksForSharingNeutral,
-                        child: _buildEmotionButton(
-                          context,
-                          '😐',
-                          AppLocalizations.of(context)!.thanksForSharing,
-                          _handleNeutralFeedback,
-                        ),
-                      ),
-                      Semantics(
-                        button: true,
-                        label: AppLocalizations.of(
-                          context,
-                        )!.thanksForSharingHappy,
-                        child: _buildEmotionButton(
-                          context,
-                          '😊',
-                          AppLocalizations.of(context)!.thanksForSharing,
-                          _handlePositiveFeedback,
-                        ),
-                      ),
-                    ],
-                  ),
-          ],
+      child: AnimatedSize(
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: _buildFeedback(),
         ),
       ),
     );
   }
 
+  Widget _buildFeedback() {
+    return Column(
+      spacing: 16,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Semantics(
+          container: true,
+          header: true,
+          child: Text(
+            AppLocalizations.of(context)!.howDoYouFeel,
+            textAlign: TextAlign.center,
+            style: context.text.headline,
+          ),
+        ),
+        _showThankYouMessage
+            ? _buildThanksMessage()
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                spacing: 16,
+                children: [
+                  Semantics(
+                    button: true,
+                    label: AppLocalizations.of(context)!.thanksForSharingSad,
+                    child: _buildEmotionButton(
+                      context,
+                      '☹️',
+                      AppLocalizations.of(context)!.thanksForSharing,
+                      _handleNegativeFeedback,
+                    ),
+                  ),
+                  Semantics(
+                    button: true,
+                    label: AppLocalizations.of(
+                      context,
+                    )!.thanksForSharingNeutral,
+                    child: _buildEmotionButton(
+                      context,
+                      '😐',
+                      AppLocalizations.of(context)!.thanksForSharing,
+                      _handleNeutralFeedback,
+                    ),
+                  ),
+                  Semantics(
+                    button: true,
+                    label: AppLocalizations.of(context)!.thanksForSharingHappy,
+                    child: _buildEmotionButton(
+                      context,
+                      '😊',
+                      AppLocalizations.of(context)!.thanksForSharing,
+                      _handlePositiveFeedback,
+                    ),
+                  ),
+                ],
+              ),
+      ],
+    );
+  }
+
   Widget _buildThanksMessage() {
+    final l10n = AppLocalizations.of(context)!;
+    // Replaces the button that was just tapped, so it's announced; spoken
+    // without the emoji ("Thanks for sharing, purple heart").
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Text(
-        AppLocalizations.of(context)!.thanksForSharing,
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-          fontSize: 18,
-          fontWeight: FontWeight.w500,
+      child: Semantics(
+        container: true,
+        liveRegion: true,
+        child: Text(
+          l10n.thanksForSharing,
+          semanticsLabel: l10n.thanksForSharingSpoken,
+          textAlign: TextAlign.center,
+          style: context.text.title,
         ),
       ),
     );
@@ -101,9 +116,11 @@ class FeedbackWidgetState extends State<FeedbackWidget> {
       _showThankYouMessage = true;
     });
 
-    await FirebaseAnalyticsService().logEvent(
-      name: FirebaseAnalyticsService.eventPostMeditationFeedback,
-      parameters: {'type': 'thumbs_up'},
+    unawaited(
+      FirebaseAnalyticsService().logEvent(
+        name: FirebaseAnalyticsService.eventPostMeditationFeedback,
+        parameters: {'type': 'thumbs_up'},
+      ),
     );
   }
 
@@ -151,7 +168,11 @@ class FeedbackWidgetState extends State<FeedbackWidget> {
               ? ColorConstants.ebony
               : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
         ),
-        child: Text(emoji, style: const TextStyle(fontSize: 32)),
+        // The Semantics label around this button names the feeling; the
+        // emoji itself would be read again after it.
+        child: ExcludeSemantics(
+          child: Text(emoji, style: const TextStyle(fontSize: 32)),
+        ),
       ),
     );
   }

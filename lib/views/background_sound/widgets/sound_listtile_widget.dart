@@ -1,3 +1,5 @@
+import 'package:medito/constants/strings/analytics_event_constants.dart';
+import 'package:medito/services/analytics/firebase_analytics_service.dart';
 import 'package:medito/constants/constants.dart';
 import 'package:medito/constants/icons/medito_icons.dart';
 import 'package:medito/l10n/app_localizations.dart';
@@ -5,12 +7,21 @@ import 'package:medito/models/models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/widgets/medito_icon.dart';
+import 'package:medito/widgets/radio_option_card.dart';
 
 import '../../../providers/background_sounds/background_sounds_notifier.dart';
 
 class SoundListTileWidget extends ConsumerWidget {
-  const SoundListTileWidget({super.key, required this.sound});
+  const SoundListTileWidget({
+    super.key,
+    required this.sound,
+    this.available = true,
+  });
   final BackgroundSoundsModel sound;
+
+  /// False offline for a sound that isn't downloaded: shown greyed out and
+  /// not selectable, since it can't be fetched.
+  final bool available;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -21,48 +32,101 @@ class SoundListTileWidget extends ConsumerWidget {
     var isSelected = selectedSoundId == sound.id;
     var hasFailed = bgSoundState.failedBgSound?.id == sound.id;
 
-    return InkWell(
-      onTap: () => _handleItemTap(ref, context, hasFailed: hasFailed),
-      focusColor: Theme.of(
-        context,
-      ).colorScheme.primary.withValues(alpha: 0.16),
-      child: Container(
-        decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(width: 0.9, color: ColorConstants.softGrey),
-          ),
-        ),
-        constraints: const BoxConstraints(minHeight: 88),
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
-        child: Row(
-          children: [
-            _radioButton(isSelected, context),
-            width16,
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    // The repository builds the "None" row with a hardcoded
-                    // English title, to be localised here.
-                    sound.id == kNoneBackgroundSoundId
-                        ? AppLocalizations.of(context)!.none
-                        : sound.title,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontFamily: dmSans,
-                      fontSize: 16,
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+
+    // Styled like the settings sheets (same radio dot, type and 16pt margins)
+    // but as plain rows rather than bordered cards: the list is long and
+    // cards would push most of it below the fold.
+    // A radio group to screen readers, like [RadioOptionCard]: the dot alone
+    // never said which sound was chosen.
+    return Semantics(
+      inMutuallyExclusiveGroup: true,
+      checked: isSelected,
+      enabled: available,
+      child: Opacity(
+        opacity: available ? 1 : 0.4,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: InkWell(
+            onTap: available
+                ? () => _handleItemTap(ref, context, hasFailed: hasFailed)
+                : null,
+            borderRadius: BorderRadius.circular(12),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 56),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 12,
+                ),
+                child: Row(
+                  children: [
+                    // Match CheckboxListTile's leading column in the bell rows.
+                    SizedBox(
+                      width: 40,
+                      child: Center(
+                        child: RadioDot(
+                          selected: isSelected,
+                          accent: context.brandAccent,
+                        ),
+                      ),
                     ),
-                  ),
-                  if (hasFailed) _failureMessage(context),
-                ],
+                    const SizedBox(width: padding12),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            // The repository builds the "None" row with a
+                            // hardcoded English title, to be localised here.
+                            sound.id == kNoneBackgroundSoundId
+                                ? AppLocalizations.of(context)!.none
+                                : sound.id == kSessionBellsId
+                                ? AppLocalizations.of(context)!.sessionBells
+                                : sound.title,
+                            style: context.text.subtitle.copyWith(
+                              color: onSurface,
+                            ),
+                          ),
+                          if (sound.id == kSessionBellsId) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              AppLocalizations.of(
+                                context,
+                              )!.sessionBellsDescription,
+                              style: context.text.bodySmall.copyWith(
+                                color: onSurface.withValues(alpha: 0.7),
+                              ),
+                            ),
+                          ],
+                          if (!available)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                AppLocalizations.of(
+                                  context,
+                                )!.soundNeedsConnection,
+                                style: context.text.caption.copyWith(
+                                  color: onSurface.withValues(alpha: 0.7),
+                                ),
+                              ),
+                            )
+                          else if (hasFailed)
+                            _failureMessage(context),
+                        ],
+                      ),
+                    ),
+                    if (isDownloading)
+                      _loadingSpinner(context)
+                    else if (hasFailed)
+                      _retryIcon(context),
+                  ],
+                ),
               ),
             ),
-            if (isDownloading)
-              _loadingSpinner(context)
-            else if (hasFailed)
-              _retryIcon(context),
-          ],
+          ),
         ),
       ),
     );
@@ -72,13 +136,16 @@ class SoundListTileWidget extends ConsumerWidget {
   /// — previously a failure was completely silent, leaving the row looking
   /// selected with nothing playing and no way to recover.
   Widget _failureMessage(BuildContext context) {
+    // Announced when it appears: the tap that failed gave no other feedback.
     return Padding(
       padding: const EdgeInsets.only(top: 2.0),
-      child: Text(
-        AppLocalizations.of(context)!.backgroundSoundDownloadFailed,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          fontFamily: dmSans,
-          color: Theme.of(context).colorScheme.error,
+      child: Semantics(
+        liveRegion: true,
+        child: Text(
+          AppLocalizations.of(context)!.backgroundSoundDownloadFailed,
+          style: context.text.caption.copyWith(
+            color: Theme.of(context).colorScheme.error,
+          ),
         ),
       ),
     );
@@ -104,28 +171,10 @@ class SoundListTileWidget extends ConsumerWidget {
         height: 16,
         width: 16,
         child: CircularProgressIndicator(
+          semanticsLabel: AppLocalizations.of(context)!.downloadingAudio,
           strokeWidth: 2,
-          color: Theme.of(context).colorScheme.onInverseSurface,
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
         ),
-      ),
-    );
-  }
-
-  Container _radioButton(bool isSelected, BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(
-          width: 2,
-          color: Theme.of(context).colorScheme.onSurface,
-        ),
-      ),
-      padding: const EdgeInsets.all(4),
-      child: CircleAvatar(
-        radius: 6,
-        backgroundColor: isSelected
-            ? Theme.of(context).colorScheme.onSurface
-            : ColorConstants.transparent,
       ),
     );
   }
@@ -135,6 +184,12 @@ class SoundListTileWidget extends ConsumerWidget {
     BuildContext context, {
     required bool hasFailed,
   }) {
+    FirebaseAnalyticsService().logEvent(
+      name: hasFailed
+          ? AnalyticsEventConstants.backgroundSoundRetryTapped
+          : AnalyticsEventConstants.backgroundSoundSelected,
+      parameters: {'sound_id': sound.id, 'sound_title': sound.title},
+    );
     final notifier = ref.read(backgroundSoundsNotifierProvider.notifier);
 
     // Retrying discards whatever is cached for the sound; a plain re-select

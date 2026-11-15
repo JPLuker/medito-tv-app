@@ -8,6 +8,7 @@ import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:medito/constants/http/http_constants.dart';
 import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:medito/constants/strings/shared_preference_constants.dart';
+import 'package:medito/utils/currency.dart';
 import 'package:medito/utils/logger.dart';
 import 'package:medito/services/device_capabilities_service.dart';
 
@@ -39,6 +40,12 @@ class MetaSdkService {
     }
 
     AppLogger.d('META', 'Init Facebook App Events (appId=$facebookAppId)');
+
+    if (isDevFlavor) {
+      AppLogger.d('META', 'Dev flavor, skipping SDK init');
+      _initialised = true;
+      return;
+    }
 
     if (facebookAppId.isEmpty) {
       AppLogger.w('META', 'Facebook App ID is empty, skipping SDK init');
@@ -73,7 +80,10 @@ class MetaSdkService {
     if (!_initialised) await init();
     if (_disabledForTv) return;
 
-    if (enabled && _events == null && facebookAppId.isNotEmpty) {
+    if (enabled &&
+        _events == null &&
+        facebookAppId.isNotEmpty &&
+        !isDevFlavor) {
       _events = FacebookAppEvents();
       _initialised = true;
       AppLogger.d('META', 'Meta SDK enabled at runtime');
@@ -132,11 +142,7 @@ class MetaSdkService {
     if (_disabledForTv) return;
     try {
       // Check if Meta Analytics is enabled by user preference
-      final prefs = await SharedPreferences.getInstance();
-      final isEnabled =
-          prefs.getBool(SharedPreferenceConstants.analyticsMetaEnabled) ?? true;
-
-      if (!isEnabled) {
+      if (!await _isEnabled()) {
         if (kDebugMode) {
           AppLogger.d(
             'META',
@@ -229,5 +235,44 @@ class MetaSdkService {
     }
 
     await logEvent(freqEvent, props);
+
+    // The custom events above carry cents in a custom param, which Meta can't
+    // use. Its standard Purchase event is the only donation signal it can
+    // optimise campaigns on and report return on ad spend for.
+    await _logPurchase(
+      amount: currencyAmountToUnits(revenueCents, currency),
+      currency: currency.toUpperCase(),
+      parameters: {
+        'fb_content_type': frequency,
+        AnalyticsEventConstants.paramVariantId: variantId ?? 'unknown',
+        ...utmParams,
+      },
+    );
+  }
+
+  Future<void> _logPurchase({
+    required double amount,
+    required String currency,
+    required Map<String, Object?> parameters,
+  }) async {
+    try {
+      if (!await _isEnabled()) return;
+      await _events?.logPurchase(
+        amount: amount,
+        currency: currency,
+        parameters: parameters,
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        AppLogger.w('META', 'Failed to log FB purchase: $e');
+      }
+    }
+  }
+
+  Future<bool> _isEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    return prefs.getBool(SharedPreferenceConstants.analyticsMetaEnabled) ??
+        true;
   }
 }

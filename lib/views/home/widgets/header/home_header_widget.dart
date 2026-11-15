@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:medito/constants/constants.dart';
+import 'package:medito/constants/theme/medito_text.dart';
 
 class HomeHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
   const HomeHeaderWidget({super.key, required this.greeting, this.color});
@@ -14,7 +14,7 @@ class HomeHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return Text(
       greeting,
-      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+      style: context.text.display.copyWith(
         color: color ?? Theme.of(context).colorScheme.onSurface,
         shadows: color == null
             ? null
@@ -25,10 +25,6 @@ class HomeHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
                   offset: const Offset(0, 2),
                 ),
               ],
-        height: 0,
-        fontSize: 28,
-        fontWeight: FontWeight.w700,
-        fontFamily: sourceSerif,
       ),
     );
   }

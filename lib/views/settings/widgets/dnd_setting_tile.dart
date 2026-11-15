@@ -6,8 +6,10 @@ import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/providers/providers.dart';
 import 'package:medito/views/home/widgets/bottom_sheet/row_item_widget.dart';
+import 'package:medito/views/settings/widgets/announce_setting.dart';
 import 'package:medito/widgets/dialogs/dialogs.dart';
 import 'package:medito/widgets/radio_option_card.dart';
+import 'package:medito/constants/theme/medito_text.dart';
 
 /// Settings row for "Silence phone during meditation": shows On / Off and
 /// opens [DndSheet] on tap. Same shape as the Zen Mode row.
@@ -87,7 +89,14 @@ class _DndSheetState extends ConsumerState<DndSheet> {
       );
     }
     await notifier.setEnabled(value);
-    if (mounted) Navigator.of(context).pop();
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    announceSettingChoice(
+      context,
+      widget.title,
+      value ? l10n.dndOn : l10n.dndOff,
+    );
+    Navigator.of(context).pop();
   }
 
   /// Explain the permission, offer the system page, and report whether access
@@ -167,11 +176,11 @@ class _DndSheetState extends ConsumerState<DndSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              widget.title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: onSurface,
-                fontWeight: FontWeight.w600,
+            Semantics(
+              header: true,
+              child: Text(
+                widget.title,
+                style: context.text.label.copyWith(color: onSurface),
               ),
             ),
             const SizedBox(height: 16),
@@ -191,8 +200,7 @@ class _DndSheetState extends ConsumerState<DndSheet> {
             const SizedBox(height: 12),
             Text(
               l10n.dndFootnote,
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w400,
+              style: context.text.caption.copyWith(
                 color: onSurface.withValues(alpha: 0.6),
               ),
             ),

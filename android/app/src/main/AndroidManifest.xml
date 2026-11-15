@@ -20,6 +20,10 @@
     <uses-permission android:name="android.permission.health.WRITE_MINDFULNESS" />
 
     <queries>
+        <!-- Watch companion apps, for WatchPresence.kt. -->
+        <package android:name="com.google.android.wearable.app" />
+        <package android:name="com.google.android.apps.wear.companion" />
+        <package android:name="com.samsung.android.app.watchmanager" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
@@ -50,7 +54,7 @@
         android:label="@string/app_name_override"
         android:name="${applicationName}"
         android:enableOnBackInvokedCallback="true"
-        android:icon="@mipmap/ic_launcher_dusk"
+        android:icon="@mipmap/ic_launcher_classic"
         android:usesCleartextTraffic="true">
 
         <meta-data
@@ -92,6 +96,10 @@
             android:launchMode="singleTop"
             android:theme="@style/LaunchTheme"
             android:windowSoftInputMode="adjustResize">
+
+            <meta-data
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme" />
 
             <!-- Flutter versions without activity-alias support need a launcher intent here. -->
             <intent-filter>
@@ -162,7 +170,7 @@
             android:exported="true"
             android:icon="@mipmap/ic_launcher_dusk"
             android:label="@string/app_name_override"
-            android:enabled="true">
+            android:enabled="false">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -188,7 +196,7 @@
             android:exported="true"
             android:icon="@mipmap/ic_launcher_classic"
             android:label="@string/app_name_override"
-            android:enabled="false">
+            android:enabled="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -341,7 +349,8 @@
 
         <receiver
             android:name=".widget.MeditationWidgetReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/widget_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="es.antonborri.home_widget.UPDATE_WIDGET" />
@@ -353,7 +362,8 @@
 
         <receiver
             android:name=".widget.ConsistencyWidgetReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/consistency_widget_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="es.antonborri.home_widget.UPDATE_WIDGET" />
@@ -365,7 +375,8 @@
 
         <receiver
             android:name=".widget.UpNextWidgetReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/up_next_widget_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="es.antonborri.home_widget.UPDATE_WIDGET" />

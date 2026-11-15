@@ -8,8 +8,8 @@ import 'package:medito/utils/utils.dart';
 /// 16px rounded corners, 24px padding, capped at 400px wide.
 ///
 /// Use [title] / [content] / [actions] for the common AlertDialog-like layout,
-/// or pass [child] for a fully custom body. A custom [child] is wrapped in a
-/// scroll view, so it must not contain vertically flexed widgets (Expanded/
+/// or pass [child] for a fully custom body. All contents are wrapped in a
+/// scroll view, so they must not contain vertically flexed widgets (Expanded/
 /// Flexible in a Column) and scrolls instead of overflowing when the keyboard
 /// shrinks the available height — overflowing buttons paint outside the
 /// dialog's bounds where taps land on the dismiss barrier.
@@ -38,7 +38,7 @@ class MeditoDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
+    final dialog = Dialog(
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
@@ -49,10 +49,15 @@ class MeditoDialog extends StatelessWidget {
           maxHeight: maxHeight ?? double.infinity,
         ),
         padding: padding,
-        child: child != null
-            ? SingleChildScrollView(child: child)
-            : _buildStructured(context),
+        child: SingleChildScrollView(child: child ?? _buildStructured(context)),
       ),
+    );
+    // Like AlertDialog: a route scope, named by MeditoDialogTitle, so screen
+    // readers announce the title when the dialog opens.
+    return Semantics(
+      scopesRoute: true,
+      explicitChildNodes: true,
+      child: dialog,
     );
   }
 
@@ -65,10 +70,7 @@ class MeditoDialog extends StatelessWidget {
           MeditoDialogTitle(title!),
           const SizedBox(height: 12),
         ],
-        if (content != null) ...[
-          Flexible(child: content!),
-          const SizedBox(height: 24),
-        ],
+        if (content != null) ...[content!, const SizedBox(height: 24)],
         if (actions != null && actions!.isNotEmpty)
           _MeditoDialogActions(actions: actions!),
       ],
@@ -99,14 +101,18 @@ class _MeditoDialogActions extends StatelessWidget {
       );
     }
 
-    return Row(
-      mainAxisSize: MainAxisSize.max,
-      children: [
-        for (var i = 0; i < actions.length; i++) ...[
-          if (i > 0) const SizedBox(width: 12),
-          Expanded(child: actions[i]),
+    // Buttons grow with large text; keep side-by-side ones the same height.
+    return IntrinsicHeight(
+      child: Row(
+        mainAxisSize: MainAxisSize.max,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < actions.length; i++) ...[
+            if (i > 0) const SizedBox(width: 12),
+            Expanded(child: actions[i]),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
@@ -119,12 +125,15 @@ class MeditoDialogTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-        fontFamily: dmSans,
-        fontWeight: FontWeight.w600,
-        color: Theme.of(context).colorScheme.onSurface,
+    return Semantics(
+      container: true,
+      header: true,
+      namesRoute: true,
+      child: Text(
+        text,
+        style: context.text.headline.copyWith(
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
       ),
     );
   }
@@ -132,19 +141,21 @@ class MeditoDialogTitle extends StatelessWidget {
 
 /// Standard dialog body text.
 class MeditoDialogBody extends StatelessWidget {
-  final String text;
+  final String? text;
+  final InlineSpan? textSpan;
 
-  const MeditoDialogBody(this.text, {super.key});
+  const MeditoDialogBody(String this.text, {super.key}) : textSpan = null;
+
+  const MeditoDialogBody.rich(InlineSpan this.textSpan, {super.key})
+    : text = null;
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-        fontFamily: dmSans,
-        height: 1.5,
-        color: Theme.of(context).colorScheme.onSurface.withOpacityValue(0.75),
-      ),
+    final style = context.text.bodySmall.copyWith(
+      color: Theme.of(context).colorScheme.onSurface.withOpacityValue(0.75),
     );
+    return textSpan == null
+        ? Text(text!, style: style)
+        : Text.rich(textSpan!, style: style);
   }
 }

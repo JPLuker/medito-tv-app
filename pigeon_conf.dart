@@ -90,6 +90,9 @@ abstract class MeditoAudioServiceApi {
 
   void stopBackgroundSound();
 
+  /// Scheduled bells, independent of the ambient background sound.
+  void setSessionBells(bool enabled, String pattern);
+
   void playBackgroundSound();
 
   void pauseBackgroundSound();
@@ -180,6 +183,9 @@ abstract class MeditoAudioServiceCallbackApi {
   void updatePlaybackState(PlaybackState state);
   @async
   bool handleCompletedTrack(CompletionData completionData);
+  // A repeated play-through (repeat once / forever): adds listening time only.
+  @async
+  bool handleRepeatPlaythrough(CompletionData completionData);
   void reportPlayerError(
     String errorCode,
     String message,

@@ -10,6 +10,7 @@ import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/app_globals.dart' show appReadyCompleter;
 import 'package:medito/providers/providers.dart';
 import 'package:medito/routes/routes.dart';
+import 'package:medito/utils/launch_source_tracker.dart';
 import 'package:medito/utils/logger.dart';
 import 'package:medito/widgets/snackbar_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -102,6 +103,7 @@ class DeepLinkService {
     }
     _lastHandledUri = uri;
     _lastHandledAt = now;
+    LaunchSourceTracker.instance.markDeepLink();
 
     try {
       // Detect home-screen widget taps via the `source` query param so we can
@@ -177,6 +179,10 @@ class DeepLinkService {
         AnalyticsEventConstants.paramWidgetType: widgetType,
         'platform': Platform.isIOS ? 'ios' : 'android',
       };
+      final placement = uri.queryParameters['placement'];
+      if (placement != null) {
+        params[AnalyticsEventConstants.paramWidgetPlacement] = placement;
+      }
 
       // Include the track id when present so we can correlate widget taps
       // with content (Up Next widget only). Normalise across the two URI

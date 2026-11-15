@@ -1,4 +1,6 @@
+import 'package:medito/models/background_sounds/session_bell_pattern.dart';
 import 'package:flutter/material.dart';
+import 'package:medito/views/background_sound/background_sound_view.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:medito/l10n/app_localizations.dart';
@@ -28,6 +30,8 @@ class _FakeNotifier extends BackgroundSoundsNotifier {
   final BackgroundSoundsState _initialState;
   final retried = <String>[];
   final changed = <String?>[];
+  final bells = <bool>[];
+  final patterns = <SessionBellPattern>[];
 
   @override
   BackgroundSoundsState build() => _initialState;
@@ -36,8 +40,32 @@ class _FakeNotifier extends BackgroundSoundsNotifier {
   void retryDownload(BackgroundSoundsModel sound) => retried.add(sound.id);
 
   @override
-  void handleOnChangeSound(BackgroundSoundsModel? sound) =>
-      changed.add(sound?.id);
+  void handleOnChangeSound(
+    BackgroundSoundsModel? sound, {
+    bool preview = true,
+  }) => changed.add(sound?.id);
+
+  @override
+  void setSessionBellCue(SessionBellCue cue, bool selected) {
+    final pattern = state.selectedBellPattern.withCue(cue, selected);
+    patterns.add(pattern);
+    state = state.copyWith(
+      bellPattern: pattern,
+      bellsEnabled: pattern != SessionBellPattern.none,
+    );
+  }
+
+  @override
+  void setSessionBellPattern(SessionBellPattern pattern) {
+    patterns.add(pattern);
+    state = state.copyWith(bellPattern: pattern);
+  }
+
+  @override
+  void setSessionBells(bool enabled, {bool preview = true}) {
+    bells.add(enabled);
+    state = state.copyWith(bellsEnabled: enabled);
+  }
 }
 
 void main() {
@@ -133,5 +161,161 @@ void main() {
 
     expect(find.text('Ninguno'), findsOneWidget);
     expect(find.text('None'), findsNothing);
+  });
+
+  testWidgets('session bells explain the three cues and select normally', (
+    tester,
+  ) async {
+    final notifier = await pump(
+      tester,
+      const BackgroundSoundsState(),
+      sound: kSessionBellsSound,
+    );
+    expect(find.text('Session bells'), findsOneWidget);
+    expect(
+      find.text('A bell at the beginning, middle and end'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byType(InkWell));
+    expect(notifier.changed, [kSessionBellsId]);
+  });
+
+  testWidgets('session bells are localised in Spanish', (tester) async {
+    await pump(
+      tester,
+      const BackgroundSoundsState(),
+      sound: kSessionBellsSound,
+      locale: const Locale('es'),
+    );
+    expect(find.text('Campanas de sesión'), findsOneWidget);
+  });
+
+  Future<_FakeNotifier> pumpSheet(
+    WidgetTester tester,
+    BackgroundSoundsState state,
+  ) async {
+    final notifier = _FakeNotifier(state);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          backgroundSoundsNotifierProvider.overrideWith(() => notifier),
+          backgroundSoundCatalogProvider.overrideWithValue(
+            const BackgroundSoundCatalog(
+              sounds: [],
+              downloadedIds: {},
+              offline: false,
+              loading: false,
+            ),
+          ),
+        ],
+        child: const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: BackgroundSoundView()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    return notifier;
+  }
+
+  testWidgets(
+    'three checkboxes show timer defaults without a switch or dropdown',
+    (tester) async {
+      await pumpSheet(
+        tester,
+        const BackgroundSoundsState(
+          bellsEnabled: true,
+          bellPattern: SessionBellPattern.beginningEnd,
+        ),
+      );
+      expect(find.byType(Checkbox), findsNWidgets(3));
+      expect(find.byType(Switch), findsNothing);
+      expect(
+        find.byType(DropdownButtonFormField<SessionBellPattern>),
+        findsNothing,
+      );
+      expect(
+        tester
+            .widget<CheckboxListTile>(
+              find.widgetWithText(CheckboxListTile, 'Beginning'),
+            )
+            .value,
+        isTrue,
+      );
+      expect(
+        tester
+            .widget<CheckboxListTile>(
+              find.widgetWithText(CheckboxListTile, 'Middle'),
+            )
+            .value,
+        isFalse,
+      );
+      expect(
+        tester
+            .widget<CheckboxListTile>(
+              find.widgetWithText(CheckboxListTile, 'End'),
+            )
+            .value,
+        isTrue,
+      );
+    },
+  );
+
+  testWidgets('checkboxes are independent and can all be cleared', (
+    tester,
+  ) async {
+    final notifier = await pumpSheet(
+      tester,
+      const BackgroundSoundsState(
+        bellsEnabled: true,
+        bellPattern: SessionBellPattern.beginningEnd,
+      ),
+    );
+    await tester.tap(find.text('Beginning'));
+    await tester.pump();
+    expect(notifier.patterns.last, SessionBellPattern.end);
+    await tester.tap(find.text('Middle'));
+    await tester.pump();
+    expect(notifier.patterns.last, SessionBellPattern.middleEnd);
+    await tester.tap(find.text('End'));
+    await tester.pump();
+    expect(notifier.patterns.last, SessionBellPattern.middle);
+    await tester.tap(find.text('Middle'));
+    await tester.pump();
+    expect(notifier.patterns.last, SessionBellPattern.none);
+    expect(
+      tester
+          .widgetList<Checkbox>(find.byType(Checkbox))
+          .every((box) => box.value == false),
+      isTrue,
+    );
+    expect(notifier.changed, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('enabling one cue starts with that cue when bells were off', (
+    tester,
+  ) async {
+    final notifier = await pumpSheet(tester, const BackgroundSoundsState());
+    await tester.tap(find.text('End'));
+    await tester.pump();
+    expect(notifier.patterns, [SessionBellPattern.end]);
+    expect(
+      tester
+          .widget<CheckboxListTile>(
+            find.widgetWithText(CheckboxListTile, 'Beginning'),
+          )
+          .value,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<CheckboxListTile>(
+            find.widgetWithText(CheckboxListTile, 'End'),
+          )
+          .value,
+      isTrue,
+    );
   });
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 /// Toggles "mock mode": a fully self-contained demo environment that runs
 /// the app against hardcoded fake data instead of the real backend. This
@@ -14,6 +15,12 @@ import 'package:flutter/foundation.dart';
 bool get isMockMode =>
     const String.fromEnvironment('MOCK_MODE', defaultValue: 'false') == 'true';
 
+/// True for builds made with `--flavor dev` (simulator/emulator and internal
+/// dev builds). These share the prod Firebase app ID and bundle ID, so any
+/// analytics they send lands in the prod GA4/Meta data; gate on this to keep
+/// them out.
+bool get isDevFlavor => appFlavor == 'dev';
+
 /// Enables small test-only shortcuts for end-to-end smoke runs without switching
 /// the app to full mock data.
 bool get isSmokeTestMode =>
@@ -26,7 +33,6 @@ class EnvConfig {
   final String authBaseUrl;
   final String apiKey;
   final String editStatsUrl;
-  final String deleteAccountBaseUrl;
   final String donationBaseUrl;
   final String donationToken;
   final String paywallFormUrl;
@@ -39,7 +45,6 @@ class EnvConfig {
     required this.authBaseUrl,
     required this.apiKey,
     required this.editStatsUrl,
-    required this.deleteAccountBaseUrl,
     required this.donationBaseUrl,
     required this.donationToken,
     required this.paywallFormUrl,
@@ -55,7 +60,6 @@ class ProdEnv extends EnvConfig {
     required super.authBaseUrl,
     required super.apiKey,
     required super.editStatsUrl,
-    required super.deleteAccountBaseUrl,
     required super.donationBaseUrl,
     required super.donationToken,
     required super.paywallFormUrl,
@@ -71,7 +75,6 @@ class StagingEnv extends EnvConfig {
     required super.authBaseUrl,
     required super.apiKey,
     required super.editStatsUrl,
-    required super.deleteAccountBaseUrl,
     required super.donationBaseUrl,
     required super.donationToken,
     required super.paywallFormUrl,
@@ -86,7 +89,6 @@ const _prodEnv = ProdEnv(
   contentBaseUrl: String.fromEnvironment('CONTENT_BASE_URL'),
   authBaseUrl: String.fromEnvironment('AUTH_URL'),
   editStatsUrl: String.fromEnvironment('EDIT_STATS_URL'),
-  deleteAccountBaseUrl: 'https://accounts.medito.app/delete',
   donationBaseUrl: String.fromEnvironment('DONATION_BASE_URL'),
   donationToken: String.fromEnvironment('DONATION_TOKEN'),
   // In-app paywall webview. Override at build time with --dart-define=PAYWALL_URL=...
@@ -106,7 +108,6 @@ const _stagingEnv = StagingEnv(
   contentBaseUrl: String.fromEnvironment('CONTENT_BASE_URL'),
   authBaseUrl: String.fromEnvironment('AUTH_URL'),
   editStatsUrl: String.fromEnvironment('EDIT_STATS_URL'),
-  deleteAccountBaseUrl: 'https://accounts.medito.dev/delete',
   donationBaseUrl: String.fromEnvironment('DONATION_BASE_URL'),
   donationToken: String.fromEnvironment('DONATION_TOKEN'),
   paywallFormUrl: String.fromEnvironment(
@@ -136,7 +137,6 @@ String get environment => _currentEnv.environment;
 String get contentBaseUrl => _currentEnv.contentBaseUrl;
 String get authBaseUrl => _currentEnv.authBaseUrl;
 String get editStatsUrl => _currentEnv.editStatsUrl;
-String get deleteAccountUrl => _currentEnv.deleteAccountBaseUrl;
 String get donationBaseUrl => _currentEnv.donationBaseUrl;
 String get donationToken => _currentEnv.donationToken;
 String get paywallFormUrl => _currentEnv.paywallFormUrl;
@@ -147,6 +147,7 @@ class HTTPConstants {
   //END POINTS
   static const String tokens = 'tokens';
   static const String packs = 'packs';
+  static const String packTracks = 'packs/tracks';
   static const String tracks = 'tracks';
   static const String favorites = 'favorites';
   static const String backgroundSounds = 'backgroundsounds';
@@ -155,6 +156,7 @@ class HTTPConstants {
   static const String allStats = 'stats';
   static const String me = 'me';
   static const String searchTracks = 'search/tracks';
+  static const String tags = 'tags';
 
   // AUTH END POINTS
   static const String authSignIn = 'signin';

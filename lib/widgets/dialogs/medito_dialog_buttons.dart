@@ -4,13 +4,8 @@ import 'package:medito/utils/utils.dart';
 
 const double _buttonHeight = 48;
 const double _buttonRadius = 12;
-const TextStyle _buttonTextStyle = TextStyle(
-  fontFamily: dmSans,
-  fontSize: 15,
-  fontWeight: FontWeight.w600,
-);
 
-/// Filled primary action used in a Medito dialog. Defaults to the brand purple
+/// Filled primary action used in a Medito dialog. Defaults to the brand accent
 /// but can be overridden (e.g. for destructive flows). Use
 /// [MeditoDialogDestructiveButton] for the standard destructive styling.
 class MeditoDialogPrimaryButton extends StatelessWidget {
@@ -31,40 +26,42 @@ class MeditoDialogPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = backgroundColor ?? context.brandPurple;
-    final fg = foregroundColor ?? context.onBrandPurple;
+    final bg = backgroundColor ?? context.brandAccent;
+    final fg = foregroundColor ?? context.onBrandAccent;
 
-    return SizedBox(
-      height: _buttonHeight,
-      child: ElevatedButton(
-        onPressed: isLoading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: bg,
-          foregroundColor: fg,
-          disabledBackgroundColor: bg.withOpacityValue(0.5),
-          disabledForegroundColor: fg.withOpacityValue(0.7),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(_buttonRadius),
-          ),
-          textStyle: _buttonTextStyle,
+    // A minimum, not a fixed height: a two-line label at large text sizes
+    // was clipped by a 48px box.
+    return ElevatedButton(
+      onPressed: isLoading ? null : onPressed,
+      style: ElevatedButton.styleFrom(
+        minimumSize: const Size(64, _buttonHeight),
+        backgroundColor: bg,
+        foregroundColor: fg,
+        disabledBackgroundColor: bg.withOpacityValue(0.5),
+        disabledForegroundColor: fg.withOpacityValue(0.7),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(_buttonRadius),
         ),
-        child: isLoading
-            ? SizedBox(
-                height: 18,
-                width: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation(fg),
-                ),
-              )
-            : Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+        textStyle: context.text.inherited.subtitle,
       ),
+      child: isLoading
+          ? SizedBox(
+              height: 18,
+              width: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation(fg),
+                // The spinner replaces the label; keep the button named.
+                semanticsLabel: label,
+              ),
+            )
+          : Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
     );
   }
 }
@@ -84,24 +81,22 @@ class MeditoDialogSecondaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
 
-    return SizedBox(
-      height: _buttonHeight,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: onSurface,
-          side: BorderSide(color: onSurface.withOpacityValue(0.3), width: 0.5),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(_buttonRadius),
-          ),
-          textStyle: _buttonTextStyle,
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(64, _buttonHeight),
+        foregroundColor: onSurface,
+        side: BorderSide(color: onSurface.withOpacityValue(0.3), width: 0.5),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(_buttonRadius),
         ),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
+        textStyle: context.text.inherited.subtitle,
+      ),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

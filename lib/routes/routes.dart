@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/constants/constants.dart';
+import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:medito/providers/providers.dart';
 import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/services/device_capabilities_service.dart';
@@ -12,9 +13,10 @@ import 'package:medito/utils/logger.dart';
 import 'package:medito/utils/utils.dart';
 import 'package:medito/views/downloads/downloads_view.dart';
 import 'package:medito/views/pack/pack_view.dart';
-import 'package:medito/views/path/journal_entry_view.dart';
 import 'package:medito/views/settings/settings_screen.dart';
 import 'package:medito/views/track/track_view.dart';
+import 'package:medito/views/timer/timer_view.dart';
+import 'package:medito/models/timer/timer_session.dart';
 import 'package:medito/views/settings/sign_up_log_in_screen.dart';
 import 'package:medito/views/tv/tv_pack_view.dart';
 import 'package:medito/views/tv/tv_track_view.dart';
@@ -27,6 +29,9 @@ import 'package:medito/views/donation/webview_donation_screen.dart';
 import 'package:medito/views/favorites/favorites_view.dart';
 import 'package:medito/views/stats/stats_screen.dart';
 import 'package:medito/views/settings/analytics_settings_screen.dart';
+import 'package:medito/views/shop/product_screen.dart';
+import 'package:medito/views/shop/shop_screen.dart';
+import 'package:medito/services/shop/fourthwall_service.dart';
 
 extension SanitisePath on String {
   String sanitisePath() => replaceFirst('/', '');
@@ -41,6 +46,11 @@ Future<void> handleNavigation(
   WidgetRef? ref,
   VoidCallback? onNavigationComplete,
   String? sourceRouteName,
+  // Where a Timer opened from, for timer_opened; deeplink when unset.
+  String? timerSource,
+  // Arbitrary key/values stamped into Stripe metadata on donation flows,
+  // for experiment/campaign attribution. Non-donation routes ignore it.
+  Map<String, String> donationCampaignMetadata = const {},
 }) async {
   ids.removeWhere((element) => element == null);
 
@@ -51,7 +61,9 @@ Future<void> handleNavigation(
       type == TypeConstants.url ||
       type == TypeConstants.link ||
       type == TypeConstants.email ||
-      _isDonationRoute(type, ids);
+      _isDonationRoute(type, ids) ||
+      (type == TypeConstants.route &&
+          (ids.any(_isShopRoute) || ids.contains(RouteConstants.timer)));
   if (isTv && isExternalOrPhoneOnly) {
     AppLogger.d(
       'ROUTES',
@@ -61,7 +73,12 @@ Future<void> handleNavigation(
   }
 
   if (type.contains('tracks') || type.contains('track')) {
-    await _handleTrackNavigation(ids, ref, isTv);
+    await _handleTrackNavigation(
+      ids,
+      ref,
+      isTv: isTv,
+      timerSource: timerSource,
+    );
   } else if (type.contains('pack')) {
     var packId = type.contains('pack3')
         ? ids[2]!
@@ -80,7 +97,10 @@ Future<void> handleNavigation(
   } else if (type == TypeConstants.url || type == TypeConstants.link) {
     final url = ids.last ?? 'https://meditofoundation.org/';
     final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
+    final shopRoute = _nativeShopRoute(uri);
+    if (shopRoute != null) {
+      await _pushRoute(shopRoute, ref);
+    } else if (await canLaunchUrl(uri)) {
       final isEditStatsUrl = url.startsWith(editStatsUrl);
       await Navigator.push<bool>(
         context,
@@ -95,26 +115,23 @@ Future<void> handleNavigation(
   } else if (type.contains('settings')) {
     await _pushRoute(SettingsScreen(), ref);
   } else if (_isDonationRoute(type, ids)) {
-    await handleDonationNavigation(context, ref, sourceRouteName);
+    await handleDonationNavigation(
+      context,
+      ref,
+      sourceRouteName,
+      campaignMetadata: donationCampaignMetadata,
+    );
   } else if (type == TypeConstants.email) {
     await _handleEmailNavigation(ids, ref);
   } else if (type == TypeConstants.flow && ids.contains('downloads')) {
     await _pushRoute(const DownloadsView(), ref);
   } else if (type == TypeConstants.account) {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (context) => const SignUpLogInPage()));
-  } else if (type == TypeConstants.journalEntry) {
-    var id = ids.first ?? '';
-    var content = ids.length > 1 ? ids[1] ?? '' : '';
-    var isCompleted = ids.length > 2 ? ids[2] == 'true' : false;
-    await _pushRoute(
-      JournalEntryView(
-        taskId: id,
-        isCompleted: isCompleted,
-        initialText: content,
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const SignUpLogInPage(
+          source: AnalyticsEventConstants.sourceDeeplink,
+        ),
       ),
-      ref,
     );
   } else if (type == TypeConstants.route &&
       ids.contains(TypeConstants.customiseHomeLayout)) {
@@ -127,6 +144,22 @@ Future<void> handleNavigation(
     );
     final initialTabIndex = statsPath?.contains(':history') == true ? 1 : 0;
     await _pushRoute(StatsScreen(initialTabIndex: initialTabIndex), ref);
+  } else if (type == TypeConstants.route && ids.any(_isShopRoute)) {
+    final id = ids.firstWhere(_isShopRoute)!;
+    final slug = id.contains(':') ? id.substring(id.indexOf(':') + 1) : '';
+    final source = sourceRouteName ?? AnalyticsEventConstants.sourceDeeplink;
+    await _pushRoute(
+      slug.isEmpty
+          ? ShopScreen(source: source)
+          : ProductScreen(slug: slug, source: source),
+      ref,
+    );
+  } else if (type == TypeConstants.route &&
+      ids.contains(RouteConstants.timer)) {
+    await _pushRoute(
+      TimerView(source: timerSource ?? AnalyticsEventConstants.sourceDeeplink),
+      ref,
+    );
   } else if (type == TypeConstants.route &&
       ids.contains(RouteConstants.analytics)) {
     await _pushRoute(const AnalyticsSettingsScreen(), ref);
@@ -146,6 +179,28 @@ Future<bool> _isAndroidTv(WidgetRef? ref) async {
   }
 }
 
+bool _isShopRoute(String? id) =>
+    id == RouteConstants.shop ||
+    (id?.startsWith('${RouteConstants.shop}:') ?? false);
+
+/// Links to shop.medito.app (announcements, carousel, settings) open the
+/// native shop: the storefront root or a collection opens the grid, a
+/// product link opens that product. Anything else stays on the web.
+Widget? _nativeShopRoute(Uri uri) {
+  if (uri.host != FourthwallService.shopDomain) return null;
+  final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+  if (segments.isEmpty || segments.first == 'collections') {
+    return const ShopScreen(source: AnalyticsEventConstants.sourceDeeplink);
+  }
+  if (segments.first == 'products' && segments.length > 1) {
+    return ProductScreen(
+      slug: segments[1],
+      source: AnalyticsEventConstants.sourceDeeplink,
+    );
+  }
+  return null;
+}
+
 Future<bool?> _pushRoute(Widget route, WidgetRef? ref) async {
   return await navigatorKey.currentState?.push<bool>(
     MaterialPageRoute(builder: (context) => route),
@@ -160,11 +215,27 @@ bool _isDonationRoute(String? type, List<String?> ids) {
 
 Future<void> _handleTrackNavigation(
   List<String?> ids,
-  WidgetRef? ref,
-  bool isTv,
-) async {
+  WidgetRef? ref, {
+  required bool isTv,
+  String? timerSource,
+}) async {
   try {
     var trackId = ids.first!;
+    // The home Timer shortcut still points at the old bell-only track; the
+    // native timer replaces it wherever it is linked from.
+    if (trackId == kLegacyTimerTrackId) {
+      if (isTv) {
+        AppLogger.d('ROUTES', 'Timer is not offered on Android TV');
+        return;
+      }
+      await _pushRoute(
+        TimerView(
+          source: timerSource ?? AnalyticsEventConstants.sourceDeeplink,
+        ),
+        ref,
+      );
+      return;
+    }
     await _pushRoute(
       isTv ? TvTrackView(trackId: trackId) : TrackView(trackId: trackId),
       ref,
@@ -192,6 +263,7 @@ Future<bool?> handleDonationNavigation(
   WidgetRef? ref,
   String? sourceRouteName, {
   NavigatorState? navigator,
+  Map<String, String> campaignMetadata = const {},
 }) async {
   if (ref == null) {
     AppLogger.w('ROUTES', 'Cannot open donation screen: ref is null');
@@ -223,7 +295,10 @@ Future<bool?> handleDonationNavigation(
 
   return await nav.push<bool>(
     MaterialPageRoute(
-      builder: (context) => WebViewDonationScreen(source: sourceRouteName),
+      builder: (context) => WebViewDonationScreen(
+        source: sourceRouteName,
+        campaignMetadata: campaignMetadata,
+      ),
     ),
   );
 }

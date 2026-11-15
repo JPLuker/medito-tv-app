@@ -1,16 +1,21 @@
+import 'package:medito/constants/strings/analytics_event_constants.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:medito/widgets/adaptive/adaptive_home_sections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/providers/stats_provider.dart';
+import 'package:medito/providers/donation/supporter_appeal_provider.dart';
 import 'package:medito/providers/notification/reminder_provider.dart';
-import 'package:medito/providers/device_capabilities_provider.dart';
-import 'package:medito/services/reminders/smart_reminders_service.dart';
+import 'package:medito/services/reminders/daily_reminders_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'package:medito/constants/enums/home_widget_type.dart';
 import 'package:medito/exceptions/app_error.dart';
 import 'package:medito/models/models.dart';
-import 'package:medito/providers/home/products_provider.dart';
+import 'package:medito/providers/shop/shop_providers.dart';
+import 'package:medito/services/shop/fourthwall_service.dart';
 import 'package:medito/providers/home/widget_order_provider.dart';
 import 'package:medito/widgets/widgets.dart';
 import 'package:medito/routes/routes.dart';
@@ -23,7 +28,6 @@ import 'widgets/products/home_products_section.dart';
 import 'widgets/quote/quote_widget.dart';
 import 'widgets/shortcuts/shortcuts_items_widget.dart';
 import 'widgets/up_next/up_next_widget.dart';
-import 'widgets/up_next/your_path_explainer_strip.dart';
 
 import '../../providers/home/announcement_provider.dart';
 import 'package:medito/providers/providers.dart';
@@ -39,10 +43,17 @@ class HomeView extends ConsumerStatefulWidget {
 class _HomeViewState extends ConsumerState<HomeView>
     with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   final _analytics = FirebaseAnalyticsService();
+
+  /// Lets a tap on the hero image do what Up Next's play button does.
+  final _upNextPrimaryAction = UpNextPrimaryAction();
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    ProviderScope.containerOf(
+      context,
+      listen: false,
+    ).invalidate(homeCacheScopeProvider);
     _logScreenView();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fixBrokenNotificationPermission();
@@ -50,14 +61,6 @@ class _HomeViewState extends ConsumerState<HomeView>
   }
 
   Future<void> _fixBrokenNotificationPermission() async {
-    try {
-      if ((await ref.read(deviceCapabilitiesProvider.future)).isAndroidTv) {
-        return;
-      }
-    } catch (_) {
-      // Fall through to the existing phone/tablet behavior if detection fails.
-    }
-
     final prefs = ref.read(sharedPreferencesProvider);
     if (!(prefs.getBool(SharedPreferenceConstants.notifPermissionFixNeeded) ??
         false)) {
@@ -71,7 +74,7 @@ class _HomeViewState extends ConsumerState<HomeView>
     if (!mounted) return;
 
     if (status.isGranted) {
-      final service = SmartRemindersService(
+      final service = DailyRemindersService(
         prefs: prefs,
         reminders: ref.read(reminderProvider),
       );
@@ -104,7 +107,12 @@ class _HomeViewState extends ConsumerState<HomeView>
   Widget build(BuildContext context) {
     super.build(context);
 
-    final home = ref.watch(fetchHomeProvider);
+    // Begin independent requests while the base feed is loading, rather than
+    // waiting for the data branch below to build the dependent widgets.
+    ref.watch(homeHeroCoverProvider);
+    ref.watch(fetchLatestAnnouncementProvider);
+    ref.watch(supporterAppealProvider);
+    final home = ref.watch(homeContentProvider);
 
     return home.when(
       loading: () => const _HomeLoadingView(),
@@ -147,44 +155,36 @@ class _HomeViewState extends ConsumerState<HomeView>
                 slivers: [
                   HomeHero(
                     onStatsButtonTap: () => _onStatsButtonTapped(context),
+                    announcement: const HomeAnnouncementSection(),
+                    onImageTap: heroType == HomeWidgetType.upNext
+                        ? _upNextPrimaryAction.trigger
+                        : null,
                     child: heroType == null
                         ? null
                         : _buildSection(heroType, homeData, inHero: true),
                   ),
-                  // First-run explainer; lives inside the Up Next card when
-                  // that card is in the list, stands alone under the hero
-                  // otherwise. Collapses itself once dismissed.
-                  if (heroType == HomeWidgetType.upNext)
+                  // Banner / no-hero mode only: with an overlaid section the
+                  // hero shows the announcement above it instead.
+                  if (heroType == null)
                     const SliverToBoxAdapter(
                       child: Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          padding16,
-                          padding8,
-                          padding16,
-                          0,
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.all(
-                            Radius.circular(kHomeTileRadius),
-                          ),
-                          child: YourPathExplainerStrip(),
-                        ),
+                        padding: EdgeInsets.only(top: 12),
+                        child: HomeAnnouncementSection(),
                       ),
                     ),
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.only(top: 12),
-                      child: HomeAnnouncementSection(),
+                  SliverToBoxAdapter(
+                    child: AdaptiveHomeSections(
+                      children: [
+                        for (final type in widgetOrder)
+                          Padding(
+                            key: ValueKey(type),
+                            padding: const EdgeInsets.only(
+                              bottom: kHomeSectionGap,
+                            ),
+                            child: _buildSection(type, homeData),
+                          ),
+                      ],
                     ),
-                  ),
-                  SliverList.builder(
-                    itemBuilder: (context, index) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: kHomeSectionGap),
-                        child: _buildSection(widgetOrder[index], homeData),
-                      );
-                    },
-                    itemCount: widgetOrder.length,
                   ),
                   SliverPadding(
                     padding: EdgeInsets.only(
@@ -222,7 +222,7 @@ class _HomeViewState extends ConsumerState<HomeView>
       HomeWidgetType.upNext => UpNextWidget(
         key: key,
         style: inHero ? UpNextStyle.hero : UpNextStyle.card,
-        inlineStrip: inHero ? null : const YourPathExplainerStrip(),
+        primaryAction: inHero ? _upNextPrimaryAction : null,
       ),
     };
   }
@@ -230,14 +230,21 @@ class _HomeViewState extends ConsumerState<HomeView>
   Future<void> _onRefresh() async {
     ref.invalidate(fetchLatestAnnouncementProvider);
     ref.invalidate(refreshHomeAPIsProvider);
-    ref.invalidate(refreshProductsProvider);
+    // The shop row fetches lazily; only refresh it if it already has.
+    for (final collection in [
+      FourthwallService.homeCollection,
+      FourthwallService.allCollection,
+    ]) {
+      final shop = shopListingProvider(collection);
+      if (ref.exists(shop)) ref.invalidate(shop);
+    }
     // Refetch all pack data; upNext is derived and will re-derive automatically.
     ref.invalidate(packDataProvider);
+    ref.invalidate(spanishFeaturedPackProvider);
     await Future.wait([
       ref.read(statsProvider.notifier).refresh(),
       ref.read(fetchLatestAnnouncementProvider.future),
       ref.read(refreshHomeAPIsProvider.future),
-      ref.read(refreshProductsProvider.future),
     ]);
   }
 
@@ -284,7 +291,11 @@ class _HomeLoadingViewState extends State<_HomeLoadingView> {
     return Scaffold(
       body: Stack(
         children: [
-          const Center(child: CircularProgressIndicator()),
+          Center(
+            child: CircularProgressIndicator(
+              semanticsLabel: AppLocalizations.of(context)!.loading,
+            ),
+          ),
           Positioned(
             left: 0,
             right: 0,
@@ -294,18 +305,42 @@ class _HomeLoadingViewState extends State<_HomeLoadingView> {
                 child: AnimatedOpacity(
                   opacity: _showDownloadsButton ? 1 : 0,
                   duration: const Duration(milliseconds: 500),
-                  child: TextButton(
-                    onPressed: _showDownloadsButton
-                        ? () => handleNavigation(TypeConstants.flow, [
-                            TypeConstants.downloads,
-                          ], context)
-                        : null,
-                    child: Text(
-                      AppLocalizations.of(context)!.goToDownloads,
-                      style: TextStyle(
-                        color: context.brandPurple.withValues(alpha: 0.8),
+                  // Both work without a connection: downloaded sessions and
+                  // the timer (local silent audio).
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton(
+                        onPressed: _showDownloadsButton
+                            ? () => handleNavigation(TypeConstants.flow, [
+                                TypeConstants.downloads,
+                              ], context)
+                            : null,
+                        child: Text(
+                          AppLocalizations.of(context)!.goToDownloads,
+                          style: TextStyle(
+                            color: context.brandAccent.withValues(alpha: 0.8),
+                          ),
+                        ),
                       ),
-                    ),
+                      TextButton(
+                        onPressed: _showDownloadsButton
+                            ? () => handleNavigation(
+                                TypeConstants.route,
+                                [RouteConstants.timer],
+                                context,
+                                timerSource:
+                                    AnalyticsEventConstants.sourceOffline,
+                              )
+                            : null,
+                        child: Text(
+                          AppLocalizations.of(context)!.openTimer,
+                          style: TextStyle(
+                            color: context.brandAccent.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

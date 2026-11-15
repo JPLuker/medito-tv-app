@@ -5,6 +5,9 @@ import 'dart:io' show Platform;
 import 'package:share_plus/share_plus.dart';
 
 import 'package:medito/constants/icons/medito_icons.dart';
+import 'dart:async';
+import 'package:medito/constants/strings/analytics_event_constants.dart';
+import 'package:medito/providers/providers.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../models/favorites/favorite_item.dart';
 import '../../../../models/track/track.dart';
@@ -13,6 +16,8 @@ import '../../../../providers/device_capabilities_provider.dart';
 import '../../../../providers/meditation/track_provider.dart';
 import '../../../../widgets/add_to_siri_util.dart';
 import '../../../../widgets/medito_icon.dart';
+import '../../../../scaffold_messenger_key.dart';
+import '../../../../widgets/snackbar_widget.dart';
 import 'animated_favourite_icon.dart';
 import 'bottom_action_bar.dart';
 
@@ -115,23 +120,45 @@ class _TrackViewBottomBarState extends ConsumerState<TrackViewBottomBar> {
 
   void _toggleFavorite(bool isFavorite, Track track) {
     final notifier = ref.read(favoritesNotifierProvider.notifier);
-    _favoriteController.trigger(
-      () => isFavorite
-          ? notifier.removeFromFavorites(widget.trackId)
-          : notifier.addToFavorites(
-              FavoriteItem(
-                id: widget.trackId,
-                title: widget.trackTitle,
-                coverUrl: widget.coverUrl ?? track.coverUrl,
-                subtitle: track.subtitle,
-                type: FavoriteItemType.track,
-                timestamp: DateTime.now().millisecondsSinceEpoch,
-              ),
-            ),
-      direction: isFavorite
-          ? FavoriteToggleDirection.remove
-          : FavoriteToggleDirection.add,
+    unawaited(
+      ref
+          .read(analyticsServiceProvider)
+          .logEvent(
+            name: isFavorite
+                ? AnalyticsEventConstants.trackUnfavourited
+                : AnalyticsEventConstants.trackFavourited,
+            parameters: {AnalyticsEventConstants.paramTrackId: widget.trackId},
+          ),
     );
+    _favoriteController
+        .trigger(
+          () => isFavorite
+              ? notifier.removeFromFavorites(widget.trackId)
+              : notifier.addToFavorites(
+                  FavoriteItem(
+                    id: widget.trackId,
+                    title: widget.trackTitle,
+                    coverUrl: widget.coverUrl ?? track.coverUrl,
+                    subtitle: track.subtitle,
+                    type: FavoriteItemType.track,
+                    timestamp: DateTime.now().millisecondsSinceEpoch,
+                  ),
+                ),
+          direction: isFavorite
+              ? FavoriteToggleDirection.remove
+              : FavoriteToggleDirection.add,
+        )
+        .then((_) {
+          // The star alone is easy to miss; say what happened.
+          if (!mounted) return;
+          final l10n = AppLocalizations.of(context)!;
+          // Replace rather than queue, so a quick re-tap reads the end state.
+          scaffoldMessengerKey.currentState?.hideCurrentSnackBar();
+          showSnackBar(
+            context,
+            isFavorite ? l10n.removedFromFavorites : l10n.addedToFavorites,
+          );
+        });
   }
 
   @override
@@ -180,7 +207,7 @@ class _TrackViewBottomBarState extends ConsumerState<TrackViewBottomBar> {
     bool isTv,
   ) {
     final colour = isFavorite
-        ? context.brandPurple
+        ? context.brandAccent
         : Theme.of(context).colorScheme.onSurface;
 
     final l10n = AppLocalizations.of(context)!;

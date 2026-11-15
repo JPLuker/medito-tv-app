@@ -3,30 +3,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:medito/constants/colors/color_constants.dart';
+import 'package:medito/constants/config_constants.dart';
 import 'package:medito/constants/pack_sequence.dart';
 import 'package:medito/constants/strings/shared_preference_constants.dart';
 import 'package:medito/constants/styles/widget_styles.dart';
 import 'package:medito/providers/home/up_next_provider.dart';
-import 'package:medito/providers/device_capabilities_provider.dart';
-import 'package:medito/routes/routes.dart';
-import 'package:medito/utils/logger.dart';
-import 'package:medito/constants/types/type_constants.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/providers/stats_provider.dart';
+import 'package:medito/models/track/track.dart';
 import 'package:medito/providers/duration_preference_provider.dart';
 import 'package:medito/providers/guide_name_preference_provider.dart';
 import 'package:medito/providers/meditation/track_provider.dart';
-import 'package:medito/models/models.dart';
 import 'package:medito/utils/track_variant_selector.dart';
+import 'package:medito/views/home/widgets/up_next/variant_sheet.dart';
 import 'package:medito/utils/utils.dart';
-import 'package:medito/views/player/player_view.dart';
+import 'package:medito/views/player/start_session.dart';
+import 'package:medito/routes/routes.dart';
+import 'package:medito/constants/types/type_constants.dart';
 import 'package:medito/widgets/snackbar_widget.dart';
 import 'dart:async';
 import 'package:medito/constants/strings/analytics_event_constants.dart';
 import 'package:medito/providers/providers.dart';
 import '../../home_styles.dart';
 import '../home_gradient_border.dart';
+import 'package:medito/constants/theme/medito_text.dart';
 
 const _kCardBorderRadius = kHomeHeroRadius;
 const _kPlayButtonSize = 52.0;
@@ -34,10 +36,11 @@ const _kProgressBarHeight = 3.0;
 
 /// Shared context for every Up Next event so the four are comparable.
 /// Experience level is omitted — it is a user property, already on every event.
-Map<String, Object> _upNextEventParams(UpNextData data) {
+Map<String, Object> _upNextEventParams(UpNextData data, UpNextStyle style) {
   final packId = data.pack.id;
   final position = PackSequence.positionOf(packId);
   return {
+    AnalyticsEventConstants.paramUpNextStyle: style.name,
     AnalyticsEventConstants.paramPackId: packId,
     AnalyticsEventConstants.paramUpNextMode: PackSequence.modeFor(packId),
     AnalyticsEventConstants.paramPackSequencePosition:
@@ -91,8 +94,8 @@ class _UpNextPalette {
       foreground: onSurface,
       muted: onSurface.withOpacityValue(0.7),
       track: onSurface.withOpacityValue(0.1),
-      buttonBackground: context.brandPurple,
-      buttonForeground: context.onBrandPurple,
+      buttonBackground: context.brandAccent,
+      buttonForeground: context.onBrandAccent,
       skipBackground: theme.scaffoldBackgroundColor,
     );
   }
@@ -105,18 +108,33 @@ class _UpNextPalette {
   final Color skipBackground;
 }
 
-class UpNextWidget extends ConsumerWidget {
-  /// Optional widget rendered inside the card below the main content (e.g. the
-  /// explainer strip). When provided it collapses inside the card so the
-  /// rounded corners are always intact. Ignored in [UpNextStyle.hero].
-  final Widget? inlineStrip;
+/// Lets something outside the Up Next content (the home hero image) trigger
+/// its primary action: start the next session, or pin the next pack once this
+/// one is complete. Whichever content is showing registers itself.
+class UpNextPrimaryAction {
+  VoidCallback? _handler;
 
+  void trigger() => _handler?.call();
+
+  void _attach(VoidCallback handler) => _handler = handler;
+
+  /// Only clears [handler]: during the AnimatedSwitcher cross-fade the
+  /// incoming content attaches before the outgoing one disposes.
+  void _detach(VoidCallback handler) {
+    if (_handler == handler) _handler = null;
+  }
+}
+
+class UpNextWidget extends ConsumerWidget {
   final UpNextStyle style;
+
+  /// Bound to the visible content's primary action, if given.
+  final UpNextPrimaryAction? primaryAction;
 
   const UpNextWidget({
     super.key,
-    this.inlineStrip,
     this.style = UpNextStyle.card,
+    this.primaryAction,
   });
 
   @override
@@ -125,7 +143,7 @@ class UpNextWidget extends ConsumerWidget {
 
     final child = upNextAsync.when(
       loading: () =>
-          _UpNextShimmer(key: const ValueKey('shimmer'), style: style),
+          _UpNextLoadingSpace(key: const ValueKey('loading'), style: style),
       error: (_, _) => const SizedBox.shrink(key: ValueKey('error')),
       data: (upNextData) {
         if (upNextData.isCompleted) {
@@ -133,6 +151,7 @@ class UpNextWidget extends ConsumerWidget {
             key: ValueKey('completed_${upNextData.pack.id}'),
             data: upNextData,
             style: style,
+            primaryAction: primaryAction,
           );
         }
 
@@ -143,26 +162,31 @@ class UpNextWidget extends ConsumerWidget {
         return _UpNextContent(
           key: ValueKey(upNextData.nextSession!.id),
           data: upNextData,
-          inlineStrip: style == UpNextStyle.hero ? null : inlineStrip,
           style: style,
+          primaryAction: primaryAction,
         );
       },
     );
 
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 350),
-      transitionBuilder: (child, animation) {
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-        );
-        final scale = Tween<double>(begin: 0.94, end: 1.0).animate(curved);
-        return FadeTransition(
-          opacity: curved,
-          child: ScaleTransition(scale: scale, child: child),
-        );
-      },
-      child: child,
+    // Progress can change while Home is covered by the player. Keep the
+    // hero settled on return instead of animating the whole page's height.
+    if (style == UpNextStyle.hero) return child;
+
+    const alignment = Alignment.topCenter;
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOutCubic,
+      alignment: alignment,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        switchInCurve: Curves.easeInOut,
+        switchOutCurve: Curves.easeInOut,
+        // Never paint outgoing session text while the next session enters.
+        // A skipped Dismissible can otherwise slide back beneath the new text.
+        layoutBuilder: (currentChild, _) =>
+            Align(alignment: alignment, heightFactor: 1, child: currentChild),
+        child: child,
+      ),
     );
   }
 }
@@ -172,11 +196,13 @@ class UpNextWidget extends ConsumerWidget {
 class _UpNextCompleted extends ConsumerStatefulWidget {
   final UpNextData data;
   final UpNextStyle style;
+  final UpNextPrimaryAction? primaryAction;
 
   const _UpNextCompleted({
     super.key,
     required this.data,
     this.style = UpNextStyle.card,
+    this.primaryAction,
   });
 
   @override
@@ -189,18 +215,70 @@ class _UpNextCompletedState extends ConsumerState<_UpNextCompleted> {
   @override
   void initState() {
     super.initState();
-    // Once per mount, not per rebuild; the key is keyed on the pack id.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _logShown());
+    widget.primaryAction?._attach(_onStartNextPack);
+    // Once per pack, not per mount — see _logShown.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _logShown();
+      _logImpression();
+    });
   }
 
+  @override
+  void didUpdateWidget(covariant _UpNextCompleted oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.primaryAction != widget.primaryAction) {
+      oldWidget.primaryAction?._detach(_onStartNextPack);
+      widget.primaryAction?._attach(_onStartNextPack);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.primaryAction?._detach(_onStartNextPack);
+    super.dispose();
+  }
+
+  void _logImpression() {
+    if (!mounted) return;
+    unawaited(
+      ref
+          .read(analyticsServiceProvider)
+          .logEvent(
+            name: AnalyticsEventConstants.upNextShown,
+            parameters: {
+              ..._upNextEventParams(widget.data, widget.style),
+              AnalyticsEventConstants.paramUpNextState: 'completed',
+            },
+          ),
+    );
+  }
+
+  /// Logged once per pack per install. The card stays on Home until the next
+  /// pack is pinned, so logging per mount counted Home visits, not completions
+  /// (~10 up_next_path_completed per user, Sep 2026).
   void _logShown() {
+    final prefs = ref.read(sharedPreferencesProvider);
+    final logged =
+        prefs.getStringList(
+          SharedPreferenceConstants.upNextCompletedLoggedPacks,
+        ) ??
+        const <String>[];
+    final packId = widget.data.pack.id;
+    if (logged.contains(packId)) return;
+    unawaited(
+      prefs.setStringList(
+        SharedPreferenceConstants.upNextCompletedLoggedPacks,
+        [...logged, packId],
+      ),
+    );
+
     final analytics = ref.read(analyticsServiceProvider);
 
     unawaited(
       analytics.logEvent(
         name: AnalyticsEventConstants.upNextPackCompleted,
         parameters: {
-          ..._upNextEventParams(widget.data),
+          ..._upNextEventParams(widget.data, widget.style),
           AnalyticsEventConstants.paramHasNextPack:
               widget.data.nextPackId != null ? 'true' : 'false',
         },
@@ -211,7 +289,7 @@ class _UpNextCompletedState extends ConsumerState<_UpNextCompleted> {
       unawaited(
         analytics.logEvent(
           name: AnalyticsEventConstants.upNextPathCompleted,
-          parameters: _upNextEventParams(widget.data),
+          parameters: _upNextEventParams(widget.data, widget.style),
         ),
       );
     }
@@ -229,7 +307,7 @@ class _UpNextCompletedState extends ConsumerState<_UpNextCompleted> {
           .logEvent(
             name: AnalyticsEventConstants.upNextNextPackPinned,
             parameters: {
-              ..._upNextEventParams(widget.data),
+              ..._upNextEventParams(widget.data, widget.style),
               AnalyticsEventConstants.paramNextPackId: nextPackId,
               AnalyticsEventConstants.paramNextPackSequencePosition:
                   PackSequence.positionOf(nextPackId)?.toString() ?? 'none',
@@ -245,9 +323,12 @@ class _UpNextCompletedState extends ConsumerState<_UpNextCompleted> {
 
     if (!mounted) return;
     setState(() => _pinning = false);
+    // The hero swaps to the new pack anyway; the snackbar only names it.
+    final nextTitle = ref.read(packProvider(packId: nextPackId)).value?.title;
+    if (nextTitle == null || nextTitle.isEmpty) return;
     showSnackBar(
       context,
-      AppLocalizations.of(context)!.upNextNextPackPinnedSnack,
+      AppLocalizations.of(context)!.upNextNextPackPinnedSnack(nextTitle),
     );
   }
 
@@ -260,9 +341,9 @@ class _UpNextCompletedState extends ConsumerState<_UpNextCompleted> {
     final l10n = AppLocalizations.of(context)!;
     final hasNext = widget.data.nextPackId != null;
 
-    final title = hasNext
-        ? l10n.upNextPackCompletedTitle(widget.data.pack.title)
-        : l10n.upNextPathCompletedTitle;
+    final title = widget.data.isEndOfPath
+        ? l10n.upNextPathCompletedTitle
+        : l10n.upNextPackCompletedTitle(widget.data.pack.title);
     final subtitle = hasNext
         ? l10n.upNextPackCompletedSubtitle(widget.data.completedCount)
         : l10n.upNextPathCompletedSubtitle;
@@ -280,7 +361,14 @@ class _UpNextCompletedState extends ConsumerState<_UpNextCompleted> {
     }
 
     final body = Padding(
-      padding: EdgeInsets.all(isHero ? padding16 : padding20),
+      padding: isHero
+          ? EdgeInsets.fromLTRB(
+              padding16,
+              padding16,
+              MediaQuery.sizeOf(context).width >= 600 ? 32 : padding16,
+              padding16,
+            )
+          : const EdgeInsets.all(padding20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -290,38 +378,29 @@ class _UpNextCompletedState extends ConsumerState<_UpNextCompleted> {
               Icon(
                 Icons.check_circle_rounded,
                 size: 18,
-                color: isHero ? palette.foreground : context.brandPurple,
+                color: isHero ? palette.foreground : context.brandAccent,
               ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  l10n.upNextTitle.toUpperCase(),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontFamily: teachers,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.2,
-                    color: palette.muted,
-                  ),
+                  l10n.completed.toUpperCase(),
+                  style: context.text.label.copyWith(color: palette.muted),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            title,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontFamily: sourceSerif,
-              fontSize: isHero ? 28 : 22,
-              fontWeight: isHero ? FontWeight.w700 : FontWeight.w500,
-              height: 1.2,
-              color: onSurface,
+          Semantics(
+            header: true,
+            child: Text(
+              title,
+              style: context.text.headline.copyWith(color: onSurface),
             ),
           ),
           const SizedBox(height: 6),
           Text(
             subtitle,
-            style: theme.textTheme.bodyMedium?.copyWith(color: palette.muted),
+            style: context.text.body.copyWith(color: palette.muted),
           ),
           if (hasNext) ...[
             const SizedBox(height: padding16),
@@ -336,8 +415,11 @@ class _UpNextCompletedState extends ConsumerState<_UpNextCompleted> {
       ),
     );
 
+    // Grouped, not labelled: a label on top of the visible title and subtitle
+    // read both twice. The content (eyebrow, title, subtitle, then the
+    // button) already reads in order.
     return Semantics(
-      label: '$title. $subtitle',
+      container: true,
       child: isHero
           ? body
           : Padding(
@@ -372,66 +454,117 @@ class _CompletedCta extends StatelessWidget {
       label: label,
       button: true,
       enabled: !busy,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: busy ? null : onTap,
-          borderRadius: BorderRadius.circular(14),
-          focusColor: palette.buttonForeground.withValues(alpha: 0.18),
-          child: HomeGradientBorder(
+      child: GestureDetector(
+        onTap: busy ? null : onTap,
+        child: HomeGradientBorder(
           backgroundColor: palette.buttonBackground,
           borderRadius: 14,
           borderWidth: 0.5,
-          child: SizedBox(
-            height: 48,
-            child: Center(
-              child: busy
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: palette.buttonForeground,
-                      ),
-                    )
-                  : ExcludeSemantics(
-                      child: Text(
-                        label,
-                        style: TextStyle(
+          // A floor, not a fixed height: a long pack name wraps at large text.
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: padding16,
+                vertical: 12,
+              ),
+              child: Center(
+                child: busy
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
                           color: palette.buttonForeground,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                        ),
+                      )
+                    : ExcludeSemantics(
+                        child: Text(
+                          label,
+                          textAlign: TextAlign.center,
+                          style: context.text.subtitle.copyWith(
+                            color: palette.buttonForeground,
+                          ),
                         ),
                       ),
-                    ),
+              ),
             ),
           ),
         ),
       ),
-    ),
     );
   }
 }
 
 class _UpNextContent extends ConsumerStatefulWidget {
   final UpNextData data;
-  final Widget? inlineStrip;
   final UpNextStyle style;
+  final UpNextPrimaryAction? primaryAction;
 
   const _UpNextContent({
     super.key,
     required this.data,
-    this.inlineStrip,
     this.style = UpNextStyle.card,
+    this.primaryAction,
   });
 
   @override
   ConsumerState<_UpNextContent> createState() => _UpNextContentState();
 }
 
-class _UpNextContentState extends ConsumerState<_UpNextContent> {
+class _UpNextContentState extends ConsumerState<_UpNextContent>
+    with SingleTickerProviderStateMixin {
+  // Swiping reveals Open pack / Skip; a tap while open should close the menu
+  // rather than start a session.
+  late final SlidableController _slidable = SlidableController(this);
+
+  // Same as the play button. A stable tear-off so detach can match it.
+  void _onPrimaryAction() => _onTap(context);
+
+  @override
+  void initState() {
+    super.initState();
+    widget.primaryAction?._attach(_onPrimaryAction);
+    // Keyed by session id, so this runs again when the card moves on to the
+    // next session.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(
+        ref
+            .read(analyticsServiceProvider)
+            .logEvent(
+              name: AnalyticsEventConstants.upNextShown,
+              parameters: {
+                AnalyticsEventConstants.paramSessionId:
+                    widget.data.nextSession!.id,
+                ..._upNextEventParams(widget.data, widget.style),
+                AnalyticsEventConstants.paramUpNextState: 'session',
+              },
+            ),
+      );
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _UpNextContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.primaryAction != widget.primaryAction) {
+      oldWidget.primaryAction?._detach(_onPrimaryAction);
+      widget.primaryAction?._attach(_onPrimaryAction);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.primaryAction?._detach(_onPrimaryAction);
+    _slidable.dispose();
+    super.dispose();
+  }
+
   bool _skipping = false;
-  bool _hasFocus = false;
+  // True while the track is being fetched and the player is opening. Shows a
+  // spinner in the play button and blocks a duplicate tap.
+  bool _isStarting = false;
 
   @override
   Widget build(BuildContext context) {
@@ -441,58 +574,92 @@ class _UpNextContentState extends ConsumerState<_UpNextContent> {
     final palette = _UpNextPalette.of(context, widget.style);
     final isHero = widget.style == UpNextStyle.hero;
     final l10n = AppLocalizations.of(context)!;
-    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
-      data: (value) => value.isAndroidTv,
-      orElse: () => false,
-    );
 
     final borderRadius = BorderRadius.circular(_kCardBorderRadius);
+    // Nothing played yet reads as a first step, not a resume.
+    final eyebrow = widget.data.completedCount == 0
+        ? l10n.upNextStartHere
+        : l10n.upNextTitle;
+    // Only hand-picked packs: series packs are where Home returns to, and
+    // are replaced by starting another pack rather than removed.
+    final canRemove =
+        widget.data.pack.id != ConfigConstants.basicsPackId &&
+        !PackSequence.contains(widget.data.pack.id);
+    final variant = _variantInfo(ref, l10n, nextSession.id);
+    final variantTrack = variant?.track;
 
-    return AnimatedOpacity(
+    return Opacity(
       opacity: _skipping ? 0.0 : 1.0,
-      duration: const Duration(milliseconds: 150),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: isHero ? 0 : padding16),
         child: ClipRRect(
           borderRadius: borderRadius,
-          child: Dismissible(
+          child: Slidable(
             key: Key('up_next_${nextSession.id}'),
-            direction: DismissDirection.endToStart,
-            background: _getSkipBackground(context, l10n, palette),
-            movementDuration: const Duration(milliseconds: 1),
-            confirmDismiss: (_) async {
-              await _onSkip(context);
-              return false;
-            },
+            controller: _slidable,
+            endActionPane: ActionPane(
+              motion: const BehindMotion(),
+              extentRatio: canRemove ? 0.75 : 0.5,
+              // No full-swipe action: every action is a button behind the
+              // menu, so a swipe only ever reveals them.
+              children: [
+                _swipeAction(
+                  palette: palette,
+                  icon: Icons.menu_book_rounded,
+                  label: l10n.openPack,
+                  onPressed: () => _onOpenPack(context),
+                ),
+                _swipeAction(
+                  palette: palette,
+                  showDivider: true,
+                  icon: Icons.skip_next_rounded,
+                  label: l10n.skip,
+                  onPressed: () => _onSkip(context),
+                ),
+                if (canRemove)
+                  _swipeAction(
+                    palette: palette,
+                    showDivider: true,
+                    icon: Icons.close_rounded,
+                    label: l10n.removeFromHomeShort,
+                    onPressed: () => _onRemove(context),
+                  ),
+              ],
+            ),
+            // One stop for the whole card: without excludeSemantics its texts,
+            // the progress bar ("43%") and "3 of 7" were read again after the
+            // label. The tap moves here because excluding drops the
+            // GestureDetector's.
             child: Semantics(
+              // A tap plays the voice and length on the variant line, so it is
+              // part of what the card says.
               label:
-                  '${l10n.upNext}: ${widget.data.pack.title} — ${nextSession.title}',
+                  '$eyebrow: ${widget.data.pack.title} — ${nextSession.title}'
+                  '${variant != null ? ', ${variant.spoken}' : ''}'
+                  '${widget.data.totalCount > 0 ? ', ${l10n.upNextProgressSemantics(widget.data.completedCount, widget.data.totalCount)}' : ''}',
               button: true,
+              excludeSemantics: true,
+              onTap: () => _onTap(context),
               customSemanticsActions: {
                 CustomSemanticsAction(label: l10n.skip): () => _onSkip(context),
+                CustomSemanticsAction(label: l10n.openPack): () =>
+                    _onOpenPack(context),
+                if (canRemove)
+                  CustomSemanticsAction(label: l10n.removeFromHome): () =>
+                      _onRemove(context),
+                if (variantTrack != null)
+                  CustomSemanticsAction(label: l10n.upNextVariantEdit): () =>
+                      showVariantSheet(context, variantTrack),
               },
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => _onTap(context),
-                  onFocusChange: (focused) {
-                    if (_hasFocus != focused) {
-                      setState(() => _hasFocus = focused);
-                    }
-                  },
-                  borderRadius: borderRadius,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 120),
-                    decoration: BoxDecoration(
-                      borderRadius: borderRadius,
-                      border: Border.all(
-                        color: _hasFocus
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.transparent,
-                        width: 3,
-                      ),
-                    ),
-                    child: _Surface(
+              child: GestureDetector(
+                // The hero style has no card surface behind the content, so
+                // without this only the painted text and the play circle
+                // would take taps; the space beside the title fell through
+                // to the image (smoke run 34957204808 tapped the card centre
+                // and nothing happened).
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _onTap(context),
+                child: _Surface(
                   style: widget.style,
                   color: cardColor,
                   child: Column(
@@ -500,7 +667,16 @@ class _UpNextContentState extends ConsumerState<_UpNextContent> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Padding(
-                        padding: EdgeInsets.all(isHero ? padding16 : padding20),
+                        padding: isHero
+                            ? EdgeInsets.fromLTRB(
+                                padding16,
+                                padding16,
+                                MediaQuery.sizeOf(context).width >= 600
+                                    ? 32
+                                    : padding16,
+                                padding16,
+                              )
+                            : const EdgeInsets.all(padding20),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
@@ -508,62 +684,60 @@ class _UpNextContentState extends ConsumerState<_UpNextContent> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
-                                    children: [
-                                      Text(
-                                        l10n.upNextTitle.toUpperCase(),
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                              fontFamily: teachers,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              letterSpacing: 1.2,
+                                  // On the hero, drop the eyebrow in the
+                                  // Continue case: the pack cover already
+                                  // carries the "where you are" cue, and the
+                                  // "CONTINUE · <pack>" line was noise over
+                                  // the artwork. Keep it when we need to say
+                                  // START HERE, and keep it in card style.
+                                  if (!isHero ||
+                                      widget.data.completedCount == 0)
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            eyebrow.toUpperCase(),
+                                            style: context.text.label.copyWith(
                                               color: palette.muted,
                                             ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '·',
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                              fontFamily: teachers,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              color: palette.muted,
-                                            ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Expanded(
-                                        child: Text(
-                                          widget.data.pack.title,
-                                          style: theme.textTheme.bodySmall
-                                              ?.copyWith(
-                                                fontFamily: teachers,
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                                letterSpacing: 1.2,
-                                                color: palette.muted,
-                                              ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '·',
+                                          style: context.text.label.copyWith(
+                                            color: palette.muted,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            widget.data.pack.title,
+                                            style: context.text.label.copyWith(
+                                              color: palette.muted,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   Text(
                                     nextSession.title,
-                                    style: theme.textTheme.headlineSmall
-                                        ?.copyWith(
-                                          fontFamily: sourceSerif,
-                                          fontSize: isHero ? 28 : 22,
-                                          fontWeight: isHero
-                                              ? FontWeight.w700
-                                              : FontWeight.w500,
-                                          height: 1.2,
-                                          color: palette.foreground,
-                                        ),
+                                    style: context.text.headline.copyWith(
+                                      color: palette.foreground,
+                                    ),
                                   ),
-                                  if (widget.data.totalCount > 0) ...[
+                                  _VariantLine(
+                                    trackId: nextSession.id,
+                                    palette: palette,
+                                  ),
+                                  // Progress bar stays off the hero — the
+                                  // image is doing the work.
+                                  if (!isHero &&
+                                      widget.data.totalCount > 0) ...[
                                     const SizedBox(height: 10),
                                     _ProgressRow(
                                       completed: widget.data.completedCount,
@@ -578,15 +752,12 @@ class _UpNextContentState extends ConsumerState<_UpNextContent> {
                             _PlayButton(
                               onTap: () => _onTap(context),
                               palette: palette,
-                              remoteNavigation: isTv,
+                              isLoading: _isStarting,
                             ),
                           ],
                         ),
                       ),
-                      if (widget.inlineStrip != null) widget.inlineStrip!,
                     ],
-                  ),
-                    ),
                   ),
                 ),
               ),
@@ -597,36 +768,45 @@ class _UpNextContentState extends ConsumerState<_UpNextContent> {
     );
   }
 
-  Widget _getSkipBackground(
-    BuildContext context,
-    AppLocalizations l10n,
-    _UpNextPalette palette,
-  ) {
-    final theme = Theme.of(context);
-    final iconColor = palette.foreground;
-
-    return Container(
-      color: palette.skipBackground,
-      child: Padding(
-        padding: const EdgeInsets.all(padding16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.skip_next_rounded, color: iconColor, size: 28),
-                const SizedBox(height: 4),
-                Text(
-                  l10n.skip,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: iconColor,
-                    fontWeight: FontWeight.w600,
+  Widget _swipeAction({
+    required _UpNextPalette palette,
+    bool showDivider = false,
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    // Custom rather than SlidableAction: its default label style is too large
+    // for half-width tiles and wrapped "Open pack" out of view.
+    return CustomSlidableAction(
+      onPressed: (_) => onPressed(),
+      // One surface for both actions (two tones looked patchy over the
+      // artwork); a hairline separates them instead.
+      backgroundColor: palette.skipBackground,
+      foregroundColor: palette.foreground,
+      padding: EdgeInsets.zero,
+      child: Container(
+        decoration: showDivider
+            ? BoxDecoration(
+                border: Border(
+                  left: BorderSide(
+                    color: palette.foreground.withValues(alpha: 0.2),
+                    width: 0.5,
                   ),
                 ),
-              ],
+              )
+            : null,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: palette.foreground, size: 28),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: context.text.caption.copyWith(color: palette.foreground),
             ),
           ],
         ),
@@ -634,11 +814,67 @@ class _UpNextContentState extends ConsumerState<_UpNextContent> {
     );
   }
 
+  void _onOpenPack(BuildContext context) {
+    unawaited(
+      ref
+          .read(analyticsServiceProvider)
+          .logEvent(
+            name: AnalyticsEventConstants.upNextPackOpened,
+            parameters: _upNextEventParams(widget.data, widget.style),
+          ),
+    );
+    handleNavigation(
+      TypeConstants.pack,
+      [widget.data.pack.id],
+      context,
+      ref: ref,
+    );
+  }
+
+  /// Home goes back to the series pack the user was on before picking this
+  /// one, or the no-pin default.
+  Future<void> _onRemove(BuildContext context) async {
+    final packId = widget.data.pack.id;
+    unawaited(
+      ref
+          .read(analyticsServiceProvider)
+          .logEvent(
+            name: AnalyticsEventConstants.packUnpinned,
+            parameters: {AnalyticsEventConstants.paramPackId: packId},
+          ),
+    );
+
+    final prefs = ref.read(sharedPreferencesProvider);
+    // This widget is replaced once the pin changes, so Undo can't use ref.
+    final container = ProviderScope.containerOf(context, listen: false);
+    final l10n = AppLocalizations.of(context)!;
+    final returnTo = prefs.getString(
+      SharedPreferenceConstants.upNextReturnPackId,
+    );
+    if (returnTo == null) {
+      await prefs.remove(SharedPreferenceConstants.upNextPackId);
+    } else {
+      await prefs.setString(SharedPreferenceConstants.upNextPackId, returnTo);
+    }
+    ref.invalidate(upNextPackIdProvider);
+
+    showSnackBar(
+      context.mounted ? context : null,
+      l10n.removedFromHome,
+      actionLabel: l10n.undo,
+      onActionPressed: () async {
+        await prefs.setString(SharedPreferenceConstants.upNextPackId, packId);
+        container.invalidate(upNextPackIdProvider);
+      },
+    );
+  }
+
   Future<void> _onSkip(BuildContext context) async {
     final nextSession = widget.data.nextSession;
-    if (nextSession == null) return;
+    if (nextSession == null || _skipping) return;
 
     setState(() => _skipping = true);
+    _announceAfterSkip(context, skippedId: nextSession.id);
 
     unawaited(
       ref
@@ -647,7 +883,7 @@ class _UpNextContentState extends ConsumerState<_UpNextContent> {
             name: AnalyticsEventConstants.upNextSkipped,
             parameters: {
               AnalyticsEventConstants.paramSessionId: nextSession.id,
-              ..._upNextEventParams(widget.data),
+              ..._upNextEventParams(widget.data, widget.style),
             },
           ),
     );
@@ -669,9 +905,49 @@ class _UpNextContentState extends ConsumerState<_UpNextContent> {
     // upNextProvider rebuilds reactively via packProvider <- statsProvider.
   }
 
+  /// The card fades out and the next session (or the completed state) fades
+  /// in under a new key, which a screen reader doesn't notice: say what
+  /// replaced it. Listens on the container because this widget is disposed
+  /// as soon as the next session arrives.
+  void _announceAfterSkip(BuildContext context, {required String skippedId}) {
+    final container = ProviderScope.containerOf(context, listen: false);
+    final view = View.of(context);
+    final direction = Directionality.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    ProviderSubscription<AsyncValue<UpNextData>>? sub;
+    void close() {
+      sub?.close();
+      sub = null;
+    }
+
+    sub = container.listen<AsyncValue<UpNextData>>(upNextProvider, (_, next) {
+      final data = next.value;
+      if (data == null) return;
+      final upcoming = data.nextSession;
+      if (upcoming != null && upcoming.id == skippedId) return;
+      close();
+      final message = data.isCompleted
+          ? (data.isEndOfPath
+                ? l10n.upNextPathCompletedTitle
+                : l10n.upNextPackCompletedTitle(data.pack.title))
+          : upcoming == null
+          ? null
+          : l10n.upNextSkippedAnnouncement(upcoming.title);
+      if (message == null) return;
+      unawaited(SemanticsService.sendAnnouncement(view, message, direction));
+    });
+    // Skipping failed or changed nothing: stop listening.
+    Future.delayed(const Duration(seconds: 10), close);
+  }
+
   Future<void> _onTap(BuildContext context) async {
     final nextSession = widget.data.nextSession;
     if (nextSession == null) return;
+    if (_isStarting) return;
+    if (_slidable.ratio != 0) {
+      unawaited(_slidable.close());
+      return;
+    }
 
     unawaited(
       ref
@@ -680,7 +956,7 @@ class _UpNextContentState extends ConsumerState<_UpNextContent> {
             name: AnalyticsEventConstants.upNextTapped,
             parameters: {
               AnalyticsEventConstants.paramSessionId: nextSession.id,
-              ..._upNextEventParams(widget.data),
+              ..._upNextEventParams(widget.data, widget.style),
             },
           ),
     );
@@ -690,54 +966,116 @@ class _UpNextContentState extends ConsumerState<_UpNextContent> {
           .logFirstActionAfterOnboardingIfNeeded('up_next'),
     );
 
-    final guideName = ref.read(guideNamePreferenceProvider);
-    final preferredDuration = ref.read(durationPreferenceProvider);
-
-    if (guideName != null && preferredDuration != null) {
-      final track = await ref.read(
-        tracksProvider(trackId: nextSession.id).future,
-      );
-      final selection = TrackVariantSelector.resolve(
-        track,
-        guideName: guideName,
-        durationMs: preferredDuration,
-      );
-
-      final request = PlaybackRequest.fromTrack(
-        track,
-        selection.voice,
-        selection.file,
-      );
-      try {
-        await ref.read(playerProvider.notifier).play(request);
-      } catch (e, st) {
-        // play() now propagates native playback failures (see P0-4 in the
-        // audit). Before this change, errors were swallowed and we'd
-        // navigate to a silent player. Show a snackbar instead.
-        AppLogger.e('UP_NEXT', 'Failed to start playback from Up Next', e, st);
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context)!.unableToLoadAudio),
-          ),
-        );
-        return;
+    setState(() => _isStarting = true);
+    // The card is one node, so the play button's spinner isn't reachable.
+    // Say it once if the track takes a moment to load.
+    final view = View.of(context);
+    final direction = Directionality.of(context);
+    final loading = AppLocalizations.of(context)!.loading;
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted && _isStarting) {
+        unawaited(SemanticsService.sendAnnouncement(view, loading, direction));
       }
-      _navigateToPlayer(context);
-    } else {
-      handleNavigation(
-        TypeConstants.track,
-        [nextSession.id, nextSession.path],
+    });
+    try {
+      await startSession(
         context,
-        ref: ref,
+        ref,
+        trackId: nextSession.id,
+        path: nextSession.path,
       );
+    } finally {
+      if (mounted) setState(() => _isStarting = false);
     }
   }
+}
 
-  void _navigateToPlayer(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const PlayerView()),
+/// The track behind [trackId] when the Home hero should show which voice and
+/// length it will play: only once both defaults are saved (otherwise a tap
+/// opens the track screen, which shows the pickers itself) and only when the
+/// track offers a choice.
+Track? _variantTrack(WidgetRef ref, String trackId) {
+  if (ref.watch(guideNamePreferenceProvider) == null ||
+      ref.watch(durationPreferenceProvider) == null) {
+    return null;
+  }
+  final track = ref.watch(tracksProvider(trackId: trackId)).value;
+  return track != null && trackHasVariants(track) ? track : null;
+}
+
+/// What a tap on the hero will play for [trackId]: the visible "Will · 10 min"
+/// and its spoken form "Will, 10 minutes". Null when [_variantTrack] is.
+({Track track, String text, String spoken})? _variantInfo(
+  WidgetRef ref,
+  AppLocalizations l10n,
+  String trackId,
+) {
+  final track = _variantTrack(ref, trackId);
+  if (track == null) return null;
+
+  final selection = TrackVariantSelector.resolve(
+    track,
+    guideName: ref.watch(guideNamePreferenceProvider),
+    durationMs: ref.watch(durationPreferenceProvider),
+  );
+  final minutes = convertDurationToMinutes(
+    milliseconds: selection.file.duration,
+  );
+  final guide = selection.voice.guideName;
+  final spokenMinutes = l10n.timerPresetSemantics(minutes);
+  if (guide == null || guide.isEmpty) {
+    return (
+      track: track,
+      text: l10n.upNextVariantMinutes(minutes),
+      spoken: spokenMinutes,
+    );
+  }
+  return (
+    track: track,
+    text: l10n.upNextVariant(guide, minutes),
+    spoken: '$guide, $spokenMinutes',
+  );
+}
+
+/// "Will · 10 min" under the session title, with a pencil: what a tap on the
+/// hero will play, since it skips the track screen. Opens [VariantSheet].
+class _VariantLine extends ConsumerWidget {
+  const _VariantLine({required this.trackId, required this.palette});
+
+  final String trackId;
+  final _UpNextPalette palette;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final variant = _variantInfo(ref, AppLocalizations.of(context)!, trackId);
+    if (variant == null) return const SizedBox.shrink();
+    final track = variant.track;
+    final text = variant.text;
+    final style = context.text.subtitle.copyWith(color: palette.muted);
+
+    // Opaque so the gap between text and pencil opens the sheet too, not the
+    // player; the vertical padding makes the target thumb-sized.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => showVariantSheet(context, track),
+      child: Padding(
+        padding: const EdgeInsets.only(top: 6, bottom: 2, right: 12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                text,
+                style: style,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(Icons.edit_outlined, size: 15, color: palette.muted),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -745,36 +1083,50 @@ class _UpNextContentState extends ConsumerState<_UpNextContent> {
 class _PlayButton extends StatelessWidget {
   final VoidCallback onTap;
   final _UpNextPalette palette;
-  final bool remoteNavigation;
+  final bool isLoading;
 
   const _PlayButton({
     required this.onTap,
     required this.palette,
-    required this.remoteNavigation,
+    this.isLoading = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Semantics(
-      label: AppLocalizations.of(context)!.play,
-      button: true,
-      child: Material(
-        color: palette.buttonBackground,
-        shape: const CircleBorder(),
-        child: InkWell(
-          onTap: onTap,
-          canRequestFocus: !remoteNavigation,
-          customBorder: const CircleBorder(),
-          focusColor: palette.buttonForeground.withValues(alpha: 0.18),
+      label: isLoading ? l10n.loading : l10n.play,
+      button: !isLoading,
+      child: GestureDetector(
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: palette.buttonBackground,
+          ),
           child: SizedBox(
             width: _kPlayButtonSize,
             height: _kPlayButtonSize,
             child: ExcludeSemantics(
-              child: Icon(
-                Icons.play_arrow_rounded,
-                color: palette.buttonForeground,
-                size: 28,
-              ),
+              // Same box size whether icon or spinner, so nothing shifts.
+              child: isLoading
+                  ? Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            palette.buttonForeground,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Icon(
+                      Icons.play_arrow_rounded,
+                      color: palette.buttonForeground,
+                      size: 28,
+                    ),
             ),
           ),
         ),
@@ -822,8 +1174,6 @@ class _ProgressRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Row(
       children: [
         Expanded(
@@ -840,43 +1190,25 @@ class _ProgressRow extends StatelessWidget {
         const SizedBox(width: 10),
         Text(
           AppLocalizations.of(context)!.upNextProgress(completed, total),
-          style: theme.textTheme.bodySmall?.copyWith(
-            fontFamily: teachers,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.6,
-            color: palette.muted,
-          ),
+          style: context.text.caption.copyWith(color: palette.muted),
         ),
       ],
     );
   }
 }
 
-class _UpNextShimmer extends StatelessWidget {
-  const _UpNextShimmer({super.key, this.style = UpNextStyle.card});
+class _UpNextLoadingSpace extends StatelessWidget {
+  const _UpNextLoadingSpace({super.key, this.style = UpNextStyle.card});
 
   final UpNextStyle style;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cardColor = theme.cardColor;
-    // Over the hero the image is the loading state.
-    if (style == UpNextStyle.hero) return const SizedBox(height: 96);
-
-    return Padding(
-      padding: const EdgeInsets.only(
-        left: padding16,
-        right: padding16,
-        bottom: padding16,
-      ),
-      child: HomeGradientBorder(
-        backgroundColor: cardColor,
-        borderRadius: _kCardBorderRadius,
-        borderWidth: 0.5,
-        child: const SizedBox(height: 128, width: double.infinity),
-      ),
+    // The pack cover may not be available yet after changing Your Path.
+    // Reserve space without flashing a card before the hero appears.
+    return SizedBox(
+      height: style == UpNextStyle.hero ? 96 : 144,
+      width: double.infinity,
     );
   }
 }

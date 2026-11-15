@@ -4,9 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/constants/constants.dart';
 import 'package:medito/models/home/home_model.dart';
-import 'package:medito/models/home/product/product_model.dart';
 import 'package:medito/models/home/shortcuts/shortcuts_model.dart';
-import 'package:medito/providers/home/products_provider.dart';
 import 'package:medito/providers/home/up_next_provider.dart';
 import 'package:medito/providers/providers.dart';
 import 'package:medito/routes/routes.dart';
@@ -14,7 +12,6 @@ import 'package:medito/utils/utils.dart';
 import 'package:medito/views/tv/widgets/tv_focus_card.dart';
 import 'package:medito/widgets/medito_icon.dart';
 import 'package:medito/widgets/network_image_widget.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 /// TV Home follows the current iPad composition closely: course/up-next first,
 /// then the icon shortcut row, Featured artwork, the daily quote and Shop to
@@ -83,8 +80,6 @@ class TvHomeView extends ConsumerWidget {
                         const SizedBox(height: 42),
                         _QuoteSection(quote: homeData.todayQuote!),
                       ],
-                      const SizedBox(height: 42),
-                      const _ShopShelf(),
                     ],
                   ),
                 ),
@@ -452,149 +447,5 @@ class _QuoteSection extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _ShopShelf extends ConsumerWidget {
-  const _ShopShelf();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final products = ref.watch(productsProvider);
-
-    return products.when(
-      loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
-      data: (items) {
-        if (items.isEmpty) return const SizedBox.shrink();
-        final visible = items.take(10).toList();
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Shop to Support',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: 136,
-                  child: TvFocusCard(
-                    onPressed: () => unawaited(
-                      _openUrl(context, ConfigConstants.shopUrl),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('See all', style: TextStyle(fontSize: 17)),
-                        SizedBox(width: 6),
-                        Icon(Icons.chevron_right_rounded, size: 22),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 272,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                clipBehavior: Clip.none,
-                itemCount: visible.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 18),
-                itemBuilder: (context, index) => _ProductTile(
-                  product: visible[index],
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  static Future<void> _openUrl(BuildContext context, String? url) async {
-    if (url == null || url.trim().isEmpty) return;
-    final uri = Uri.tryParse(url);
-    if (uri != null && await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      return;
-    }
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('This link is not available on this TV.')),
-    );
-  }
-}
-
-class _ProductTile extends StatelessWidget {
-  const _ProductTile({required this.product});
-
-  final ProductGroupModel product;
-
-  @override
-  Widget build(BuildContext context) {
-    final image = product.displayImageUrl ?? product.imageUrl;
-
-    return SizedBox(
-      width: 190,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 190,
-            height: 190,
-            child: TvFocusCard(
-              onPressed: () => unawaited(
-                _ShopShelf._openUrl(context, product.url),
-              ),
-              child: image != null && image.isNotEmpty
-                  ? NetworkImageWidget(url: image, shouldCache: true)
-                  : const Center(
-                      child: Icon(Icons.shopping_bag_outlined, size: 48),
-                    ),
-            ),
-          ),
-          const SizedBox(height: 9),
-          Text(
-            product.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'From ${_formatPrice(product)}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.68),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static String _formatPrice(ProductGroupModel product) {
-    final symbol = switch (product.currency.toUpperCase()) {
-      'USD' => r'$',
-      'GBP' => '£',
-      'EUR' => '€',
-      _ => '${product.currency} ',
-    };
-    final price = product.basePrice;
-    final digits = price == price.roundToDouble() ? 0 : 2;
-    return '$symbol${price.toStringAsFixed(digits)}';
   }
 }

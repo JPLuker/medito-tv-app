@@ -16,7 +16,7 @@ DART_DEFINES = [
 
 platform :ios do
 
-  before_all do
+  before_all do |lane|
     # Honour the Xcode that the environment has already selected rather than
     # forcing the runner's *default* `/Applications/Xcode.app` symlink.
     #
@@ -88,8 +88,8 @@ platform :ios do
 
     # submit_for_review:true sends the uploaded version straight to App Store
     # review; the default keeps today's behaviour (draft version, submitted by
-    # hand). automatic_release stays false so an approved build still needs a
-    # manual "Release this version" — approval alone doesn't publish it.
+    # hand). automatic_release publishes the version as soon as Apple approves
+    # it; switch the version to manual in App Store Connect to hold one back.
     # Export compliance is pre-answered via ITSAppUsesNonExemptEncryption in
     # Info.plist, so the submission doesn't stall on that question.
     submit = options[:submit_for_review].to_s == 'true'
@@ -97,7 +97,7 @@ platform :ios do
     notes = ENV["RELEASE_NOTES"] || ""
     upload_options = {
       submit_for_review: submit,
-      automatic_release: false,
+      automatic_release: true,
       force: true,
       run_precheck_before_submit: false,
       # Every locale enabled on the App Store listing needs a What's New value,
@@ -115,18 +115,26 @@ platform :ios do
 
     if use_existing_build
       # No ipa to read the version from, so deliver needs both explicitly.
-      # Build selection happens at submission time: with submit_for_review:true
-      # deliver picks the build with this build_number (the beta lane's
-      # upload_to_testflight has already waited for it to finish processing);
-      # with submit_for_review:false the version stays a draft and the build is
-      # attached by hand in ASC — same as the build-and-upload path, where
-      # uploading the binary doesn't attach it to the version either.
+      # Deliver selects the build only when submitting for review. Drafts
+      # attach it explicitly below, after Apple finishes processing it.
       upload_options[:skip_binary_upload] = true
+      # A version that is already Waiting for Review can't change its build
+      # ("The specified pre-release build could not be added"). Pull it from
+      # review first when asked, as 2610.6.3 needed (302471 was in review).
+      upload_options[:reject_if_possible] = true if options[:reject_if_possible].to_s == 'true'
       upload_options[:app_version] = options[:app_version]
       upload_options[:build_number] = options[:build_number]
     end
 
     upload_to_app_store(**upload_options)
+    unless submit
+      pubspec = File.read(File.expand_path("../../pubspec.yaml", __dir__))
+      version, build_number = pubspec.match(/^version:\s*(\S+)/)[1].split("+")
+      attach_draft_build(
+        options[:app_version] || version,
+        options[:build_number] || build_number
+      )
+    end
     cleanup_keychain() unless use_existing_build
   end
 
@@ -194,6 +202,46 @@ platform :ios do
     upload_dsyms_to_crashlytics
   end
 
+end
+
+# App Store Connect now reports appVersionState; appStoreState is deprecated
+# and can be absent even while the version is an editable draft.
+def draft_version_state(version)
+  version.app_version_state || version.app_store_state
+end
+
+# Deliver uploads a draft's binary and metadata without selecting its build.
+# Finish the draft explicitly, without creating a review submission.
+def attach_draft_build(app_version, build_number)
+  # An editable version can retain the preceding binary's rejection state.
+  # Selecting a replacement build must not send it back into review.
+  editable_states = %w[PREPARE_FOR_SUBMISSION DEVELOPER_REJECTED REJECTED METADATA_REJECTED INVALID_BINARY]
+  app = Spaceship::ConnectAPI::App.find(ENV.fetch("DEVELOPER_APP_IDENTIFIER"))
+  UI.user_error!("App not found on App Store Connect") unless app
+  build = FastlaneCore::BuildWatcher.wait_for_build_processing_to_be_complete(
+    app_id: app.id,
+    platform: "IOS",
+    app_version: app_version,
+    build_version: build_number,
+    poll_interval: 30,
+    timeout_duration: 1800,
+    return_spaceship_testflight_build: false
+  )
+  UI.user_error!("Build #{build_number} is not valid") unless build.processing_state == "VALID"
+
+  filter = { versionString: app_version, platform: "IOS" }
+  version = app.get_app_store_versions(filter: filter).first
+  state = version && draft_version_state(version)
+  UI.message("App Store version #{app_version}: #{state || 'not found'}")
+  unless editable_states.include?(state)
+    UI.user_error!("Version #{app_version} is not an editable draft (#{state || 'not found'})")
+  end
+  version.select_build(build_id: build.id)
+  saved = app.get_app_store_versions(filter: filter).first
+  unless saved&.build&.id == build.id && editable_states.include?(draft_version_state(saved))
+    UI.user_error!("Could not verify draft #{app_version} with build #{build_number}")
+  end
+  UI.success("Verified editable version #{app_version} (#{build_number}): #{draft_version_state(saved)}, build attached, not submitted for review")
 end
 
 # Builds and code-signs the .ipa with `flutter build ios --no-codesign` +

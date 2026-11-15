@@ -49,6 +49,11 @@ class StatsManager {
   bool _dirty = false;
   Duration _dayBoundaryOffset = Duration.zero;
 
+  // Bumped by clearAllStats. A sync that was already fetching when the stats
+  // were cleared (sign-out, account deletion) drops its result instead of
+  // writing the old account's history back.
+  int _clearGeneration = 0;
+
   StatsManager._internal();
 
   Future<bool> _acquireLock() async {
@@ -169,8 +174,10 @@ class StatsManager {
   }
 
   Future<void> _doSync() async {
+    final generation = _clearGeneration;
     //dev.log'StatsManager: Fetching remote stats');
     var remoteStats = await _statsService.fetchAllStats();
+    if (generation != _clearGeneration) return;
 
     // If we got empty stats but have valid local stats, keep the local stats
     // but still recalculate streak against current date
@@ -192,6 +199,10 @@ class StatsManager {
 
     // Pass the remote stats to merge instead of overwriting first
     await _merge(tempRemoteStats);
+    if (generation != _clearGeneration) {
+      _allStats = LocalAllStats.empty();
+      return;
+    }
 
     if (_allStats != null) {
       // Store the current streak values before recalculating
@@ -229,6 +240,26 @@ class StatsManager {
     }
 
     //dev.log'StatsManager: Sync completed');
+  }
+
+  /// Reads saved progress without attempting a network sync, even when empty.
+  Future<LocalAllStats> readLocalStats() async {
+    await initialize();
+    final generation = _clearGeneration;
+    final local = _allStats ?? await _loadLocalAllStats();
+    if (generation != _clearGeneration) return LocalAllStats.empty();
+    return local;
+  }
+
+  /// Current local history for first paint. Unlike localAllStats, this never
+  /// starts a network request, even for an empty/new account.
+  Future<LocalAllStats> readLocalSnapshot() async {
+    await initialize();
+    final generation = _clearGeneration;
+    final snapshot = _allStats ?? await _loadLocalAllStats();
+    if (generation != _clearGeneration) return LocalAllStats.empty();
+    final local = calculateStreak(snapshot);
+    return local.copyWith(consistencyScore: calculateConsistencyScore(local));
   }
 
   Future<LocalAllStats> get localAllStats async {
@@ -585,6 +616,41 @@ class StatsManager {
     }
   }
 
+  /// Adds the listening time of a repeated play-through without recording a
+  /// new session. See [AudioCompletionTracker.addRepeatListeningTime].
+  Future<void> addRepeatListeningTime(int duration) async {
+    if (!_isInitialized) {
+      await initialize();
+    }
+    await _ensureStatsLoaded();
+
+    _dirty = true;
+    _allStats = AudioCompletionTracker.addRepeatListeningTime(
+      stats: _allStats,
+      duration: duration,
+    );
+    await _saveLocalAllStatsToSharedPrefs();
+
+    // The local write is the record; don't surface a post failure (the caller
+    // would retry and double-count). _dirty stays true so the next sync pushes.
+    try {
+      await _statsService.postStats(_allStats!);
+      _lastSyncedAt = _getCurrentDate();
+      await _saveLastSyncedAt();
+      _dirty = false;
+    } catch (e) {
+      AppLogger.e(
+        'STATS_MANAGER',
+        'addRepeatListeningTime: post failed, will retry on next sync',
+        e,
+      );
+    }
+
+    HomeWidgetService.updateWidgetFromStats(_allStats!).catchError((e) {
+      // Silently fail - widget updates are not critical
+    });
+  }
+
   /// Posts the current stats once, after a batch of [addAudioCompleted] calls
   /// made with `skipPost: true`. No-op if there's nothing to flush.
   Future<void> flushPendingPost() async {
@@ -640,6 +706,36 @@ class StatsManager {
     HomeWidgetService.updateWidgetFromStats(_allStats!).catchError((e) {
       // Silently fail - widget updates are not critical
     });
+  }
+
+  /// Corrects one history entry without changing listening totals or counts.
+  Future<bool> replaceAudioCompleted({
+    required LocalAudioCompleted original,
+    required LocalAudioCompleted replacement,
+  }) async {
+    if (replacement.timestamp > _getCurrentDate().millisecondsSinceEpoch) {
+      throw ArgumentError('A session cannot be moved into the future');
+    }
+    if (!_isInitialized) await initialize();
+    await _ensureStatsLoaded();
+    if (_allStats == null) return false;
+    final sessions = [...?_allStats!.audioCompleted];
+    final index = sessions.indexWhere(
+      (entry) =>
+          entry.id == original.id && entry.timestamp == original.timestamp,
+    );
+    if (index < 0) return false;
+    if (sessions.asMap().entries.any(
+      (entry) =>
+          entry.key != index &&
+          entry.value.id == replacement.id &&
+          entry.value.timestamp == replacement.timestamp,
+    )) {
+      throw StateError('A matching session already exists');
+    }
+    sessions[index] = replacement;
+    await restoreFromBackup(_allStats!.copyWith(audioCompleted: sessions));
+    return true;
   }
 
   Future<void> removeAudioCompleted(LocalAudioCompleted session) async {
@@ -789,6 +885,8 @@ class StatsManager {
     if (!_isInitialized) {
       await initialize();
     }
+    _clearGeneration++;
+    _dirty = false;
     var prefs = _prefs;
     await prefs.remove(SharedPreferenceConstants.localAllStatsKey);
     _allStats = LocalAllStats.empty();

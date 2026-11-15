@@ -2,11 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../colors/color_constants.dart';
 
-const String dmMono = 'DM Mono';
-const String dmSans = 'DM Sans';
-const String dmSerif = 'DM Serif Display';
-const String sourceSerif = 'Source Serif';
-const String teachers = 'Teachers';
+// The single typeface used throughout the app.
+const String googleSans = 'Google Sans';
 
 const String materialIcons = 'MaterialIcons';
 const padding8 = 8.0;
@@ -15,7 +12,6 @@ const padding14 = 14.0;
 const padding16 = 16.0;
 const padding20 = 20.0;
 const padding24 = 24.0;
-const fontSize16 = 16.0;
 const width4 = SizedBox(width: 4);
 const width8 = SizedBox(width: 8);
 const width12 = SizedBox(width: 12);

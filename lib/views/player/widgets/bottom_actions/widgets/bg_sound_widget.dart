@@ -1,11 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:medito/constants/constants.dart';
 import 'package:medito/constants/icons/medito_icons.dart';
-import 'package:medito/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:medito/widgets/medito_icon.dart';
-
-import '../../../../background_sound/background_sound_view.dart';
 
 class BgSoundWidget extends ConsumerStatefulWidget {
   const BgSoundWidget({super.key, required this.isBackgroundSoundSelected});
@@ -24,22 +23,33 @@ class _BgSoundWidgetState extends ConsumerState<BgSoundWidget>
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(seconds: 2),
+      // 33⅓ rpm — one revolution every 1.8s, like a real turntable.
+      duration: const Duration(milliseconds: 1800),
       vsync: this,
     );
-    if (widget.isBackgroundSoundSelected) {
-      _animationController.repeat();
-    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncSpin();
   }
 
   @override
   void didUpdateWidget(BgSoundWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.isBackgroundSoundSelected &&
-        !oldWidget.isBackgroundSoundSelected) {
+    _syncSpin();
+  }
+
+  /// Spins while a sound is selected, unless the system asks for reduced
+  /// motion: then the record stays still (its highlight still shows it's on).
+  void _syncSpin() {
+    final spin =
+        widget.isBackgroundSoundSelected &&
+        !MediaQuery.disableAnimationsOf(context);
+    if (spin && !_animationController.isAnimating) {
       _animationController.repeat();
-    } else if (!widget.isBackgroundSoundSelected &&
-        oldWidget.isBackgroundSoundSelected) {
+    } else if (!spin) {
       _animationController.stop();
     }
   }
@@ -50,26 +60,23 @@ class _BgSoundWidgetState extends ConsumerState<BgSoundWidget>
     super.dispose();
   }
 
+  // Display only: the action-bar slot owns the tap (opening the sheet) so the
+  // whole button area responds, not just a nested inner button.
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: widget.isBackgroundSoundSelected
-          ? BoxDecoration(
-              color: ColorConstants.graphite.withAlpha(200),
-              borderRadius: BorderRadius.circular(6),
-            )
-          : null,
-      child: IconButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const BackgroundSoundView(),
-            ),
-          );
-        },
-        tooltip: AppLocalizations.of(context)!.backgroundSounds,
-        icon: widget.isBackgroundSoundSelected
+    // Merges into the action-bar button: "Background sound, selected" while a
+    // sound is playing, which sighted users see from the spinning record.
+    return Semantics(
+      selected: widget.isBackgroundSoundSelected,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: widget.isBackgroundSoundSelected
+            ? BoxDecoration(
+                color: ColorConstants.graphite.withAlpha(200),
+                borderRadius: BorderRadius.circular(6),
+              )
+            : null,
+        child: widget.isBackgroundSoundSelected
             ? _spinningIcon()
             : MeditoIcon(
                 assetName: MeditoIcons.musicNote,
@@ -81,17 +88,55 @@ class _BgSoundWidgetState extends ConsumerState<BgSoundWidget>
   }
 
   Widget _spinningIcon() {
-    return AnimatedBuilder(
-      animation: _animationController,
-      builder: (context, child) {
-        return Transform.rotate(
-          angle: _animationController.value * 2 * 3.1415926535897932,
-          child: MeditoIcon(
-            assetName: MeditoIcons.compactDiscSolid,
-            color: ColorConstants.white,
-          ),
-        );
-      },
+    return RotationTransition(
+      turns: _animationController,
+      child: const CustomPaint(
+        size: Size.square(24),
+        painter: _VinylPainter(color: ColorConstants.white),
+      ),
     );
   }
+}
+
+/// A single-colour vinyl record in the style of the other action-bar icons:
+/// a solid disc with short groove arcs, the label edge and the spindle hole
+/// cut out. The arcs are off-centre, so the spin is visible.
+class _VinylPainter extends CustomPainter {
+  const _VinylPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final r = size.shortestSide / 2;
+    final cut = Paint()
+      ..blendMode = BlendMode.clear
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = r * 0.08
+      ..strokeCap = StrokeCap.round;
+
+    void groove(double radius, double startDeg, double sweepDeg) =>
+        canvas.drawArc(
+          Rect.fromCircle(center: center, radius: r * radius),
+          startDeg * math.pi / 180,
+          sweepDeg * math.pi / 180,
+          false,
+          cut,
+        );
+
+    canvas.saveLayer(Offset.zero & size, Paint());
+    canvas.drawCircle(center, r, Paint()..color = color);
+
+    groove(0.74, 195, 60);
+    groove(0.58, 205, 40);
+    groove(0.74, 20, 45);
+
+    canvas.drawCircle(center, r * 0.34, cut);
+    canvas.drawCircle(center, r * 0.1, Paint()..blendMode = BlendMode.clear);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_VinylPainter oldDelegate) => oldDelegate.color != color;
 }

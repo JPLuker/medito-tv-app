@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -39,6 +40,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get removed => 'Eliminado';
+
+  @override
+  String get undo => 'Deshacer';
+
+  @override
+  String get reorder => 'Reordenar';
 
   @override
   String get meditationProducts => 'Tienda para Apoyar';
@@ -83,6 +90,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get backgroundSounds => 'Sonido de Fondo';
 
   @override
+  String get changeBackgroundSoundsHint =>
+      'Toca aquí para cambiar los sonidos de fondo o las campanas.';
+
+  @override
+  String get dismissTip => 'Cerrar consejo';
+
+  @override
   String get x06 => 'x0.6';
 
   @override
@@ -114,6 +128,35 @@ class AppLocalizationsEs extends AppLocalizations {
   String get tapToShare => 'Toca para compartir';
 
   @override
+  String quoteBackgroundOption(String name) {
+    return 'Fondo $name';
+  }
+
+  @override
+  String get quotePaletteMidnight => 'Medianoche';
+
+  @override
+  String get quotePaletteIndigo => 'Índigo';
+
+  @override
+  String get quotePaletteOcean => 'Océano';
+
+  @override
+  String get quotePaletteForest => 'Bosque';
+
+  @override
+  String get quotePaletteSunset => 'Atardecer';
+
+  @override
+  String get quotePaletteRose => 'Rosa';
+
+  @override
+  String get quotePaletteCream => 'Crema';
+
+  @override
+  String get quotePaletteSlate => 'Pizarra';
+
+  @override
   String get id => 'id';
 
   @override
@@ -138,16 +181,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get buildNumber => 'buildNumber';
 
   @override
-  String get dismiss => 'Cerrar';
-
-  @override
   String get debugInfo => 'Información de depuración';
 
   @override
-  String get writeBelowThisLine => '--- Escribe debajo de esta línea ---';
+  String get explore => 'Explorar';
 
   @override
-  String get explore => 'Explorar';
+  String get explorePacksEmpty => 'No hay packs disponibles';
 
   @override
   String get welcome => '👋 Bienvenido';
@@ -156,19 +196,74 @@ class AppLocalizationsEs extends AppLocalizations {
   String get thanksForSharing => 'Gracias por compartir  💜';
 
   @override
-  String get thanksForSharingNeutral => 'Cara feliz';
+  String get thanksForSharingNeutral => 'Cara neutral';
 
   @override
-  String get thanksForSharingHappy => 'Cara neutral';
+  String get thanksForSharingHappy => 'Cara feliz';
 
   @override
   String get thanksForSharingSad => 'Cara triste';
+
+  @override
+  String get thanksForSharingSpoken => 'Gracias por compartir';
+
+  @override
+  String get zenModeEndMessage1 => 'Bien hecho por estar aquí.';
+
+  @override
+  String get zenModeEndMessage2 => 'Gracias por practicar.';
+
+  @override
+  String get zenModeEndMessage3 => 'Tiempo bien invertido.';
+
+  @override
+  String get zenModeEndMessage4 => 'Un momento solo para ti.';
+
+  @override
+  String get zenModeEndMessage5 => 'Gratitud por esta pausa.';
+
+  @override
+  String get zenModeEndMessage6 => 'Disfruta el resto de tu día.';
+
+  @override
+  String get zenModeEndMessage7 => 'Llévate esta sensación contigo.';
+
+  @override
+  String get zenModeEndMessage8 => 'Lleva esta calma contigo.';
+
+  @override
+  String get zenModeEndMessage9 => 'Hasta la próxima.';
+
+  @override
+  String get zenModeEndMessage10 => 'Hasta mañana.';
+
+  @override
+  String get zenModeEndMessage11 => 'Sesión completada.';
+
+  @override
+  String get zenModeEndMessage12 => 'Práctica completada.';
+
+  @override
+  String get zenModeEndMessage13 => 'Aquí y ahora.';
+
+  @override
+  String get ratingAskTitle => '¿Podrías valorar Medito?';
+
+  @override
+  String get ratingAskBody =>
+      'Solo te llevará un momento y ayudará a que más personas descubran la meditación gratuita.';
+
+  @override
+  String get ratingAskCta => 'Valorar Medito';
 
   @override
   String get min => 'min';
 
   @override
   String get hey => '👋 Hola';
+
+  @override
+  String get heyLabel => 'Hola';
 
   @override
   String get someThingWentWrong => 'Algo salió mal';
@@ -241,13 +336,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get meditoReliesOnYourDonationsToSurvive =>
       'Medito depende únicamente de tus donaciones para sobrevivir. Producimos contenido gratuito para ayudar a la humanidad.';
-
-  @override
-  String get reminderNotificationBody =>
-      'Es hora de tu meditación diaria. Tómate un momento para relajarte y concentrarte.';
-
-  @override
-  String get reminderNotificationTitle => 'Recordatorio de Meditación Diaria';
 
   @override
   String get pickTimeHelpText => 'Selecciona la hora de tu recordatorio diario';
@@ -395,9 +483,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get hourFull => 'hora';
 
   @override
-  String get minutes => 'Minutos';
-
-  @override
   String get minute => 'minuto';
 
   @override
@@ -429,13 +514,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get emailLabel => 'Correo electrónico';
 
   @override
-  String get invalidEmailError => 'Correo electrónico inválido.';
-
-  @override
   String get createAccountButtonText => 'Crear Cuenta';
 
   @override
   String get createAccountLogInButtonText => 'Iniciar sesión o Registrarse';
+
+  @override
+  String get getStarted => 'Empezar';
+
+  @override
+  String get splashSignInOrSignUp => 'Iniciar sesión o registrarse';
 
   @override
   String get sendMeMyPasswordText => 'Continuar';
@@ -461,6 +549,28 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String resendCodeInSeconds(Object seconds) {
     return 'Reenviar código en $seconds s';
+  }
+
+  @override
+  String retryInSecondsSpoken(int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: '$seconds segundos',
+      one: '1 segundo',
+    );
+    return 'Reintentar en $_temp0';
+  }
+
+  @override
+  String resendCodeInSecondsSpoken(int seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: '$seconds segundos',
+      one: '1 segundo',
+    );
+    return 'Reenviar código en $_temp0';
   }
 
   @override
@@ -529,7 +639,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get deleteAccountConfirmation =>
-      '¿Estás seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer y debes seguir las instrucciones en la siguiente página.';
+      'Esto elimina tu cuenta de forma permanente, incluidas tus estadísticas y favoritos. No se puede deshacer.';
 
   @override
   String get deleteAccountButtonText => 'Eliminar Cuenta';
@@ -540,6 +650,61 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get deleteAccountError => 'Error al eliminar la cuenta.';
+
+  @override
+  String get deleteAccountDonationNotice =>
+      'Eliminar tu cuenta no cancela una donación recurrente (mensual o anual). Puedes cancelarla en el portal de donaciones con el correo con el que donaste.';
+
+  @override
+  String get deleteAccountManageDonations => 'Gestionar donaciones';
+
+  @override
+  String get deleteAccountReasonTitle => '¿Por qué te vas?';
+
+  @override
+  String get deleteAccountReasonSubtitle =>
+      'Es opcional, pero nos ayuda a mejorar Medito.';
+
+  @override
+  String get deleteAccountReasonNotUsing => 'Ya no la uso';
+
+  @override
+  String get deleteAccountReasonPrivacy => 'Preocupaciones de privacidad';
+
+  @override
+  String get deleteAccountReasonSwitchingApp => 'Me cambio a otra app';
+
+  @override
+  String get deleteAccountReasonTechnicalIssues => 'Problemas técnicos';
+
+  @override
+  String get deleteAccountReasonTooManyNotifications =>
+      'Demasiadas notificaciones';
+
+  @override
+  String get deleteAccountReasonOther => 'Otra cosa';
+
+  @override
+  String get deleteAccountDetailsHint =>
+      '¿Algo más que quieras contarnos? (opcional)';
+
+  @override
+  String get deleteAccountFinalButton => 'Eliminar mi cuenta';
+
+  @override
+  String get deleteAccountFailed =>
+      'No se pudo eliminar la cuenta, inténtalo de nuevo.';
+
+  @override
+  String get deleteAccountUnconfirmed =>
+      'No pudimos confirmar que tu cuenta se eliminó. Revisa tu conexión e inténtalo de nuevo.';
+
+  @override
+  String get accountDeletedTitle => 'Tu cuenta ha sido eliminada';
+
+  @override
+  String get accountDeletedBody =>
+      'Tu perfil, estadísticas y favoritos se han eliminado. Puedes seguir usando Medito sin una cuenta.';
 
   @override
   String get accountMarkedForDeletionError =>
@@ -577,9 +742,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get locked => 'Bloqueado';
-
-  @override
-  String get loadingPath => 'Cargando tu ruta...';
 
   @override
   String get pathLoadError =>
@@ -674,6 +836,17 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get dayStreak => 'días de racha';
+
+  @override
+  String streakDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count días de racha',
+      one: '1 día de racha',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get dailyQuote => 'Cita Diaria';
@@ -786,6 +959,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get customiseHomeLayout => 'Organizar Diseño de Inicio';
 
   @override
+  String get customiseHomeLayoutHint =>
+      'Mantén pulsado un elemento y arrástralo para cambiar el orden. Con un lector de pantalla, usa el menú de acciones para mover los elementos.';
+
+  @override
   String get featuresIntegrations => 'Características e Integraciones';
 
   @override
@@ -801,7 +978,33 @@ class AppLocalizationsEs extends AppLocalizations {
   String get advanced => 'Avanzado';
 
   @override
+  String get appearance => 'Apariencia';
+
+  @override
+  String get community => 'Comunidad';
+
+  @override
   String get restorePreviousStats => 'Restaurar estadísticas anteriores';
+
+  @override
+  String get dayStartsTitle => 'Cuándo empieza mi día';
+
+  @override
+  String get dayStartsMidnightDefault => 'Medianoche (predeterminado)';
+
+  @override
+  String get dayStartsDialogTitle => '¿Cuándo empieza tu día?';
+
+  @override
+  String get dayStartsDialogBody =>
+      'Elige cuándo empieza un nuevo día para tu racha. Es útil si sueles meditar tarde por la noche y quieres que las sesiones después de medianoche sigan contando para el día anterior.';
+
+  @override
+  String get dayStartsExperimentalNote =>
+      'Experimental. Al cambiar esto se actualiza cómo se agrupan en días todas tus sesiones anteriores, así que tu racha actual y tu racha más larga pueden cambiar.';
+
+  @override
+  String get save => 'Guardar';
 
   @override
   String get restorePreviousStatsExplainer =>
@@ -851,6 +1054,31 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String dayCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count días',
+      one: '1 día',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sessionCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sesiones',
+      one: '1 sesión',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get historySessionFallback => 'Sesión de meditación';
+
+  @override
   String get newStreak => 'Nueva racha';
 
   @override
@@ -886,6 +1114,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get minutesPerDayOptional => 'Minutos por día (opcional)';
 
   @override
+  String get durationMinutesOptional => 'Duración (en minutos, opcional)';
+
+  @override
   String get onboarding => 'Incorporación';
 
   @override
@@ -897,25 +1128,25 @@ class AppLocalizationsEs extends AppLocalizations {
       'Habilita las notificaciones para que nunca te pierdas una sesión.';
 
   @override
-  String get enableNotificationsTitleLearn => 'Keep the learning going';
+  String get enableNotificationsTitleLearn => 'Sigue aprendiendo';
 
   @override
   String get enableNotificationsBodyLearn =>
-      'A daily reminder is the single biggest thing that helps beginners stick with it.';
+      'Un recordatorio diario es lo que más ayuda a los principiantes a mantener la práctica.';
 
   @override
-  String get enableNotificationsTitleHabit => 'Build the habit you\'re after';
+  String get enableNotificationsTitleHabit => 'Crea el hábito que buscas';
 
   @override
   String get enableNotificationsBodyHabit =>
-      'People who set a reminder are far more likely to meditate regularly.';
+      'Las personas que configuran un recordatorio tienen muchas más probabilidades de meditar con regularidad.';
 
   @override
-  String get enableNotificationsTitleStress => 'Make it part of your day';
+  String get enableNotificationsTitleStress => 'Hazlo parte de tu día';
 
   @override
   String get enableNotificationsBodyStress =>
-      'Just a few minutes daily is enough to start feeling the difference.';
+      'Solo unos minutos al día bastan para empezar a notar la diferencia.';
 
   @override
   String get enableNotificationsCta => 'Habilitar Notificaciones';
@@ -930,6 +1161,16 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get notificationPreviewBodyB =>
       'Tu respiración diaria te espera. Solo toca para empezar.';
+
+  @override
+  String onboardingStepIndicator(int current, int total) {
+    return 'Paso $current de $total';
+  }
+
+  @override
+  String onboardingReminderCurrentlySet(String time) {
+    return 'Recordatorio diario configurado para las $time';
+  }
 
   @override
   String get reminderChipsQuestion => '¿Cuándo vas a meditar?';
@@ -1002,27 +1243,25 @@ class AppLocalizationsEs extends AppLocalizations {
   String get onboardingBatteryOptimize => 'Desactivar Optimización de Batería';
 
   @override
+  String get onboardingBatteryAutoStartTitle => 'Activar inicio automático';
+
+  @override
+  String get onboardingBatteryAutoStartBody =>
+      'Sigue los pasos para activar el inicio automático de Medito.';
+
+  @override
+  String get onboardingBatteryOemTitle =>
+      'Tu dispositivo tiene una optimización de batería adicional';
+
+  @override
+  String get onboardingBatteryOemBody =>
+      'Sigue los pasos para desactivar estas optimizaciones y que Medito funcione sin problemas.';
+
+  @override
   String get skipForNow => 'Omitir por Ahora';
 
   @override
   String get skip => 'Omitir';
-
-  @override
-  String get packSetAsUpNext =>
-      'Este paquete ahora aparecerá en la sección Tu Camino en la página de inicio';
-
-  @override
-  String get packUnpinnedFromUpNext =>
-      'Este paquete ha sido eliminado de la sección Tu Camino';
-
-  @override
-  String get smartReminders => 'Recordatorios Inteligentes';
-
-  @override
-  String get turnOnSmartReminders => 'Activar Recordatorios Inteligentes';
-
-  @override
-  String get smartRemindersOn => 'Recordatorios Inteligentes Activados';
 
   @override
   String get donationTitle =>
@@ -1033,7 +1272,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'Medito es gestionado por un pequeño equipo sin fines de lucro. Sin anuncios, sin inversores, sin muros de pago — solo donaciones de personas que usan la app.';
 
   @override
-  String get donationPrimerCta => 'See how to help';
+  String get donationPrimerCta => 'Descubre cómo ayudar';
 
   @override
   String get donateNow => 'Conviértete en colaborador';
@@ -1054,66 +1293,61 @@ class AppLocalizationsEs extends AppLocalizations {
   String get startMeditating => 'Comenzar a Meditar';
 
   @override
-  String get trackingPermissionTitle => 'Help Us Improve Medito';
+  String get trackingPermissionTitle => 'Ayúdanos a Mejorar Medito';
 
   @override
   String get trackingPermissionBody =>
-      'Your privacy matters. We use anonymous data to understand how people use Medito, so we can make it better for everyone. We never collect personal information or sell your data.';
+      'Tu privacidad importa. Usamos datos anónimos para entender cómo se usa Medito y así mejorarlo para todos. Nunca recopilamos información personal ni vendemos tus datos.';
 
   @override
   String get trackingPermissionPrivacyNote =>
-      'Your data stays anonymous and is never shared with third parties.';
+      'Tus datos siguen siendo anónimos y nunca se comparten con terceros.';
 
   @override
-  String get trackingPermissionAllow => 'Continue';
+  String get trackingPermissionAllow => 'Continuar';
 
   @override
-  String get onboardingFirstMeditationTitle => 'Your first meditation';
+  String get onboardingFirstMeditationTitle => 'Tu primera meditación';
 
   @override
-  String get onboardingFirstMeditationHook => 'Your first moment of calm.';
+  String get onboardingFirstMeditationHook => 'Tu primer momento de calma.';
 
   @override
-  String get onboardingFirstMeditationDuration => 'Just over 2 minutes';
+  String get onboardingFirstMeditationDuration => 'Poco más de 2 minutos';
 
   @override
   String get onboardingFirstMeditationSubtitle =>
-      'Nothing to get right. Just sit back and listen.';
+      'No hay nada que hacer bien. Solo relájate y escucha.';
 
   @override
-  String get onboardingFirstMeditationBegin => 'Start';
+  String get onboardingFirstMeditationBegin => 'Empezar';
 
   @override
-  String get onboardingFirstMeditationSkip => 'Maybe later';
+  String get onboardingFirstMeditationSkip => 'Quizás más tarde';
 
   @override
-  String get onboardingFirstMeditationSkipShort => 'Skip';
+  String get onboardingFirstMeditationSkipShort => 'Omitir';
 
   @override
-  String get onboardingFirstMeditationDone => 'That\'s it. You just meditated.';
+  String get onboardingFirstMeditationDone => 'Eso es todo. Acabas de meditar.';
 
   @override
-  String get onboardingFirstMeditationContinue => 'Continue';
+  String get onboardingFirstMeditationContinue => 'Continuar';
 
   @override
   String get splashHeadline => 'Meditación Hecha Simple';
 
   @override
-  String get splashBenefit1Title => 'Gratis para Todos, Para Siempre';
+  String get splashSubtitle =>
+      'Gratis para siempre. Sin anuncios. Sin ánimo de lucro.';
 
   @override
   String get splashBenefit1Subtitle =>
       'Explora horas de meditaciones guiadas, cursos avanzados y más. Sin muro de pago.';
 
   @override
-  String get splashBenefit2Title => 'Desafíos y Recordatorios';
-
-  @override
   String get splashBenefit2Subtitle =>
       'Mantente motivado diariamente, rastrea el progreso y construye hábitos duraderos.';
-
-  @override
-  String get splashBenefit3Title => 'Sin Fines de Lucro y Sin Anuncios';
 
   @override
   String get splashBenefit3Subtitle =>
@@ -1124,6 +1358,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get setReminderB => 'Recuérdamelo Cada Día';
+
+  @override
+  String get donationContinueToPayment => 'Continuar al pago';
 
   @override
   String get donationEmailLabel => 'Correo electrónico';
@@ -1139,6 +1376,25 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get donationEmailInvalid =>
       'Ese correo electrónico no parece correcto.';
+
+  @override
+  String emailTypoSuggestion(String email) {
+    return '¿Quisiste decir $email?';
+  }
+
+  @override
+  String get emailTypoDialogTitle => 'Revisa tu correo';
+
+  @override
+  String emailTypoDialogTyped(String email) {
+    return 'Escribiste $email.';
+  }
+
+  @override
+  String get emailTypoUseSuggestion => 'Usar este';
+
+  @override
+  String get emailTypoKeepTyped => 'Dejar el mío';
 
   @override
   String get donationThankYouTitle => '¡Gracias por Tu Apoyo!';
@@ -1655,6 +1911,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get english => 'English';
 
   @override
+  String get german => 'Deutsch';
+
+  @override
   String get spanish => 'Español (beta)';
 
   @override
@@ -1700,7 +1959,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get debugInfoLabel => 'Información de depuración';
 
   @override
+  String get writeBelowThisLine => '--- Escribe debajo de esta línea ---';
+
+  @override
   String get fieldRequiredError => 'Campo requerido';
+
+  @override
+  String get invalidEmailError => 'Correo electrónico inválido.';
 
   @override
   String get invalidInputError => 'Entrada inválida';
@@ -1718,6 +1983,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'Ocurrió un error desconocido. O tenemos problemas o estás sin conexión.';
 
   @override
+  String get reminderNotificationTitle => 'Recordatorio de Meditación Diaria';
+
+  @override
+  String get reminderNotificationBody =>
+      'Es hora de tu meditación diaria. Tómate un momento para relajarte y concentrarte.';
+
+  @override
   String get helpLegalSection => 'Ayuda';
 
   @override
@@ -1727,7 +1999,29 @@ class AppLocalizationsEs extends AppLocalizations {
   String get customizationSection => 'Personalización';
 
   @override
-  String get addHomeScreenWidget => 'Add Home Screen Widget';
+  String get addHomeScreenWidget => 'Añadir Widget a la Pantalla de Inicio';
+
+  @override
+  String get addWidgetSheetTitle => 'Añade un widget de Medito';
+
+  @override
+  String get addWidgetStepHold =>
+      'Mantén pulsado un espacio vacío de la pantalla de inicio hasta que las apps empiecen a moverse.';
+
+  @override
+  String get addWidgetStepEdit =>
+      'Toca Editar en la esquina superior y luego Añadir widget. En versiones anteriores de iOS, toca +.';
+
+  @override
+  String get addWidgetStepSearch =>
+      'Busca Medito y elige Streak, Consistency o Continue.';
+
+  @override
+  String get addWidgetStepAdd => 'Toca Añadir widget y luego OK.';
+
+  @override
+  String get addWidgetFootnote =>
+      'Tu widget se actualiza después de cada meditación. Para la pantalla bloqueada, mantenla pulsada y toca Personalizar y luego Añadir widgets.';
 
   @override
   String get themeTitle => 'Tema';
@@ -1827,9 +2121,6 @@ class AppLocalizationsEs extends AppLocalizations {
       'Dependemos de donantes como tú para seguir proporcionando mindfulness a todos.';
 
   @override
-  String get donateAgain => 'Donar Nuevamente';
-
-  @override
   String get donationInfoTitle => 'Por Qué Puedes Ver Esto';
 
   @override
@@ -1844,200 +2135,212 @@ class AppLocalizationsEs extends AppLocalizations {
       'Solicitud de donación oculta por 30 días';
 
   @override
+  String get dailyReminders => 'Recordatorios Diarios';
+
+  @override
+  String get turnOnReminders => 'Activar recordatorios';
+
+  @override
   String get reminderPromptDismissedMessage =>
       'Puedes activar o desactivar los recordatorios en Configuración';
 
   @override
-  String get smartReminderDay1TitleVar1 => 'Mantén tu racha 🌱';
+  String reminderSetFor(String time) {
+    return 'Recordatorio diario a las $time';
+  }
 
   @override
-  String smartReminderDay1BodyVar1(String streak) {
+  String get dontShowAgain => 'No volver a mostrar';
+
+  @override
+  String get reminderDay1TitleVar1 => 'Mantén tu racha 🌱';
+
+  @override
+  String reminderDay1BodyVar1(String streak) {
     return 'Tienes una racha de $streak días. ¿La mantienes?';
   }
 
   @override
-  String get smartReminderDay1TitleVar2 => 'Paso fuerte ✨';
+  String get reminderDay1TitleVar2 => 'Paso fuerte ✨';
 
   @override
-  String smartReminderDay1BodyVar2(String consistency) {
+  String reminderDay1BodyVar2(String consistency) {
     return 'Consistencia $consistency%. Sigamos adelante.';
   }
 
   @override
-  String get smartReminderDay1TitleVar3 => 'Las victorias pequeñas suman 💜';
+  String get reminderDay1TitleVar3 => 'Las victorias pequeñas suman 💜';
 
   @override
-  String get smartReminderDay1BodyVar3 =>
+  String get reminderDay1BodyVar3 =>
       'Unos minutos ahora mantienen tu impulso vivo.';
 
   @override
-  String get smartReminderDay1TitleVar4 => 'Tu práctica te espera 🌸';
+  String get reminderDay1TitleVar4 => 'Tu práctica te espera 🌸';
 
   @override
-  String get smartReminderDay1BodyVar4 =>
+  String get reminderDay1BodyVar4 =>
       'Tómate un momento para reconectar contigo mismo.';
 
   @override
-  String get smartReminderDay1TitleVar5 => 'Una respiración a la vez 🫧';
+  String get reminderDay1TitleVar5 => 'Una respiración a la vez 🫧';
 
   @override
-  String get smartReminderDay1BodyVar5 =>
+  String get reminderDay1BodyVar5 =>
       'Cada sesión cuenta, sin importar cuán corta sea.';
 
   @override
-  String get smartReminderDay2TitleVar1 => 'Mantén el flujo 🔁';
+  String get reminderDay2TitleVar1 => 'Mantén el flujo 🔁';
 
   @override
-  String get smartReminderDay2BodyVar1 =>
+  String get reminderDay2BodyVar1 =>
       'Recuperemos esa racha. Unos minutos pueden marcar una gran diferencia.';
 
   @override
-  String get smartReminderDay2TitleVar2 => 'Construye tu ritmo 🧘';
+  String get reminderDay2TitleVar2 => 'Construye tu ritmo 🧘';
 
   @override
-  String get smartReminderDay2BodyVar2 => 'Otra práctica suave te espera.';
+  String get reminderDay2BodyVar2 => 'Otra práctica suave te espera.';
 
   @override
-  String get smartReminderDay2TitleVar3 => 'Tú puedes 🌟';
+  String get reminderDay2TitleVar3 => 'Tú puedes 🌟';
 
   @override
-  String get smartReminderDay2BodyVar3 =>
+  String get reminderDay2BodyVar3 =>
       'Regresa a tu respiración, un momento a la vez.';
 
   @override
-  String get smartReminderDay2TitleVar4 => 'Pequeños pasos adelante 🚶';
+  String get reminderDay2TitleVar4 => 'Pequeños pasos adelante 🚶';
 
   @override
-  String get smartReminderDay2BodyVar4 =>
+  String get reminderDay2BodyVar4 =>
       'La consistencia construye fuerza. Empieza con solo unos minutos.';
 
   @override
-  String get smartReminderDay2TitleVar5 => 'Regreso suave 💚';
+  String get reminderDay2TitleVar5 => 'Regreso suave 💚';
 
   @override
-  String get smartReminderDay2BodyVar5 =>
+  String get reminderDay2BodyVar5 =>
       'Tu práctica consciente está aquí cuando estés listo.';
 
   @override
-  String get smartReminderDay3TitleVar1 => 'Construye el hábito 📆';
+  String get reminderDay3TitleVar1 => 'Construye el hábito 📆';
 
   @override
-  String get smartReminderDay3BodyVar1 => 'El impulso importa. Tú puedes.';
+  String get reminderDay3BodyVar1 => 'El impulso importa. Tú puedes.';
 
   @override
-  String get smartReminderDay3TitleVar2 => ' Chispa de tres días ✴️';
+  String get reminderDay3TitleVar2 => ' Chispa de tres días ✴️';
 
   @override
-  String get smartReminderDay3BodyVar2 => 'Tu práctica está tomando forma.';
+  String get reminderDay3BodyVar2 => 'Tu práctica está tomando forma.';
 
   @override
-  String get smartReminderDay3TitleVar3 => 'Un suave empujón 🤍';
+  String get reminderDay3TitleVar3 => 'Un suave empujón 🤍';
 
   @override
-  String get smartReminderDay3BodyVar3 =>
-      'Dos minutos conscientes son suficientes.';
+  String get reminderDay3BodyVar3 => 'Dos minutos conscientes son suficientes.';
 
   @override
-  String get smartReminderDay3TitleVar4 => 'Creciendo más fuerte 🌿';
+  String get reminderDay3TitleVar4 => 'Creciendo más fuerte 🌿';
 
   @override
-  String get smartReminderDay3BodyVar4 =>
+  String get reminderDay3BodyVar4 =>
       'Cada día que practicas, construyes algo significativo.';
 
   @override
-  String get smartReminderDay3TitleVar5 => 'Encuentra tu calma 🕊️';
+  String get reminderDay3TitleVar5 => 'Encuentra tu calma 🕊️';
 
   @override
-  String get smartReminderDay3BodyVar5 =>
+  String get reminderDay3BodyVar5 =>
       'Una breve pausa puede resetear todo tu día.';
 
   @override
-  String get smartReminderDay4Title => 'Pasos pequeños 🪴';
+  String get reminderDay4Title => 'Pasos pequeños 🪴';
 
   @override
-  String get smartReminderDay4Body =>
+  String get reminderDay4Body =>
       'Han pasado 4 días. Reinicia tu práctica con una sesión corta.';
 
   @override
-  String get smartReminderDay5Title => 'Tiempo de reconectar 💪';
+  String get reminderDay5Title => 'Tiempo de reconectar 💪';
 
   @override
-  String get smartReminderDay5Body =>
+  String get reminderDay5Body =>
       'Han pasado 5 días. Una pausa calmada ahora puede ayudarte a volver al camino.';
 
   @override
-  String get smartReminderDay6Title => 'Casi una semana ⏰';
+  String get reminderDay6Title => 'Casi una semana ⏰';
 
   @override
-  String get smartReminderDay6Body =>
+  String get reminderDay6Body =>
       'Han pasado casi una semana desde que meditaste. Cierra el ciclo con un momento consciente.';
 
   @override
-  String get smartReminderDay7Title => 'Revisión semanal 📅';
+  String get reminderDay7Title => 'Revisión semanal 📅';
 
   @override
-  String get smartReminderDay7Body =>
+  String get reminderDay7Body =>
       'Ha pasado una semana desde que meditaste. ¿Listo para regresar?';
 
   @override
-  String get smartReminderDay8Title => 'Nuevo comienzo 🌤️';
+  String get reminderDay8Title => 'Nuevo comienzo 🌤️';
 
   @override
-  String get smartReminderDay8Body =>
+  String get reminderDay8Body =>
       'Han pasado más de una semana. Un nuevo comienzo con solo unos minutos conscientes.';
 
   @override
-  String get smartReminderDay9Title => 'Encuentra tu centro 🎯';
+  String get reminderDay9Title => 'Encuentra tu centro 🎯';
 
   @override
-  String get smartReminderDay9Body => 'Una sesión corta puede resetear tu día.';
+  String get reminderDay9Body => 'Una sesión corta puede resetear tu día.';
 
   @override
-  String get smartReminderDay10Title => 'Dos dígitos 🔟';
+  String get reminderDay10Title => 'Dos dígitos 🔟';
 
   @override
-  String get smartReminderDay10Body =>
+  String get reminderDay10Body =>
       'Han pasado 10 días. Continúa donde lo dejaste.';
 
   @override
-  String get smartReminderDay11Title => 'Suave empujón 🤍';
+  String get reminderDay11Title => 'Suave empujón 🤍';
 
   @override
-  String get smartReminderDay11Body =>
-      'Detente, respira y nota cómo te sientes.';
+  String get reminderDay11Body => 'Detente, respira y nota cómo te sientes.';
 
   @override
-  String get smartReminderDay12Title => 'Mantén la estabilidad 🧭';
+  String get reminderDay12Title => 'Mantén la estabilidad 🧭';
 
   @override
-  String get smartReminderDay12Body => 'Un momento calmado te espera.';
+  String get reminderDay12Body => 'Un momento calmado te espera.';
 
   @override
-  String get smartReminderDay13Title => 'Acercándose a dos semanas ⏳';
+  String get reminderDay13Title => 'Acercándose a dos semanas ⏳';
 
   @override
-  String get smartReminderDay13Body =>
+  String get reminderDay13Body =>
       'Han pasado casi dos semanas desde que meditaste. Intenta un reinicio de dos minutos.';
 
   @override
-  String get smartReminderDay14Title => 'Revisión de dos semanas 🔔';
+  String get reminderDay14Title => 'Revisión de dos semanas 🔔';
 
   @override
-  String get smartReminderDay14Body =>
+  String get reminderDay14Body =>
       'Han pasado 14 días. Comienza de nuevo ahora, gentilmente.';
 
   @override
-  String get smartReminderDay15Title => 'Pausaremos los recordatorios 🌿';
+  String get reminderDay15Title => 'Pausaremos los recordatorios 🌿';
 
   @override
-  String get smartReminderDay15Body =>
+  String get reminderDay15Body =>
       'Estamos pausando los recordatorios por ahora. Estamos aquí cuando estés listo.';
 
   @override
-  String get smartReminderDay30Title => 'Un suave empujón 🤗';
+  String get reminderDay30Title => 'Un suave empujón 🤗';
 
   @override
-  String get smartReminderDay30Body =>
+  String get reminderDay30Body =>
       'Ha pasado un mes desde que meditaste. Solo 2 minutos pueden ayudarte a sentirte mejor. Estamos aquí cuando estés listo.';
 
   @override
@@ -2048,6 +2351,19 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get repeatModeForever => 'Repetir siempre';
+
+  @override
+  String get repeatModeOff => 'Desactivado';
+
+  @override
+  String get repeatModeOffDescription => 'Se reproduce una vez y termina.';
+
+  @override
+  String get repeatModeOnceDescription => 'Se reproduce dos veces y termina.';
+
+  @override
+  String get repeatModeForeverDescription =>
+      'Sigue sonando hasta que lo detengas.';
 
   @override
   String get addSession => 'Agregar sesión';
@@ -2094,6 +2410,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get durationInMinutes => 'Duración (minutos)';
 
   @override
+  String get minutes => 'Minutos';
+
+  @override
   String get optional => 'Opcional';
 
   @override
@@ -2129,11 +2448,27 @@ class AppLocalizationsEs extends AppLocalizations {
   String get completedAt => 'Completado a las';
 
   @override
-  String get upNextTitle => 'Your Path';
+  String get upNextTitle => 'Continuar';
 
   @override
   String upNextProgress(int completed, int total) {
     return '$completed de $total';
+  }
+
+  @override
+  String upNextProgressSemantics(int completed, int total) {
+    String _temp0 = intl.Intl.pluralLogic(
+      total,
+      locale: localeName,
+      other: '$completed de $total sesiones completadas',
+      one: '$completed de 1 sesión completada',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String upNextSkippedAnnouncement(String title) {
+    return 'Omitida. A continuación: $title';
   }
 
   @override
@@ -2161,54 +2496,56 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get upNextPathCompletedTitle => 'You\'ve completed your path';
+  String get upNextPathCompletedTitle =>
+      'Has terminado todos los paquetes de la serie';
 
   @override
   String get upNextPathCompletedSubtitle =>
-      'Every pack in your path is done. Explore the library to choose what\'s next.';
+      'Explora la biblioteca para encontrar lo siguiente.';
 
   @override
-  String get upNextNextPackPinnedSnack =>
-      'Your next pack is ready in Your Path';
-
-  @override
-  String upNextSessionCount(int current, int total) {
-    return 'Session $current of $total';
+  String upNextNextPackPinnedSnack(String packTitle) {
+    return '$packTitle está listo en Inicio';
   }
 
   @override
-  String get manageDefaults => 'Manage Defaults';
+  String upNextSessionCount(int current, int total) {
+    return 'Sesión $current de $total';
+  }
 
   @override
-  String get defaults => 'Defaults';
+  String get manageDefaults => 'Gestionar Predeterminados';
 
   @override
-  String get defaultGuideName => 'Default Guide Name';
+  String get defaults => 'Predeterminados';
 
   @override
-  String get defaultDuration => 'Default Duration';
+  String get defaultGuideName => 'Guía Predeterminado';
 
   @override
-  String get defaultGuideNameCleared => 'Default guide name cleared';
+  String get defaultDuration => 'Duración Predeterminada';
 
   @override
-  String get defaultDurationCleared => 'Default duration cleared';
+  String get defaultGuideNameCleared => 'Guía predeterminado eliminado';
 
   @override
-  String get notSet => 'Not set';
+  String get defaultDurationCleared => 'Duración predeterminada eliminada';
+
+  @override
+  String get notSet => 'Sin configurar';
 
   @override
   String get defaultsNote =>
-      'These defaults are set from your last selection on any track. Your Path uses them to skip the selection screen.';
+      'Se basan en lo que reproduces en cualquier pista. Inicio y tu reloj los usan para empezar sesiones sin la pantalla de selección.';
 
   @override
-  String get streakFreezeUsed => 'Streak freeze used';
+  String get streakFreezeUsed => 'Congelación de racha usada';
 
   @override
-  String get session => 'session';
+  String get session => 'sesión';
 
   @override
-  String get sessions => 'sessions';
+  String get sessions => 'sesiones';
 
   @override
   String get play => 'Reproducir';
@@ -2217,10 +2554,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get pause => 'Pausar';
 
   @override
-  String get skipBackward10Seconds => 'Retroceder 10 segundos';
+  String get skipBackward15Seconds => 'Retroceder 15 segundos';
 
   @override
-  String get skipForward10Seconds => 'Avanzar 10 segundos';
+  String get skipForward15Seconds => 'Avanzar 15 segundos';
 
   @override
   String get repeat => 'Repetir';
@@ -2235,7 +2572,23 @@ class AppLocalizationsEs extends AppLocalizations {
   String get deleteDownload => 'Eliminar descarga';
 
   @override
+  String downloadRemoved(String title) {
+    return '“$title” eliminado';
+  }
+
+  @override
   String get playbackSpeed => 'Velocidad de reproducción';
+
+  @override
+  String playbackSpeedValue(String speed) {
+    return '$speed veces';
+  }
+
+  @override
+  String get speedReset => 'Restablecer';
+
+  @override
+  String get backgroundSoundsSection => 'Sonidos';
 
   @override
   String get reportIssue => 'Reportar problema';
@@ -2247,7 +2600,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get refresh => 'Actualizar';
 
   @override
-  String get upNext => 'Tu Camino';
+  String get upNext => 'Continuar';
+
+  @override
+  String get dismiss => 'Cerrar';
 
   @override
   String get donationInfo => 'Información sobre donaciones';
@@ -2266,16 +2622,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get yourPathExplainerText =>
-      'Learn meditation one minute at a time. Sessions get longer as you learn.';
+      'Aprende a meditar minuto a minuto. Las sesiones se alargan a medida que aprendes.';
 
   @override
-  String get yourPathExplainerSwipeHint => 'Swipe left to skip.';
-
-  @override
-  String get onboardingStep1of2 => '1 de 2';
-
-  @override
-  String get onboardingStep2of2 => '2 de 2';
+  String get yourPathExplainerSwipeHint =>
+      'Desliza a la izquierda para omitir o abrir el paquete.';
 
   @override
   String get onboardingExperienceQuestion => '¿Has meditado antes?';
@@ -2311,24 +2662,30 @@ class AppLocalizationsEs extends AppLocalizations {
       'Gestionar el estrés, el sueño o las emociones';
 
   @override
-  String get onboardingAttributionQuestion => 'How did you hear about Medito?';
+  String get onboardingStep1of2 => '1 de 2';
+
+  @override
+  String get onboardingStep2of2 => '2 de 2';
+
+  @override
+  String get onboardingAttributionQuestion => '¿Cómo conociste Medito?';
 
   @override
   String get onboardingAttributionSubtext =>
-      'This helps us reach more people who need it.';
+      'Esto nos ayuda a llegar a más personas que lo necesitan.';
 
   @override
-  String get onboardingAttributionGoogleAd => 'Google ad';
+  String get onboardingAttributionGoogleAd => 'Anuncio de Google';
 
   @override
-  String get onboardingAttributionSocialAd => 'Instagram or Facebook ad';
+  String get onboardingAttributionSocialAd => 'Anuncio de Instagram o Facebook';
 
   @override
-  String get onboardingAttributionFriend => 'A friend told me';
+  String get onboardingAttributionFriend => 'Me lo recomendó un amigo';
 
   @override
   String get onboardingAttributionTherapist =>
-      'Therapist or healthcare professional';
+      'Terapeuta o profesional de la salud';
 
   @override
   String get onboardingAttributionAppStore => 'App Store';
@@ -2337,14 +2694,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get onboardingAttributionPlayStore => 'Play Store';
 
   @override
-  String get onboardingAttributionOther => 'Other';
+  String get onboardingAttributionOther => 'Otro';
 
   @override
-  String get onboardingAttributionOtherLabel => 'Something else?';
+  String get onboardingAttributionOtherLabel => '¿Otra cosa?';
 
   @override
-  String get onboardingAttributionOtherHint =>
-      'Tell us where you heard about us';
+  String get onboardingAttributionOtherHint => 'Cuéntanos dónde nos conociste';
 
   @override
   String get onboardingResultLearnHeading => 'Estás en el lugar correcto.';
@@ -2374,13 +2730,19 @@ class AppLocalizationsEs extends AppLocalizations {
   String get addToFavorites => 'Agregar a favoritos';
 
   @override
+  String get addedToFavorites => 'Añadido a Favoritos';
+
+  @override
+  String get removedFromFavorites => 'Quitado de Favoritos';
+
+  @override
   String get removeFromFavorites => 'Quitar de favoritos';
 
   @override
-  String get pinToUpNext => 'Fijar en Tu Camino';
+  String get openPack => 'Abrir paquete';
 
   @override
-  String get unpinFromUpNext => 'Desfijar de Tu Camino';
+  String get yourPathAllDone => 'Todas las sesiones completadas';
 
   @override
   String get connectionErrorTitle => 'No se pudo cargar el paywall';
@@ -2406,4 +2768,715 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get markTrackIncomplete => 'Marcar como no completado';
+
+  @override
+  String get accountPromptTitle => 'Guarda tu progreso';
+
+  @override
+  String get accountPromptBody =>
+      'Añade tu correo para que tu racha y tu historial te acompañen en un teléfono nuevo.';
+
+  @override
+  String get accountPromptCta => 'Guardar mi progreso';
+
+  @override
+  String donateAmountPerMonth(String amount) {
+    return 'Donar $amount/mes';
+  }
+
+  @override
+  String get donateWithApplePayPrefix => 'Donar con';
+
+  @override
+  String get donateOtherAmount => 'Otra cantidad';
+
+  @override
+  String get donateMostPopular => 'Más popular';
+
+  @override
+  String get donateMonthlyDisclosure =>
+      'Mensual, cancela cuando quieras. Pago seguro con Stripe.';
+
+  @override
+  String donateAmountPerMonthSpoken(String amount) {
+    return 'Donar $amount al mes';
+  }
+
+  @override
+  String donateAmountPerMonthWithApplePay(String amount) {
+    return 'Donar $amount al mes con Apple Pay';
+  }
+
+  @override
+  String get donateWithApplePay => 'Donar con Apple Pay';
+
+  @override
+  String get donateWithCard => 'Donar con tarjeta';
+
+  @override
+  String get yearlyDonation => 'Anual';
+
+  @override
+  String get donateNotNow => 'Ahora no';
+
+  @override
+  String donationMinimumAmount(String amount) {
+    return 'La cantidad mínima es $amount';
+  }
+
+  @override
+  String donationOtherAmountHint(String amount) {
+    return 'Otra cantidad (mín. $amount)';
+  }
+
+  @override
+  String get donationDisclosure =>
+      'Tu donación ayuda a que Medito siga siendo gratis para todos, sin anuncios ni muros de pago. Recibirás un correo de confirmación en breve.';
+
+  @override
+  String get donationStripeTrust => 'Pago seguro con Stripe';
+
+  @override
+  String get supportMedito => 'Apoya a Medito';
+
+  @override
+  String get tagSleep => 'Sueño';
+
+  @override
+  String get tagStress => 'Estrés';
+
+  @override
+  String get tagAnxiety => 'Ansiedad';
+
+  @override
+  String get tagLowMood => 'Ánimo bajo';
+
+  @override
+  String get tagFocus => 'Concentración';
+
+  @override
+  String get tagCalm => 'Calma';
+
+  @override
+  String get tagSelfCompassion => 'Autocompasión';
+
+  @override
+  String get tagGratitude => 'Gratitud';
+
+  @override
+  String get tagEmotions => 'Emociones difíciles';
+
+  @override
+  String get tagPain => 'Dolor';
+
+  @override
+  String get tagConfidence => 'Confianza';
+
+  @override
+  String get tagRelationships => 'Relaciones';
+
+  @override
+  String get tagGrief => 'Duelo';
+
+  @override
+  String get tagHabitBuilding => 'Crear el hábito';
+
+  @override
+  String get tagBreathing => 'Respiración';
+
+  @override
+  String get tagBodyScan => 'Escaneo corporal';
+
+  @override
+  String get tagLovingKindness => 'Bondad amorosa';
+
+  @override
+  String get tagOpenAwareness => 'Conciencia abierta';
+
+  @override
+  String get tagVisualization => 'Visualización';
+
+  @override
+  String get tagMantra => 'Mantra';
+
+  @override
+  String get tagWalking => 'Caminar';
+
+  @override
+  String get tagReflection => 'Reflexión';
+
+  @override
+  String get tagSound => 'Sonido';
+
+  @override
+  String get tagGuidedMeditation => 'Meditación guiada';
+
+  @override
+  String get tagTalk => 'Charlas';
+
+  @override
+  String get tagSleepStory => 'Cuentos para dormir';
+
+  @override
+  String get tagMusic => 'Música';
+
+  @override
+  String get tagNatureSounds => 'Sonidos de la naturaleza';
+
+  @override
+  String get tagCourseLesson => 'Lecciones del curso';
+
+  @override
+  String get tagBeginners => 'Para principiantes';
+
+  @override
+  String get tagExperienced => 'Con experiencia';
+
+  @override
+  String get tagTeensStudents => 'Adolescentes y estudiantes';
+
+  @override
+  String get tagTeachers => 'Docentes';
+
+  @override
+  String get tagWorkplace => 'Trabajo';
+
+  @override
+  String get tagKids => 'Niños';
+
+  @override
+  String get tagMorning => 'Mañana';
+
+  @override
+  String get tagEvening => 'Noche';
+
+  @override
+  String get tagSos => 'SOS';
+
+  @override
+  String get tagOnTheGo => 'En movimiento';
+
+  @override
+  String get tagCrisis => 'Tiempos de crisis';
+
+  @override
+  String get tagSpanish => 'Español';
+
+  @override
+  String get tagNoTracks => 'Aún no hay sesiones con esta etiqueta';
+
+  @override
+  String get sessionBells => 'Campanas de sesión';
+
+  @override
+  String get sessionBellsDescription =>
+      'Una campana al principio, a la mitad y al final';
+
+  @override
+  String get upNextStartHere => 'Empieza aquí';
+
+  @override
+  String widgetStreakSummary(String value) {
+    return 'Racha de meditación: $value';
+  }
+
+  @override
+  String widgetConsistencySummary(String value) {
+    return 'Puntuación de consistencia: $value';
+  }
+
+  @override
+  String get widgetNotMeditatedToday => 'Aún no has meditado hoy';
+
+  @override
+  String widgetRecentDays(String done, String total) {
+    return 'Has meditado $done de los últimos $total días';
+  }
+
+  @override
+  String widgetUpNextProgress(String completed, String total) {
+    return '$completed de $total';
+  }
+
+  @override
+  String get widgetPackComplete => 'Paquete completado';
+
+  @override
+  String get widgetChooseWhatsNext => 'Elige qué sigue';
+
+  @override
+  String get removeFromHomeShort => 'Quitar';
+
+  @override
+  String get removeFromHome => 'Quitar de Inicio';
+
+  @override
+  String get removedFromHome => 'Quitado de Inicio.';
+
+  @override
+  String get packStart => 'Empezar';
+
+  @override
+  String get packContinue => 'Continuar';
+
+  @override
+  String get packAddedToHome =>
+      'Añadido a Inicio para que retomes donde lo dejaste.';
+
+  @override
+  String get shopSubtitle =>
+      'Cada compra ayuda a que Medito siga siendo gratis para todos.';
+
+  @override
+  String get shopAllCollection => 'Todo';
+
+  @override
+  String shopFromPrice(String price) {
+    return 'Desde $price';
+  }
+
+  @override
+  String get shopSoldOut => 'Agotado';
+
+  @override
+  String get shopAddToBag => 'Añadir a la bolsa';
+
+  @override
+  String get shopAddedToBag => 'Añadido a la bolsa';
+
+  @override
+  String get shopSelectSize => 'Elige una talla';
+
+  @override
+  String get shopColour => 'Color';
+
+  @override
+  String get shopSize => 'Talla';
+
+  @override
+  String get shopOption => 'Opción';
+
+  @override
+  String get shopBagTitle => 'Tu bolsa';
+
+  @override
+  String get shopBagEmpty => 'Tu bolsa está vacía';
+
+  @override
+  String get shopBagEmptyBody =>
+      'Lo que añadas te esperará aquí hasta que estés listo.';
+
+  @override
+  String get shopBrowse => 'Explorar la tienda';
+
+  @override
+  String get shopSubtotal => 'Subtotal';
+
+  @override
+  String get shopShippingNote =>
+      'El envío y los impuestos se calculan al pagar.';
+
+  @override
+  String get shopCheckout => 'Pagar';
+
+  @override
+  String get shopCheckoutHint => 'Abre el pago seguro en tu navegador';
+
+  @override
+  String get shopCheckoutPrompt => '¿Ya hiciste tu pedido?';
+
+  @override
+  String get shopClearBag => 'Vaciar bolsa';
+
+  @override
+  String get shopSupportNote =>
+      'Medito es una organización sin ánimo de lucro. Cada compra apoya la meditación gratuita para todos.';
+
+  @override
+  String get shopLoadError => 'No pudimos cargar la tienda en este momento.';
+
+  @override
+  String get shopOpenInBrowser => 'Abrir en el navegador';
+
+  @override
+  String get shopRemoveItem => 'Quitar';
+
+  @override
+  String get shopIncreaseQuantity => 'Aumentar cantidad';
+
+  @override
+  String get shopDecreaseQuantity => 'Disminuir cantidad';
+
+  @override
+  String get shopViewBag => 'Ver bolsa';
+
+  @override
+  String get shopMoreDetails => 'Detalles';
+
+  @override
+  String shopBagItemCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count artículos',
+      one: '1 artículo',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get shopSeeAll => 'Ver todo';
+
+  @override
+  String get shopAddOnsTitle => 'Añade un detalle';
+
+  @override
+  String get shopSizeGuide => 'Guía de tallas';
+
+  @override
+  String get shopSizeChartNote =>
+      'Medidas de la prenda en plano, del proveedor. Pueden variar hasta 5 cm, así que compáralas con una camiseta que tengas.';
+
+  @override
+  String get shopMeasureLength => 'Largo';
+
+  @override
+  String get shopMeasureWidth => 'Ancho';
+
+  @override
+  String get shopMeasureSleeve => 'Manga';
+
+  @override
+  String get shopInches => 'in';
+
+  @override
+  String get shopCentimetres => 'cm';
+
+  @override
+  String get shopUnitInches => 'pulgadas';
+
+  @override
+  String get shopUnitCentimetres => 'centímetros';
+
+  @override
+  String shopPhotoPosition(int index, int count) {
+    return 'Foto $index de $count';
+  }
+
+  @override
+  String get timerTitle => 'Temporizador';
+
+  @override
+  String get timerModeStopwatch => 'Cronómetro';
+
+  @override
+  String get timerHoursLabel => 'Horas';
+
+  @override
+  String get timerMinutesLabel => 'Minutos';
+
+  @override
+  String get timerStopwatchCaption =>
+      'El tiempo cuenta desde cero. Pulsa detener cuando termines y la sesión se guarda.';
+
+  @override
+  String get timerStart => 'Empezar';
+
+  @override
+  String get timerEndSession => 'Terminar sesión';
+
+  @override
+  String get timerElapsed => 'transcurrido';
+
+  @override
+  String get timerTooShort =>
+      'Las sesiones de menos de un minuto no se guardan';
+
+  @override
+  String timerHistoryTitle(String duration) {
+    return 'Temporizador · $duration';
+  }
+
+  @override
+  String timerPresetSemantics(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: '$minutes minutos',
+      one: '1 minuto',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get soundNeedsConnection =>
+      'No descargado. Conéctate para reproducirlo';
+
+  @override
+  String get timerStopwatchTitle => 'Medita el tiempo que quieras';
+
+  @override
+  String get openTimer => 'Abrir temporizador';
+
+  @override
+  String get downloadingAudio => 'Descargando';
+
+  @override
+  String get audioDownloaded => 'Descargado';
+
+  @override
+  String get playbackPosition => 'Posición de reproducción';
+
+  @override
+  String playbackPositionValue(String position, String duration) {
+    return '$position de $duration';
+  }
+
+  @override
+  String spokenHours(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count horas',
+      one: '1 hora',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String spokenMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count minutos',
+      one: '1 minuto',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String spokenSeconds(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count segundos',
+      one: '1 segundo',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get dayMeditated => 'Meditaste';
+
+  @override
+  String get dayNotMeditated => 'Sin meditar';
+
+  @override
+  String get clearEmail => 'Borrar correo electrónico';
+
+  @override
+  String get previousMonth => 'Mes anterior';
+
+  @override
+  String get nextMonth => 'Mes siguiente';
+
+  @override
+  String searchResultsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count resultados',
+      one: '1 resultado',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get clearField => 'Borrar';
+
+  @override
+  String shopPriceWas(String price, String compareAt) {
+    return '$price, antes $compareAt';
+  }
+
+  @override
+  String shopQuantity(int count) {
+    return 'Cantidad: $count';
+  }
+
+  @override
+  String get externalLink => 'Enlace externo';
+
+  @override
+  String get meditatedToday => 'Has meditado hoy';
+
+  @override
+  String get endScreenDone => 'Listo';
+
+  @override
+  String endScreenRestoredLastNight(String title) {
+    return 'Hola de nuevo. Terminaste «$title» anoche.';
+  }
+
+  @override
+  String endScreenRestoredEarlierToday(String title) {
+    return 'Hola de nuevo. Terminaste «$title» hoy más temprano.';
+  }
+
+  @override
+  String endScreenRestoredYesterday(String title) {
+    return 'Hola de nuevo. Terminaste «$title» ayer.';
+  }
+
+  @override
+  String endScreenRestoredTimerLastNight(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: '$minutes minutos',
+      one: '1 minuto',
+    );
+    return 'Hola de nuevo. Terminaste un temporizador de $_temp0 anoche.';
+  }
+
+  @override
+  String endScreenRestoredTimerEarlierToday(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: '$minutes minutos',
+      one: '1 minuto',
+    );
+    return 'Hola de nuevo. Terminaste un temporizador de $_temp0 hoy más temprano.';
+  }
+
+  @override
+  String endScreenRestoredTimerYesterday(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: '$minutes minutos',
+      one: '1 minuto',
+    );
+    return 'Hola de nuevo. Terminaste un temporizador de $_temp0 ayer.';
+  }
+
+  @override
+  String upNextVariant(String guide, int minutes) {
+    return '$guide · $minutes min';
+  }
+
+  @override
+  String upNextVariantMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get upNextVariantEdit => 'Cambiar voz o duración';
+
+  @override
+  String get variantSheetTitle => 'Voz y duración';
+
+  @override
+  String get variantSheetNote =>
+      'Se guarda como predeterminado para las sesiones que empiezas desde Inicio.';
+
+  @override
+  String get variantVoice => 'Voz';
+
+  @override
+  String get variantLength => 'Duración';
+
+  @override
+  String get clearDefaults => 'Borrar predeterminados';
+
+  @override
+  String get defaultsCleared => 'Predeterminados borrados';
+
+  @override
+  String get sessionBellTiming => 'Cuándo suenan las campanas';
+
+  @override
+  String get sessionBellBeginningMiddleEnd => 'Principio, mitad y final';
+
+  @override
+  String get sessionBellBeginningEnd => 'Principio y final';
+
+  @override
+  String get sessionBellEveryMinute => 'Cada minuto';
+
+  @override
+  String get sessionBellEveryMinuteDescription =>
+      'Una campana al principio, cada minuto y al final';
+
+  @override
+  String get sessionBellBeginning => 'Principio';
+
+  @override
+  String get sessionBellMiddle => 'Mitad';
+
+  @override
+  String get sessionBellEnd => 'Final';
+
+  @override
+  String get sessionBellEveryXMinutes => 'Cada pocos minutos';
+
+  @override
+  String get sessionBellIntervalOff => 'Desactivado';
+
+  @override
+  String sessionBellIntervalMinutes(int minutes) {
+    return 'Cada $minutes min';
+  }
+
+  @override
+  String get downloadAll => 'Descargar todo';
+
+  @override
+  String downloadingPack(int completed, int total) {
+    return 'Descargando $completed de $total';
+  }
+
+  @override
+  String get stopDownloading => 'Detener descarga';
+
+  @override
+  String get deletePackDownloads => 'Eliminar descargas';
+
+  @override
+  String get packDownloadsDeleted => 'Descargas eliminadas';
+
+  @override
+  String get allDownloaded => 'Todas las sesiones descargadas';
+
+  @override
+  String get overflowMenu => 'Más opciones';
+
+  @override
+  String get downloadRemaining => 'Descargar pistas restantes';
+
+  @override
+  String packDownloadedCount(int count, int total) {
+    return '$count de $total pistas descargadas';
+  }
+
+  @override
+  String get trackDownloaded => 'Descargada';
+
+  @override
+  String get sessionOptions => 'Opciones de la sesión';
+
+  @override
+  String get openSession => 'Abrir sesión';
+
+  @override
+  String get editSessionDateTime => 'Editar fecha y hora';
+
+  @override
+  String get editSessionExplanation =>
+      'Corrige cuándo tuvo lugar esta sesión. Tu tiempo de escucha no cambiará.';
+
+  @override
+  String get editSessionError =>
+      'No se pudo actualizar esta sesión. Inténtalo de nuevo.';
 }

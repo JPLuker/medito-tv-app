@@ -10,6 +10,8 @@ class NetworkImageWidget extends StatelessWidget {
   final bool shouldCache;
   final Gradient? gradient;
   final Widget? errorWidget;
+  final Duration fadeInDuration;
+  final Duration fadeOutDuration;
   const NetworkImageWidget({
     super.key,
     required this.url,
@@ -18,6 +20,8 @@ class NetworkImageWidget extends StatelessWidget {
     this.shouldCache = false,
     this.gradient,
     this.errorWidget,
+    this.fadeInDuration = const Duration(milliseconds: 500),
+    this.fadeOutDuration = const Duration(milliseconds: 1000),
   });
 
   static final Map<double, String> _resolutionSuffixes = {
@@ -38,8 +42,13 @@ class NetworkImageWidget extends StatelessWidget {
     return '$contentBaseUrl$imagePath$suffix';
   }
 
+  // Artwork only, never labelled: excluded so each card doesn't pick up an
+  // "image" trait (or a stray unlabelled image stop) from it.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      ExcludeSemantics(child: _buildImage(context));
+
+  Widget _buildImage(BuildContext context) {
     // Skip loading images from dead domains
     if (HTTPConstants.isDeadDomain(url)) {
       return errorWidget ??
@@ -71,6 +80,8 @@ class NetworkImageWidget extends StatelessWidget {
   Widget _buildCachedImage(String scaledUrl, String originalUrl) {
     return CachedNetworkImage(
       imageUrl: scaledUrl,
+      fadeInDuration: fadeInDuration,
+      fadeOutDuration: fadeOutDuration,
       imageBuilder: (context, imageProvider) => Container(
         decoration: BoxDecoration(
           image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
@@ -83,6 +94,8 @@ class NetworkImageWidget extends StatelessWidget {
         if (url != originalUrl) {
           return CachedNetworkImage(
             imageUrl: originalUrl,
+            fadeInDuration: fadeInDuration,
+            fadeOutDuration: fadeOutDuration,
             imageBuilder: (context, imageProvider) => Container(
               decoration: BoxDecoration(
                 image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
@@ -146,6 +159,8 @@ class NetworkImageWidget extends StatelessWidget {
             : ColorConstants.lightCard;
 
         return Shimmer.fromColors(
+          // A static placeholder when the user asked for reduced motion.
+          enabled: !MediaQuery.disableAnimationsOf(context),
           period: const Duration(seconds: 1),
           baseColor: baseColor,
           highlightColor: backgroundColor,

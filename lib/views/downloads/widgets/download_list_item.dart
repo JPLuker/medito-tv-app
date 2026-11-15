@@ -1,88 +1,163 @@
-import 'package:medito/utils/utils.dart';
+import 'package:medito/constants/icons/medito_icons.dart';
+import 'package:medito/widgets/medito_icon.dart';
+import 'package:medito/widgets/shimmers/widgets/box_shimmer_widget.dart';
 import 'package:medito/widgets/widgets.dart';
 import 'package:flutter/material.dart';
+import 'package:medito/constants/theme/medito_text.dart';
+
+const _coverSize = 72.0;
+const _coverRadius = 14.0;
+const _rowPadding = EdgeInsets.fromLTRB(12, 12, 4, 12);
 
 //ignore:prefer-match-file-name
 class DownloadListItemWidget extends StatelessWidget {
-  final PackImageListItemData data;
+  const DownloadListItemWidget({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.coverUrl,
+    required this.index,
+  });
 
-  const DownloadListItemWidget(this.data, {super.key});
+  final String title;
+  final String subtitle;
+  final String coverUrl;
+
+  /// Position in the reorderable list, for the drag handle.
+  final int index;
 
   @override
   Widget build(BuildContext context) {
-    var notNullAndNotEmpty = data.subtitle.isNotNullAndNotEmpty();
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: _rowPadding,
       child: Row(
-        mainAxisSize: MainAxisSize.max,
         children: [
-          _getListItemLeadingImageWidget(),
-          Container(width: 12),
-          Flexible(
+          ClipRRect(
+            borderRadius: BorderRadius.circular(_coverRadius),
+            // The cached image path ignores width/height, so size it here.
+            child: SizedBox.square(
+              dimension: _coverSize,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  NetworkImageWidget(url: coverUrl, shouldCache: true),
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: Container(
+                      margin: const EdgeInsets.all(5),
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.65),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        size: 20,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _getTitle(context),
-                notNullAndNotEmpty ? Container(height: 4) : Container(),
-                notNullAndNotEmpty ? _getSubtitle(context) : Container(),
+                Text(
+                  title,
+                  style: context.text.subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: context.text.muted.bodySmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ],
+            ),
+          ),
+          // Explicit handle: the default long-press-to-drag on phones gave no
+          // hint that the list could be reordered at all. Hidden from screen
+          // readers: its label merged a "Reorder" that did nothing into every
+          // row, and ReorderableListView already offers the move actions.
+          ReorderableDragStartListener(
+            index: index,
+            child: ExcludeSemantics(
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: Center(
+                  child: MeditoIcon(
+                    assetName: MeditoIcons.dragHandle,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.45),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
       ),
     );
   }
-
-  Text _getSubtitle(BuildContext context) =>
-      Text(data.subtitle ?? '', style: Theme.of(context).textTheme.titleMedium);
-
-  Text _getTitle(BuildContext context) => Text(
-    data.title ?? '',
-    style: Theme.of(context).textTheme.headlineMedium,
-    maxLines: 1,
-    overflow: TextOverflow.ellipsis,
-  );
-
-  Widget _getListItemLeadingImageWidget() => ClipRRect(
-    borderRadius: BorderRadius.circular(3.0),
-    child: Container(
-      color: data.colorPrimary,
-      child: SizedBox(
-        height: data.coverSize,
-        width: data.coverSize,
-        child: _coverImageWidget(),
-      ),
-    ),
-  );
-
-  Padding _coverImageWidget() {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child:
-          data.icon ?? NetworkImageWidget(url: data.cover!, shouldCache: true),
-    );
-  }
 }
 
-class PackImageListItemData {
-  String? title;
-  String? subtitle;
-  String? cover;
-  String? backgroundImage;
-  Color? colorPrimary;
-  double? coverSize;
-  Widget? icon;
+/// Loading placeholder shaped like the download rows above.
+class DownloadListShimmer extends StatelessWidget {
+  const DownloadListShimmer({super.key, this.rows = 5});
 
-  PackImageListItemData({
-    this.title,
-    this.subtitle,
-    this.colorPrimary,
-    this.cover,
-    this.coverSize,
-    this.icon,
-    this.backgroundImage,
-  });
+  final int rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(20, 64, 20, 24),
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: rows,
+      itemBuilder: (context, _) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Padding(
+            padding: _rowPadding,
+            child: Row(
+              children: [
+                BoxShimmerWidget(
+                  width: _coverSize,
+                  height: _coverSize,
+                  borderRadius: _coverRadius,
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      BoxShimmerWidget(width: 180, height: 18, borderRadius: 6),
+                      SizedBox(height: 8),
+                      BoxShimmerWidget(width: 120, height: 14, borderRadius: 6),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 48),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

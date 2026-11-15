@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:medito/constants/constants.dart';
 import 'package:medito/constants/icons/medito_icons.dart';
 import 'package:medito/l10n/app_localizations.dart';
+import 'package:medito/providers/favorites/favorites_provider.dart';
 import 'package:medito/providers/providers.dart';
 import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/providers/stats_provider.dart';
 import 'package:medito/repositories/auth/auth_repository.dart';
-import 'package:medito/services/account/account_service.dart';
 import 'package:medito/views/home/widgets/bottom_sheet/row_item_widget.dart';
 import 'package:medito/views/splash_view.dart';
+import 'package:medito/views/settings/delete_account_screen.dart';
 import 'package:medito/views/settings/sign_up_log_in_screen.dart';
-import 'package:medito/widgets/dialogs/dialogs.dart';
 import 'package:medito/widgets/medito_icon.dart';
 import 'package:medito/widgets/snackbar_widget.dart';
 
@@ -42,7 +43,6 @@ class AccountSectionWidget extends ConsumerWidget {
     required bool isTv,
   }) {
     final authRepository = ref.watch(authRepositorySyncProvider);
-    final accountService = ref.watch(accountServiceProvider);
 
     return Padding(
       padding: inCard
@@ -58,7 +58,7 @@ class AccountSectionWidget extends ConsumerWidget {
             ),
             child: Text(
               email,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: context.text.label.copyWith(
                 color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
@@ -70,7 +70,7 @@ class AccountSectionWidget extends ConsumerWidget {
               size: 24,
             ),
             title: AppLocalizations.of(context)!.signOutButtonText,
-            titleStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+            titleStyle: context.text.subtitle.copyWith(
               color: Theme.of(context).colorScheme.onSurface,
             ),
             hasUnderline: true,
@@ -78,6 +78,9 @@ class AccountSectionWidget extends ConsumerWidget {
               try {
                 await authRepository.signOut();
                 await ref.read(statsManagerProvider).clearAllStats();
+                // Otherwise the next account to sign in on this device
+                // merges (and uploads) this account's favourites.
+                await ref.read(favoritesNotifierProvider.notifier).clearLocal();
                 ref.read(meRefreshProvider)();
                 ref.read(statsProvider.notifier).refresh();
                 ref.invalidate(packProvider);
@@ -98,7 +101,8 @@ class AccountSectionWidget extends ConsumerWidget {
                   showSnackBar(
                     context,
                     AppLocalizations.of(context)!.signOutErrorMessage,
-                    backgroundColor: Colors.red,
+                    // White on Colors.red is ~3.7:1; this red clears 4.5:1.
+                    backgroundColor: ColorConstants.lightError,
                   );
                 }
               }
@@ -112,68 +116,11 @@ class AccountSectionWidget extends ConsumerWidget {
               size: 24,
             ),
             title: AppLocalizations.of(context)!.deleteAccountButtonText,
-            titleStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+            titleStyle: context.text.subtitle.copyWith(
               color: Theme.of(context).colorScheme.onSurface,
             ),
             hasUnderline: !inCard,
-            onTap: () async {
-              final confirmed =
-                  await showDialog<bool>(
-                    context: context,
-                    builder: (context) => MeditoDialog(
-                      title: AppLocalizations.of(context)!.deleteAccountTitle,
-                      content: MeditoDialogBody(
-                        AppLocalizations.of(context)!.deleteAccountConfirmation,
-                      ),
-                      actions: [
-                        MeditoDialogSecondaryButton(
-                          label: AppLocalizations.of(context)!.cancel,
-                          onPressed: () => Navigator.of(context).pop(false),
-                        ),
-                        MeditoDialogDestructiveButton(
-                          label: AppLocalizations.of(context)!.delete,
-                          onPressed: () => Navigator.of(context).pop(true),
-                        ),
-                      ],
-                    ),
-                  ) ??
-                  false;
-
-              if (confirmed) {
-                try {
-                  await accountService.openAccountDeletionPage();
-                  // Assuming deletion page handles the rest and user might manually sign out or be signed out.
-                  // Forcing local sign out for consistency.
-                  await authRepository.signOut();
-                  await ref.read(statsManagerProvider).clearAllStats();
-                  ref.read(meRefreshProvider)();
-                  ref.read(statsProvider.notifier).refresh();
-                  ref.invalidate(packProvider);
-                  ref.invalidate(authRepositoryProvider);
-
-                  if (context.mounted) {
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                        builder: (context) => const SplashView(),
-                      ),
-                      (route) => false,
-                    );
-                    showSnackBar(
-                      context,
-                      AppLocalizations.of(context)!.accountDeletionInitiated,
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    showSnackBar(
-                      context,
-                      '${AppLocalizations.of(context)!.deleteAccountError} ${e.toString()}',
-                      backgroundColor: Colors.red,
-                    );
-                  }
-                }
-              }
-            },
+            onTap: () => startDeleteAccountFlow(context),
           ),
         ],
       ),
@@ -191,13 +138,15 @@ class AccountSectionWidget extends ConsumerWidget {
             size: 24,
           ),
           title: AppLocalizations.of(context)!.signInSignUp,
-          titleStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+          titleStyle: context.text.subtitle.copyWith(
             color: Theme.of(context).colorScheme.onSurface,
           ),
           hasUnderline: !inCard,
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute(builder: (context) => const SignUpLogInPage()),
+              MaterialPageRoute(
+                builder: (context) => const SignUpLogInPage(fromSettings: true),
+              ),
             );
           },
         ),

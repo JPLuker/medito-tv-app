@@ -32,10 +32,18 @@ on:
         description: 'Submit builds to store review automatically (Play: production release publishes on approval; iOS: App Store version is submitted, released manually after approval)'
         type: boolean
         default: false
+      skip_android_signed_in_test:
+        description: 'Skip ONLY the Android signed-in Maestro test (the CI emulator crashes in it, Oct 2026). Verify sign-in on a real phone instead.'
+        type: boolean
+        default: false
       android_promote_to_production:
         description: 'Promote the latest Android INTERNAL release to production — no new build; goes to Play review and publishes on approval. Standalone: other toggles can stay off.'
         type: boolean
         default: false
+
+# Least privilege by default; jobs that need more declare it themselves.
+permissions:
+  contents: read
 
 jobs:
   # Standalone promote path: ships the release already sitting on the internal
@@ -50,9 +58,11 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.android_promote_to_production
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@v1.338.0
         with:
           ruby-version: '3.2'
           bundler-cache: true
@@ -71,28 +81,40 @@ jobs:
     if: github.event_name != 'workflow_dispatch' || inputs.android_internal || inputs.android_production
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4.9.1
         with:
           distribution: temurin
           java-version: '17'
+
+      # Cache the Flutter SDK ourselves: flutter-action v2.12.0's built-in cache
+      # keys on hashFiles('**/pubspec.lock'), which is re-evaluated after the
+      # build and timed out over the iOS build tree, failing a job whose tests
+      # had passed (run 37440292038 attempt 2).
+      - name: Cache Flutter SDK
+        uses: actions/cache@v4.3.0
+        with:
+          path: ${{ runner.tool_cache }}/flutter
+          key: flutter-sdk-${{ runner.os }}-${{ runner.arch }}-3.47.2
 
       - uses: subosito/flutter-action@v2.12.0
         with:
           flutter-version: '3.47.2'
           channel: stable
-          cache: true
+          cache: false
 
       - name: Cache pub packages
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         with:
           path: ~/.pub-cache
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
           restore-keys: ${{ runner.os }}-pub-
 
       - name: Cache Gradle
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         with:
           path: |
             ~/.gradle/caches
@@ -105,7 +127,7 @@ jobs:
 
       - name: Cache build_runner outputs
         id: cache-buildrunner
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         with:
           path: |
             lib/**/*.g.dart
@@ -119,17 +141,18 @@ jobs:
 
       - name: Cache pigeon outputs
         id: cache-pigeon
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         with:
           path: |
             lib/src/audio_pigeon.g.dart
+            lib/src/watch_presence_pigeon.g.dart
             android/app/src/main/kotlin/meditofoundation/medito/pigeon/AudioPigeon.g.kt
-          key: ${{ runner.os }}-pigeon-${{ hashFiles('pigeon_conf.dart', 'pubspec.lock') }}
+          key: ${{ runner.os }}-pigeon-${{ hashFiles('pigeon_conf.dart', 'pigeons/**', 'pubspec.lock') }}
           restore-keys: ${{ runner.os }}-pigeon-
 
       - name: Run pigeon
         if: steps.cache-pigeon.outputs.cache-hit != 'true'
-        run: flutter pub run pigeon --input pigeon_conf.dart --package_name=medito
+        run: for f in pigeon_conf.dart pigeons/*.dart; do flutter pub run pigeon --input "$f" --package_name=medito || exit 1; done
 
       - name: Write .prod.json
         env:
@@ -188,7 +211,7 @@ jobs:
           ls -lh build/app/outputs/apk/prod/release/app-prod-release.apk
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: app-prod-release
           path: build/app/outputs/apk/prod/release/app-prod-release.apk
@@ -202,10 +225,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Download APK
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.3.0
         with:
           name: app-prod-release
           path: build/app/outputs/apk/prod/release/
@@ -217,13 +242,20 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Smoke test on emulator
-        timeout-minutes: 12
-        uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 25
+        uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
           api-level: 34
           arch: x86_64
-          target: google_apis
+          # No Google Play services: on google_apis, Android restarted GMS mid-run
+          # and killed the app with it (the donation webview binds GMS fonts,
+          # run 37440292038). Without Play the app takes its webview paths.
+          target: default
           profile: pixel_6
+          # The donation webview renders in software (swiftshader); on the default
+          # RAM/cores the emulator froze and went offline mid-run (09-30).
+          ram-size: 4096M
+          cores: 4
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
@@ -233,11 +265,96 @@ jobs:
             adb shell pm grant meditofoundation.medito android.permission.POST_NOTIFICATIONS || true
             adb shell am force-stop com.google.android.apps.nexuslauncher || true
             mkdir -p /tmp/maestro-debug
-            $HOME/.maestro/bin/maestro test -e APP_ID=meditofoundation.medito .maestro/smoke.yaml --no-ansi --debug-output /tmp/maestro-debug
+            .maestro/run_flow.sh /tmp/maestro-debug -e APP_ID=meditofoundation.medito .maestro/smoke.yaml
+
+      - name: Signed-in stats test on emulator
+        # Its own emulator boot: the emulator has crashed outright (adb
+        # "device not found") after rendering the donation webview late in
+        # a long session (run 37446734529), which no in-session retry can
+        # survive. The AVD keeps the installed app between boots.
+        id: signed_in
+        if: ${{ !inputs.skip_android_signed_in_test }}
+        continue-on-error: true
+        timeout-minutes: 25
+        uses: reactivecircus/android-emulator-runner@v2.38.0
+        env:
+          TEST_ACCOUNT_EMAIL: ${{ secrets.TEST_ACCOUNT_EMAIL }}
+          TEST_ACCOUNT_OTP: ${{ secrets.TEST_ACCOUNT_OTP }}
+        with:
+          api-level: 34
+          arch: x86_64
+          # No Google Play services: on google_apis, Android restarted GMS mid-run
+          # and killed the app with it (the donation webview binds GMS fonts,
+          # run 37440292038). Without Play the app takes its webview paths.
+          target: default
+          profile: pixel_6
+          # The donation webview renders in software (swiftshader); on the default
+          # RAM/cores the emulator froze and went offline mid-run (09-30).
+          ram-size: 4096M
+          cores: 4
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: |
+            curl -Ls "https://get.maestro.mobile.dev" | bash
+            adb shell am force-stop com.google.android.apps.nexuslauncher || true
+            mkdir -p /tmp/maestro-debug
+            sh -c 'nohup adb logcat -b all -v threadtime > /tmp/maestro-debug/signed-in-logcat.txt 2>&1 &'
+            .maestro/run_flow.sh /tmp/maestro-debug/signed-in -e APP_ID=meditofoundation.medito -e TEST_ACCOUNT_EMAIL="$TEST_ACCOUNT_EMAIL" -e TEST_ACCOUNT_OTP="$TEST_ACCOUNT_OTP" .maestro/signed_in_stats.yaml
+
+      - name: Signed-in stats test on emulator (retry on a fresh boot)
+        if: ${{ !inputs.skip_android_signed_in_test && steps.signed_in.outcome == 'failure' }}
+        timeout-minutes: 25
+        uses: reactivecircus/android-emulator-runner@v2.38.0
+        env:
+          TEST_ACCOUNT_EMAIL: ${{ secrets.TEST_ACCOUNT_EMAIL }}
+          TEST_ACCOUNT_OTP: ${{ secrets.TEST_ACCOUNT_OTP }}
+        with:
+          api-level: 34
+          arch: x86_64
+          # No Google Play services: on google_apis, Android restarted GMS mid-run
+          # and killed the app with it (the donation webview binds GMS fonts,
+          # run 37440292038). Without Play the app takes its webview paths.
+          target: default
+          profile: pixel_6
+          # The donation webview renders in software (swiftshader); on the default
+          # RAM/cores the emulator froze and went offline mid-run (09-30).
+          ram-size: 4096M
+          cores: 4
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: |
+            curl -Ls "https://get.maestro.mobile.dev" | bash
+            adb shell am force-stop com.google.android.apps.nexuslauncher || true
+            mkdir -p /tmp/maestro-debug
+            sh -c 'nohup adb logcat -b all -v threadtime > /tmp/maestro-debug/signed-in-retry-logcat.txt 2>&1 &'
+            .maestro/run_flow.sh /tmp/maestro-debug/signed-in -e APP_ID=meditofoundation.medito -e TEST_ACCOUNT_EMAIL="$TEST_ACCOUNT_EMAIL" -e TEST_ACCOUNT_OTP="$TEST_ACCOUNT_OTP" .maestro/signed_in_stats.yaml
+
+      - name: Host diagnostics (emulator crash)
+        # The emulator has vanished mid-flow with no output of its own (adb
+        # "device not found", runs 37454547179 and 37462825805). The host
+        # kernel log shows whether qemu was OOM-killed or segfaulted.
+        if: failure() || steps.signed_in.outcome == 'failure'
+        run: |
+          free -m || true
+          sudo dmesg -T | grep -iE 'oom|killed process|segfault|qemu|emulator|out of memory' | tail -60 || true
+
+      - name: Scrub test account credentials from debug output
+        if: failure()
+        env:
+          TEST_ACCOUNT_EMAIL: ${{ secrets.TEST_ACCOUNT_EMAIL }}
+          TEST_ACCOUNT_OTP: ${{ secrets.TEST_ACCOUNT_OTP }}
+        run: |
+          [ -d /tmp/maestro-debug ] || exit 0
+          find /tmp/maestro-debug -type f ! -name '*.png' -print0 | while IFS= read -r -d '' f; do
+            TEST_ACCOUNT_EMAIL="$TEST_ACCOUNT_EMAIL" TEST_ACCOUNT_OTP="$TEST_ACCOUNT_OTP" \
+              perl -pi -e 's/\Q$ENV{TEST_ACCOUNT_EMAIL}\E/[redacted]/g if length $ENV{TEST_ACCOUNT_EMAIL}; s/\Q$ENV{TEST_ACCOUNT_OTP}\E/[redacted]/g if length $ENV{TEST_ACCOUNT_OTP}' "$f"
+          done
 
       - name: Upload Maestro debug output
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: maestro-debug-android
           path: /tmp/maestro-debug/
@@ -260,6 +377,10 @@ jobs:
     name: Android – Upgrade Test
     needs: [android-smoke-test]
     runs-on: ubuntu-latest
+    # action-download-artifact reads a previous run's artifact.
+    permissions:
+      contents: read
+      actions: read
     # Non-blocking: a failed upgrade test won't gate the deploy. Useful when
     # there's no baseline yet, or to avoid blocking ship on a flaky test.
     continue-on-error: true
@@ -267,13 +388,14 @@ jobs:
     steps:
       # fetch-depth: 0 so we can resolve previous tags and `git show` the
       # smoke.yaml that matches the previously-shipped binary.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       # NEW APK (this release) — already built and uploaded upstream.
       - name: Download NEW APK
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.3.0
         with:
           name: app-prod-release
           path: /tmp/new/
@@ -319,13 +441,16 @@ jobs:
       - name: Extract OLD seed flow from previous tag
         if: steps.prev.outputs.sha != ''
         run: |
-          git show "${{ steps.prev.outputs.sha }}:.maestro/smoke.yaml" \
-            > /tmp/old-seed.yaml || echo "Previous tag had no smoke.yaml"
+          # Extract the whole .maestro/ dir, not just smoke.yaml: the seed
+          # flow calls subflows (runFlow file:) resolved relative to itself.
+          mkdir -p /tmp/old-maestro
+          git archive "${{ steps.prev.outputs.sha }}" .maestro \
+            | tar -x -C /tmp/old-maestro || echo "Previous tag had no .maestro/"
 
       - name: Skip if no baseline available
         id: gate
         run: |
-          if [ ! -f /tmp/old/app-prod-release.apk ] || [ ! -s /tmp/old-seed.yaml ]; then
+          if [ ! -f /tmp/old/app-prod-release.apk ] || [ ! -s /tmp/old-maestro/.maestro/smoke.yaml ]; then
             echo "No usable baseline (APK or seed flow missing) — skipping upgrade test." >> "$GITHUB_STEP_SUMMARY"
             echo "run=false" >> "$GITHUB_OUTPUT"
           else
@@ -354,12 +479,19 @@ jobs:
       - name: Seed old version on emulator
         if: steps.gate.outputs.run == 'true'
         timeout-minutes: 15
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
           api-level: 34
           arch: x86_64
-          target: google_apis
+          # No Google Play services: on google_apis, Android restarted GMS mid-run
+          # and killed the app with it (the donation webview binds GMS fonts,
+          # run 37440292038). Without Play the app takes its webview paths.
+          target: default
           profile: pixel_6
+          # The donation webview renders in software (swiftshader); on the default
+          # RAM/cores the emulator froze and went offline mid-run (09-30).
+          ram-size: 4096M
+          cores: 4
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
@@ -369,17 +501,24 @@ jobs:
             adb install /tmp/old/app-prod-release.apk
             adb shell pm grant meditofoundation.medito android.permission.POST_NOTIFICATIONS || true
             adb shell am force-stop com.google.android.apps.nexuslauncher || true
-            $HOME/.maestro/bin/maestro test -e APP_ID=meditofoundation.medito /tmp/old-seed.yaml --no-ansi --debug-output /tmp/maestro-debug/seed || (echo "Seed failed once (usually the donation webview not loading in time); clearing app data and retrying" && adb shell pm clear meditofoundation.medito && adb shell pm grant meditofoundation.medito android.permission.POST_NOTIFICATIONS && $HOME/.maestro/bin/maestro test -e APP_ID=meditofoundation.medito /tmp/old-seed.yaml --no-ansi --debug-output /tmp/maestro-debug/seed-retry)
+            $HOME/.maestro/bin/maestro test -e APP_ID=meditofoundation.medito /tmp/old-maestro/.maestro/smoke.yaml --no-ansi --debug-output /tmp/maestro-debug/seed || (echo "Seed failed once (usually the donation webview not loading in time); clearing app data and retrying" && adb shell pm clear meditofoundation.medito && adb shell pm grant meditofoundation.medito android.permission.POST_NOTIFICATIONS && $HOME/.maestro/bin/maestro test -e APP_ID=meditofoundation.medito /tmp/old-maestro/.maestro/smoke.yaml --no-ansi --debug-output /tmp/maestro-debug/seed-retry)
 
       - name: Install new version and verify on a fresh boot
         if: steps.gate.outputs.run == 'true'
         timeout-minutes: 12
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
           api-level: 34
           arch: x86_64
-          target: google_apis
+          # No Google Play services: on google_apis, Android restarted GMS mid-run
+          # and killed the app with it (the donation webview binds GMS fonts,
+          # run 37440292038). Without Play the app takes its webview paths.
+          target: default
           profile: pixel_6
+          # The donation webview renders in software (swiftshader); on the default
+          # RAM/cores the emulator froze and went offline mid-run (09-30).
+          ram-size: 4096M
+          cores: 4
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
@@ -392,7 +531,7 @@ jobs:
 
       - name: Upload upgrade-test debug output
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: maestro-debug-android-upgrade
           path: /tmp/maestro-debug/
@@ -416,15 +555,17 @@ jobs:
     environment: prod
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Download APK
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.3.0
         with:
           name: app-prod-release
           path: build/app/outputs/apk/prod/release/
 
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@v1.338.0
         with:
           ruby-version: '3.2'
           bundler-cache: true
@@ -438,6 +579,8 @@ jobs:
           if [ -z "$notes" ]; then
             notes=$(awk '/^[0-9]/{if(in_v)exit; in_v=1;next} in_v && /^-/{print} in_v && !/^-/{if(NF)exit}' release_notes.txt)
           fi
+          # "- [ios] ..." lines are iOS-only; "- [android] ..." lines lose their tag.
+          notes=$(printf '%s\n' "$notes" | sed -e '/^- \[ios\] /d' -e 's/^- \[android\] /- /')
           notes="${notes:0:500}"
           { echo "RELEASE_NOTES<<EOF"; echo "$notes"; echo "EOF"; } >> "$GITHUB_ENV"
 
@@ -478,30 +621,47 @@ jobs:
     if: github.event_name != 'workflow_dispatch' || inputs.ios_testflight || inputs.ios_appstore
     runs-on: macos-latest
     environment: prod
+    # The XCTest driver Maestro installs can take well over its default
+    # startup timeout on a cold CI simulator ("iOS driver not ready in time",
+    # run 36309254158), failing the job before any flow runs.
+    env:
+      MAESTRO_DRIVER_STARTUP_TIMEOUT: 180000
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Select Xcode (Icon Composer requires 26+)
-        uses: maxim-lobanov/setup-xcode@v1
+        uses: maxim-lobanov/setup-xcode@v1.7.0
         with:
           xcode-version: 'latest-stable'
+
+      # Cache the Flutter SDK ourselves: flutter-action v2.12.0's built-in cache
+      # keys on hashFiles('**/pubspec.lock'), which is re-evaluated after the
+      # build and timed out over the iOS build tree, failing a job whose tests
+      # had passed (run 37440292038 attempt 2).
+      - name: Cache Flutter SDK
+        uses: actions/cache@v4.3.0
+        with:
+          path: ${{ runner.tool_cache }}/flutter
+          key: flutter-sdk-${{ runner.os }}-${{ runner.arch }}-3.47.2
 
       - uses: subosito/flutter-action@v2.12.0
         with:
           flutter-version: '3.47.2'
           channel: stable
-          cache: true
+          cache: false
 
       - name: Cache pub packages
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         with:
           path: ~/.pub-cache
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
           restore-keys: ${{ runner.os }}-pub-
 
       - name: Cache CocoaPods
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         with:
           path: ios/Pods
           key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
@@ -509,10 +669,10 @@ jobs:
 
       - name: Cache iOS app
         id: cache-ios-app
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         with:
           path: build/ios/iphonesimulator/Medito Dev.app
-          key: ${{ runner.os }}-ios-app-${{ hashFiles('lib/**/*.dart', 'pubspec.lock', 'ios/Podfile.lock', 'ios/Runner.xcodeproj/project.pbxproj') }}
+          key: ${{ runner.os }}-ios-app-${{ hashFiles('lib/**/*.dart', 'pubspec.lock', 'ios/Podfile.lock', 'ios/Runner.xcodeproj/project.pbxproj', 'ios/Runner/**', 'ios/MeditoWidget/**', 'ios/*.entitlements', 'ios/*.plist') }}
 
       - name: Flutter pub get
         if: steps.cache-ios-app.outputs.cache-hit != 'true'
@@ -521,7 +681,7 @@ jobs:
       - name: Cache build_runner outputs
         if: steps.cache-ios-app.outputs.cache-hit != 'true'
         id: cache-buildrunner
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         with:
           path: |
             lib/**/*.g.dart
@@ -536,17 +696,18 @@ jobs:
       - name: Cache pigeon outputs
         if: steps.cache-ios-app.outputs.cache-hit != 'true'
         id: cache-pigeon
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         with:
           path: |
             lib/src/audio_pigeon.g.dart
+            lib/src/watch_presence_pigeon.g.dart
             android/app/src/main/kotlin/meditofoundation/medito/pigeon/AudioPigeon.g.kt
-          key: ${{ runner.os }}-pigeon-${{ hashFiles('pigeon_conf.dart', 'pubspec.lock') }}
+          key: ${{ runner.os }}-pigeon-${{ hashFiles('pigeon_conf.dart', 'pigeons/**', 'pubspec.lock') }}
           restore-keys: ${{ runner.os }}-pigeon-
 
       - name: Run pigeon
         if: steps.cache-ios-app.outputs.cache-hit != 'true' && steps.cache-pigeon.outputs.cache-hit != 'true'
-        run: flutter pub run pigeon --input pigeon_conf.dart --package_name=medito
+        run: for f in pigeon_conf.dart pigeons/*.dart; do flutter pub run pigeon --input "$f" --package_name=medito || exit 1; done
 
       - name: Write .prod.json
         if: steps.cache-ios-app.outputs.cache-hit != 'true'
@@ -629,7 +790,7 @@ jobs:
           tar -C build/ios/iphonesimulator -cf /tmp/sim-app/medito-sim.tar "Medito Dev.app"
 
       - name: Upload simulator .app artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: medito-sim-app
           path: /tmp/sim-app/medito-sim.tar
@@ -656,20 +817,55 @@ jobs:
         run: curl -Ls "https://get.maestro.mobile.dev" | bash
 
       - name: Smoke test on simulator
-        timeout-minutes: 12
+        # ~6 min per attempt; run_flow.sh may retry once.
+        timeout-minutes: 20
         run: |
           xcrun simctl install booted "build/ios/iphonesimulator/Medito Dev.app"
           # Give SpringBoard a few extra seconds to settle before Maestro connects
           sleep 5
           mkdir -p /tmp/maestro-debug
-          $HOME/.maestro/bin/maestro test \
+          .maestro/run_flow.sh /tmp/maestro-debug \
             -e APP_ID=org.meditofoundation \
-            .maestro/smoke.yaml \
-            --no-ansi --debug-output /tmp/maestro-debug
+            .maestro/smoke.yaml
+
+      - name: Signed-in stats test on simulator
+        # Two sign-ins + two onboarding passes + a session: ~11 min on the
+        # macOS runner, so 12 cut off a run that had passed (36317083446).
+        # run_flow.sh may retry once.
+        timeout-minutes: 35
+        env:
+          TEST_ACCOUNT_EMAIL: ${{ secrets.TEST_ACCOUNT_EMAIL }}
+          TEST_ACCOUNT_OTP: ${{ secrets.TEST_ACCOUNT_OTP }}
+        run: |
+          .maestro/run_flow.sh /tmp/maestro-debug/signed-in \
+            -e APP_ID=org.meditofoundation \
+            -e TEST_ACCOUNT_EMAIL="$TEST_ACCOUNT_EMAIL" \
+            -e TEST_ACCOUNT_OTP="$TEST_ACCOUNT_OTP" \
+            .maestro/signed_in_stats.yaml
+
+      - name: Save iOS app log
+        if: failure()
+        run: |
+          mkdir -p /tmp/maestro-debug
+          # The smoke build's executable is "Medito Dev" (dev flavor), not Runner.
+          xcrun simctl spawn booted log show --last 30m --style compact --info --debug \
+            --predicate 'process BEGINSWITH "Medito"' > /tmp/maestro-debug/ios-app.log 2>&1 || true
+
+      - name: Scrub test account credentials from debug output
+        if: failure()
+        env:
+          TEST_ACCOUNT_EMAIL: ${{ secrets.TEST_ACCOUNT_EMAIL }}
+          TEST_ACCOUNT_OTP: ${{ secrets.TEST_ACCOUNT_OTP }}
+        run: |
+          [ -d /tmp/maestro-debug ] || exit 0
+          find /tmp/maestro-debug -type f ! -name '*.png' -print0 | while IFS= read -r -d '' f; do
+            TEST_ACCOUNT_EMAIL="$TEST_ACCOUNT_EMAIL" TEST_ACCOUNT_OTP="$TEST_ACCOUNT_OTP" \
+              perl -pi -e 's/\Q$ENV{TEST_ACCOUNT_EMAIL}\E/[redacted]/g if length $ENV{TEST_ACCOUNT_EMAIL}; s/\Q$ENV{TEST_ACCOUNT_OTP}\E/[redacted]/g if length $ENV{TEST_ACCOUNT_OTP}' "$f"
+          done
 
       - name: Upload Maestro debug output
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: maestro-debug-ios
           path: /tmp/maestro-debug/
@@ -693,18 +889,28 @@ jobs:
     needs: [ios-smoke-test]
     runs-on: macos-latest
     if: github.event_name != 'workflow_dispatch' || inputs.ios_testflight || inputs.ios_appstore
+    # The XCTest driver Maestro installs can take well over its default
+    # startup timeout on a cold CI simulator ("iOS driver not ready in time",
+    # run 36309254158), failing the job before any flow runs.
+    # action-download-artifact reads a previous run's artifact.
+    permissions:
+      contents: read
+      actions: read
+    env:
+      MAESTRO_DRIVER_STARTUP_TIMEOUT: 180000
     # Non-blocking: a failed upgrade test won't gate the deploy. Useful when
     # there's no baseline yet, or to avoid blocking ship on a flaky test.
     continue-on-error: true
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       # NEW .app (this release) — uploaded by ios-smoke-test.
       - name: Download NEW simulator .app
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.3.0
         with:
           name: medito-sim-app
           path: /tmp/new/
@@ -748,13 +954,16 @@ jobs:
       - name: Extract OLD seed flow from previous tag
         if: steps.prev.outputs.sha != ''
         run: |
-          git show "${{ steps.prev.outputs.sha }}:.maestro/smoke.yaml" \
-            > /tmp/old-seed.yaml || echo "Previous tag had no smoke.yaml"
+          # Extract the whole .maestro/ dir, not just smoke.yaml: the seed
+          # flow calls subflows (runFlow file:) resolved relative to itself.
+          mkdir -p /tmp/old-maestro
+          git archive "${{ steps.prev.outputs.sha }}" .maestro \
+            | tar -x -C /tmp/old-maestro || echo "Previous tag had no .maestro/"
 
       - name: Skip if no baseline available
         id: gate
         run: |
-          if [ ! -f /tmp/old/medito-sim.tar ] || [ ! -s /tmp/old-seed.yaml ]; then
+          if [ ! -f /tmp/old/medito-sim.tar ] || [ ! -s /tmp/old-maestro/.maestro/smoke.yaml ]; then
             echo "No usable baseline (.app or seed flow missing) — skipping upgrade test." >> "$GITHUB_STEP_SUMMARY"
             echo "run=false" >> "$GITHUB_OUTPUT"
           else
@@ -797,7 +1006,7 @@ jobs:
           # 2. Seed state using the OLD tag's smoke.yaml — matches that
           #    binary's onboarding UI even if HEAD has renamed strings.
           $HOME/.maestro/bin/maestro test \
-            -e APP_ID=org.meditofoundation /tmp/old-seed.yaml \
+            -e APP_ID=org.meditofoundation /tmp/old-maestro/.maestro/smoke.yaml \
             --no-ansi --debug-output /tmp/maestro-debug/seed
 
           # 3. In-place upgrade. simctl install over an existing bundle ID
@@ -813,7 +1022,7 @@ jobs:
 
       - name: Upload upgrade-test debug output
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: maestro-debug-ios-upgrade
           path: /tmp/maestro-debug/
@@ -838,28 +1047,40 @@ jobs:
     if: github.event_name != 'workflow_dispatch' || inputs.ios_testflight || inputs.ios_appstore
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Select Xcode (Icon Composer requires 26+)
-        uses: maxim-lobanov/setup-xcode@v1
+        uses: maxim-lobanov/setup-xcode@v1.7.0
         with:
           xcode-version: 'latest-stable'
+
+      # Cache the Flutter SDK ourselves: flutter-action v2.12.0's built-in cache
+      # keys on hashFiles('**/pubspec.lock'), which is re-evaluated after the
+      # build and timed out over the iOS build tree, failing a job whose tests
+      # had passed (run 37440292038 attempt 2).
+      - name: Cache Flutter SDK
+        uses: actions/cache@v4.3.0
+        with:
+          path: ${{ runner.tool_cache }}/flutter
+          key: flutter-sdk-${{ runner.os }}-${{ runner.arch }}-3.47.2
 
       - uses: subosito/flutter-action@v2.12.0
         with:
           flutter-version: '3.47.2'
           channel: stable
-          cache: true
+          cache: false
 
       - name: Cache pub packages
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         with:
           path: ~/.pub-cache
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
           restore-keys: ${{ runner.os }}-pub-
 
       - name: Cache CocoaPods
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         with:
           path: ios/Pods
           key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
@@ -879,7 +1100,7 @@ jobs:
 
       - name: Cache build_runner outputs
         id: cache-buildrunner
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         with:
           path: |
             lib/**/*.g.dart
@@ -893,17 +1114,18 @@ jobs:
 
       - name: Cache pigeon outputs
         id: cache-pigeon
-        uses: actions/cache@v4
+        uses: actions/cache@v4.3.0
         with:
           path: |
             lib/src/audio_pigeon.g.dart
+            lib/src/watch_presence_pigeon.g.dart
             android/app/src/main/kotlin/meditofoundation/medito/pigeon/AudioPigeon.g.kt
-          key: ${{ runner.os }}-pigeon-${{ hashFiles('pigeon_conf.dart', 'pubspec.lock') }}
+          key: ${{ runner.os }}-pigeon-${{ hashFiles('pigeon_conf.dart', 'pigeons/**', 'pubspec.lock') }}
           restore-keys: ${{ runner.os }}-pigeon-
 
       - name: Run pigeon
         if: steps.cache-pigeon.outputs.cache-hit != 'true'
-        run: flutter pub run pigeon --input pigeon_conf.dart --package_name=medito
+        run: for f in pigeon_conf.dart pigeons/*.dart; do flutter pub run pigeon --input "$f" --package_name=medito || exit 1; done
 
       - name: Write .prod.json
         env:
@@ -950,7 +1172,7 @@ jobs:
 
       # Bundler-managed fastlane, so the fastlane version CI runs is the one
       # pinned in ios/Gemfile.lock. Lanes are invoked as `bundle exec fastlane`.
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@v1.338.0
         with:
           ruby-version: '3.2'
           bundler-cache: true
@@ -981,6 +1203,8 @@ jobs:
               in_v && NF && !/^- / { exit }
             ' release_notes.txt)
           fi
+          # "- [android] ..." lines are Android-only; "- [ios] ..." lines lose their tag.
+          notes=$(printf '%s\n' "$notes" | sed -e '/^- \[android\] /d' -e 's/^- \[ios\] /- /')
           notes="${notes:0:500}"
           { echo "RELEASE_NOTES<<EOF"; echo "$notes"; echo "EOF"; } >> "$GITHUB_ENV"
 
@@ -1035,6 +1259,41 @@ jobs:
             fi
           fi
 
+      # Keep this build's dSYMs. They are the only copy: Apple stopped retaining
+      # dSYMs for uploads when bitcode went away, the runner is thrown away
+      # with the .xcarchive, and 2609.18.0 showed the in-lane Crashlytics upload
+      # can be cut short when the job ends. With the artifact, symbols can be
+      # re-uploaded later with
+      #   upload-symbols -gsp ios/Runner/GoogleService-Info.plist -p ios <dir>
+      # Runs even when a later step failed, as long as gym produced an archive.
+      - name: Collect iOS dSYMs
+        id: dsyms
+        if: ${{ !cancelled() }}
+        run: |
+          archive=$(ls -dt ~/Library/Developer/Xcode/Archives/*/*.xcarchive 2>/dev/null | head -1)
+          if [ -z "$archive" ] || [ ! -d "$archive/dSYMs" ]; then
+            echo "No .xcarchive with a dSYMs folder found; nothing to keep."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+/-/')
+          mkdir -p /tmp/ios-dsyms
+          cp -R "$archive/dSYMs/." /tmp/ios-dsyms/
+          echo "Kept dSYMs from: $archive"
+          ls /tmp/ios-dsyms
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "name=ios-dsyms-$version" >> "$GITHUB_OUTPUT"
+
+      - name: Upload iOS dSYM artifact
+        if: ${{ !cancelled() && steps.dsyms.outputs.found == 'true' }}
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: ${{ steps.dsyms.outputs.name }}
+          path: /tmp/ios-dsyms
+          # Same window as the APK artifact; long enough to symbolicate a
+          # release for its whole time on the store.
+          retention-days: 90
+
   # After a successful deploy, tag the built commit with the pubspec version
   # (bare semver, no v prefix — matches existing tags). Runs only when at
   # least one deploy job actually deployed, and is a no-op if the tag already
@@ -1049,7 +1308,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
       - name: Tag commit with pubspec version
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//' | cut -d'+' -f1)

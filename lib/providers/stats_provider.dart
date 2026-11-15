@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:medito/constants/http/http_constants.dart';
 import 'package:medito/models/local_all_stats.dart';
 import 'package:medito/providers/device_and_app_info/device_and_app_info_provider.dart';
@@ -71,7 +72,8 @@ final editStatsUrlProvider = FutureProvider<String>((ref) async {
 
 @Riverpod(keepAlive: true)
 class StatsNotifier extends AsyncNotifier<LocalAllStats> {
-  static DateTime? _lastRefresh;
+  DateTime? _lastRefresh;
+  Future<void>? _refreshing;
   static const _minRefreshInterval = Duration(seconds: 2);
   static const _maxRetries = 2;
 
@@ -79,7 +81,15 @@ class StatsNotifier extends AsyncNotifier<LocalAllStats> {
   Future<LocalAllStats> build() async {
     AppLogger.d('STATS_PROVIDER', 'StatsNotifier: Building');
 
-    return _fetchStatsWithRetry();
+    final local = await ref.read(statsManagerProvider).readLocalSnapshot();
+    // Queue after build resolves, so the first value is local data rather than
+    // a loading state held open by the background network operation.
+    unawaited(
+      Future<void>(() async {
+        if (ref.mounted) await refresh();
+      }),
+    );
+    return local;
   }
 
   Future<LocalAllStats> _fetchStatsWithRetry({bool force = false}) async {
@@ -130,7 +140,12 @@ class StatsNotifier extends AsyncNotifier<LocalAllStats> {
         );
         await statsManager.initialize();
         // Force sync when refreshing to get latest data from server across devices
-        await statsManager.sync(force: force);
+        try {
+          await statsManager.sync(force: force);
+        } catch (error) {
+          // Sync is best-effort: saved progress remains available offline.
+          AppLogger.w('STATS_PROVIDER', 'Stats sync failed: $error');
+        }
       } else {
         AppLogger.d(
           'STATS_PROVIDER',
@@ -138,7 +153,7 @@ class StatsNotifier extends AsyncNotifier<LocalAllStats> {
         );
       }
 
-      return await statsManager.localAllStats;
+      return await statsManager.readLocalStats();
     } catch (error) {
       AppLogger.e('STATS_PROVIDER', 'StatsNotifier: Error during fetch', error);
 
@@ -149,7 +164,20 @@ class StatsNotifier extends AsyncNotifier<LocalAllStats> {
     }
   }
 
-  Future<void> refresh() async {
+  Future<void> refresh() {
+    if (_refreshing != null) return _refreshing!;
+    return _refreshing = _refresh().whenComplete(() => _refreshing = null);
+  }
+
+  Future<void> _refresh() async {
+    // Startup callers may request refresh while build is still reading disk.
+    // Publish that first value before a fast server response can replace it.
+    try {
+      await future;
+    } catch (_) {
+      return;
+    }
+    if (!ref.mounted) return;
     AppLogger.d('STATS_PROVIDER', 'StatsNotifier: Starting refresh');
     if (_lastRefresh != null) {
       var timeSinceLastRefresh = DateTime.now().difference(_lastRefresh!);
@@ -164,7 +192,16 @@ class StatsNotifier extends AsyncNotifier<LocalAllStats> {
     }
 
     _lastRefresh = DateTime.now();
-    state = await AsyncValue.guard(() => _fetchStatsWithRetry(force: true));
+    final owner = ref.read(authRepositorySyncProvider).currentUser?.id;
+    final result = await AsyncValue.guard(
+      () => _fetchStatsWithRetry(force: true),
+    );
+    if (!ref.mounted ||
+        ref.read(authRepositorySyncProvider).currentUser?.id != owner) {
+      return;
+    }
+    // Offline refreshes keep the already displayed local history.
+    if (result.hasValue || !state.hasValue) state = result;
     AppLogger.d('STATS_PROVIDER', 'StatsNotifier: Refresh completed');
 
     // Update home widget if stats are available (fire-and-forget to avoid blocking)
@@ -186,7 +223,7 @@ class StatsNotifier extends AsyncNotifier<LocalAllStats> {
 
     try {
       await statsManager.initialize();
-      var localStats = await statsManager.localAllStats;
+      var localStats = await statsManager.readLocalStats();
       state = AsyncValue.data(localStats);
       AppLogger.d(
         'STATS_PROVIDER',

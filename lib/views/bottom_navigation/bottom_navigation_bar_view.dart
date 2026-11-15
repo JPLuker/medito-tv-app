@@ -1,4 +1,10 @@
+import 'package:medito/widgets/adaptive/adaptive_content.dart';
+import 'package:medito/views/bottom_navigation/widgets/medito_sidebar.dart';
+
 import 'dart:async';
+
+import 'package:medito/services/notifications/supporter_campaign_navigation.dart';
+import 'package:medito/providers/donation/supporter_appeal_provider.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,12 +16,16 @@ import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/providers/providers.dart';
 import 'package:medito/providers/stats_provider.dart';
 import 'package:medito/services/analytics/firebase_analytics_service.dart';
-import 'package:medito/views/bottom_navigation/widgets/floating_nav_bar.dart';
-import 'package:medito/views/bottom_navigation/widgets/floating_search_field.dart';
+import 'package:medito/services/installed_widgets_service.dart';
+import 'package:medito/services/watch_presence_service.dart';
+import 'package:medito/constants/strings/analytics_event_constants.dart';
+import 'package:medito/utils/logger.dart';
+import 'package:medito/utils/pending_end_screen.dart';
+import 'package:medito/views/end_screen/end_screen_view.dart';
+import 'package:medito/views/bottom_navigation/widgets/medito_nav_bar.dart';
 import 'package:medito/views/explore/widgets/explore_view.dart';
 import 'package:medito/views/home/home_view.dart';
-import 'package:medito/views/path/path_view.dart';
-import 'package:medito/views/search/search_results.dart';
+import 'package:medito/views/search/search_view.dart';
 import 'package:medito/views/settings/settings_screen.dart';
 import 'package:medito/views/tv/tv_navigation_shell.dart';
 
@@ -29,33 +39,108 @@ class BottomNavigationBarView extends ConsumerStatefulWidget {
 
 class _BottomNavigationBarViewState
     extends ConsumerState<BottomNavigationBarView> {
-  static const _pageIndexForDestination = [0, 1, 3];
-  static const _searchDebounce = Duration(milliseconds: 500);
+  // Nav destination index == page index in _pages: Home, Explore, Search,
+  // Settings. Search is a full tab (not an overlay), so it behaves like any
+  // other tab: you leave it by switching tabs, and Android back returns Home.
+  static const _homeIndex = 0;
+  static const _exploreIndex = 1;
+  static const _searchIndex = 2;
 
   late int _currentPageIndex;
   final _exploreViewKey = GlobalKey<ExploreViewState>();
+  final _searchViewKey = GlobalKey<SearchViewState>();
   late final List<Widget> _pages;
-
-  bool _searchOpen = false;
-  String _searchQuery = '';
-  final _searchController = TextEditingController();
-  final _searchFocusNode = FocusNode();
-  Timer? _searchDebounceTimer;
+  bool _restoringEndScreen = false;
 
   @override
   void initState() {
     super.initState();
     final prefs = ref.read(sharedPreferencesProvider);
     final saved = prefs.getInt(SharedPreferenceConstants.lastMainTabIndex) ?? 0;
-    _currentPageIndex = saved <= 1 ? saved : 0;
+    // Only Home/Explore are restored on launch; never open straight into
+    // Search or Settings.
+    _currentPageIndex = SupporterAppealRuntime.consumeHomeRequest()
+        ? _homeIndex
+        : saved <= _exploreIndex
+        ? saved
+        : _homeIndex;
+    SupporterAppealRuntime.homeRequested.addListener(_openAppealHome);
     _pages = [
       const HomeView(),
       ExploreView(key: _exploreViewKey),
-      const JourneyView(),
+      SearchView(key: _searchViewKey),
       const SettingsScreen(),
     ];
 
     _initializeStats();
+    // Completions replayed by the platform after launch arrive late (Android
+    // pushes them from onResume), so listen as well as check now.
+    PendingEndScreen.completions.addListener(_restorePendingEndScreen);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _restorePendingEndScreen(),
+    );
+    if (_currentPageIndex == _homeIndex) {
+      unawaited(reportWatchPresence());
+      unawaited(reportInstalledHomeWidgets());
+    }
+  }
+
+  void _openAppealHome() {
+    if (!mounted || !SupporterAppealRuntime.consumeHomeRequest()) return;
+    ref.invalidate(supporterAppealProvider);
+    _onDestinationSelected(_homeIndex);
+    revealSupporterCampaignHome(context);
+  }
+
+  @override
+  void dispose() {
+    SupporterAppealRuntime.homeRequested.removeListener(_openAppealHome);
+    PendingEndScreen.completions.removeListener(_restorePendingEndScreen);
+    super.dispose();
+  }
+
+  /// Shows the end screen of a session that finished while the app was in the
+  /// background and was killed before that end screen could open. Rebuilt in
+  /// place, without a route transition, as if it had been there all along.
+  Future<void> _restorePendingEndScreen() async {
+    if (_restoringEndScreen || PendingEndScreen.hasLivePlayer) return;
+    _restoringEndScreen = true;
+    try {
+      // TV has its own completion screen inside the TV player; the phone end
+      // screen is never shown there.
+      final isTv = await ref
+          .read(deviceCapabilitiesProvider.future)
+          .then((value) => value.isAndroidTv, onError: (_) => false);
+      if (isTv || !mounted) return;
+      final pending = await PendingEndScreen.takeCompleted(
+        ref.read(sharedPreferencesProvider),
+      );
+      if (pending == null || !mounted) return;
+      AppLogger.d(
+        'END_SCREEN',
+        'Restoring end screen: ${pending.request.fileId}',
+      );
+      unawaited(
+        ref
+            .read(analyticsServiceProvider)
+            .logEvent(name: AnalyticsEventConstants.endScreenRestored),
+      );
+      unawaited(
+        Navigator.of(context).push(
+          PageRouteBuilder<void>(
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+            pageBuilder: (_, _, _) => EndScreenView(
+              request: pending.request,
+              priorStats: pending.priorStats,
+              restoredFrom: pending.completedAt,
+            ),
+          ),
+        ),
+      );
+    } finally {
+      _restoringEndScreen = false;
+    }
   }
 
   Future<void> _initializeStats() async {
@@ -63,21 +148,12 @@ class _BottomNavigationBarViewState
   }
 
   @override
-  void dispose() {
-    _searchDebounceTimer?.cancel();
-    _searchController.dispose();
-    _searchFocusNode.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final capabilities = ref.watch(deviceCapabilitiesProvider);
-    final isTv = capabilities.maybeWhen(
-      data: (value) => value.isAndroidTv,
-      orElse: () => false,
-    );
-
+    // Android TV / Google TV gets its own remote-first shell; phones, tablets
+    // and foldables keep the adaptive layout below.
+    final isTv = ref
+        .watch(deviceCapabilitiesProvider)
+        .maybeWhen(data: (value) => value.isAndroidTv, orElse: () => false);
     if (isTv) {
       return const TvNavigationShell();
     }
@@ -85,31 +161,15 @@ class _BottomNavigationBarViewState
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final selectedDestination = _pageIndexForDestination.indexOf(
-      _currentPageIndex,
-    );
-
-    final pageBody = Stack(
-      children: [
-        IndexedStack(index: _currentPageIndex, children: _pages),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 220),
-          child: _searchOpen
-              ? Material(
-                  key: const ValueKey('search'),
-                  color: theme.scaffoldBackgroundColor,
-                  child: SafeArea(
-                    bottom: false,
-                    child: SearchResults(
-                      query: _searchQuery,
-                      onBeforeNavigate: _searchFocusNode.unfocus,
-                    ),
-                  ),
-                )
-              : const SizedBox.shrink(key: ValueKey('tabs')),
-        ),
-      ],
-    );
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final width = MediaQuery.sizeOf(context).width;
+    final wide = width >= 700;
+    final items = [
+      MeditoNavItem(icon: MeditoIcons.home, label: l10n.home),
+      MeditoNavItem(icon: MeditoIcons.book, label: l10n.explore),
+      MeditoNavItem(icon: MeditoIcons.search, label: l10n.search),
+      MeditoNavItem(icon: MeditoIcons.settings, label: l10n.settings),
+    ];
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -122,98 +182,88 @@ class _BottomNavigationBarViewState
             : Brightness.dark,
       ),
       child: PopScope(
-        canPop: !_searchOpen && _currentPageIndex == 0,
+        canPop: _currentPageIndex == _homeIndex,
         onPopInvokedWithResult: (didPop, _) {
           if (didPop) return;
-          if (_searchOpen) {
-            _closeSearch();
-          } else {
-            _onDestinationSelected(0);
-          }
+          _onDestinationSelected(_homeIndex);
         },
-        child: FocusTraversalGroup(
-          policy: ReadingOrderTraversalPolicy(),
-          child: Scaffold(
-            floatingActionButtonLocation:
-                FloatingActionButtonLocation.centerFloat,
-            extendBody: true,
-            bottomNavigationBar: FloatingNavBar(
-              selectedIndex: selectedDestination >= 0
-                  ? selectedDestination
-                  : 0,
-              onSelected: (index) => _onDestinationSelected(
-                _pageIndexForDestination[index],
-              ),
-              items: [
-                FloatingNavItem(icon: MeditoIcons.home, label: l10n.home),
-                FloatingNavItem(icon: MeditoIcons.book, label: l10n.explore),
-                FloatingNavItem(
-                  icon: MeditoIcons.settings,
-                  label: l10n.settings,
+        child: Scaffold(
+          // The nav bar stays at the bottom and is covered by the keyboard
+          // when it opens, rather than being lifted to sit on top of it.
+          resizeToAvoidBottomInset: false,
+          bottomNavigationBar: wide
+              ? null
+              : MeditoNavBar(
+                  selectedIndex: _currentPageIndex,
+                  onSelected: _onDestinationSelected,
+                  items: items,
+                ),
+          body: Padding(
+            padding: EdgeInsets.only(bottom: wide ? keyboardInset : 0),
+            child: Row(
+              children: [
+                if (wide)
+                  MeditoSidebar(
+                    extended: width >= 1100,
+                    items: items,
+                    selectedIndex: _currentPageIndex,
+                    onSelected: _onDestinationSelected,
+                  ),
+                Expanded(
+                  key: const ValueKey('main-content'),
+                  child: AdaptiveContent(
+                    child: IndexedStack(
+                      index: _currentPageIndex,
+                      children: _pages,
+                    ),
+                  ),
                 ),
               ],
-              action: FloatingNavAction(
-                icon: MeditoIcons.search,
-                label: l10n.search,
-                onTap: _openSearch,
-              ),
-              expanded: _searchOpen,
-              expandedChild: FloatingSearchField(
-                controller: _searchController,
-                focusNode: _searchFocusNode,
-                onChanged: _onSearchChanged,
-                onClear: _clearSearch,
-              ),
-              cancelLabel: l10n.cancel,
-              onCancel: _closeSearch,
             ),
-            body: pageBody,
           ),
         ),
       ),
     );
   }
 
-  void _openSearch() {
-    if (_searchOpen) return;
-    unawaited(
-      ref
-          .read(analyticsServiceProvider)
-          .logFirstActionAfterOnboardingIfNeeded('search'),
-    );
-    unawaited(FirebaseAnalyticsService().logScreenView(screenName: 'Search'));
-    setState(() => _searchOpen = true);
-  }
-
-  void _clearSearch() {
-    _searchDebounceTimer?.cancel();
-    _searchController.clear();
-    setState(() => _searchQuery = '');
-    _searchFocusNode.requestFocus();
-  }
-
-  void _closeSearch() {
-    _searchDebounceTimer?.cancel();
-    _searchFocusNode.unfocus();
-    _searchController.clear();
-    setState(() {
-      _searchOpen = false;
-      _searchQuery = '';
-    });
-  }
-
-  void _onSearchChanged(String value) {
-    _searchDebounceTimer?.cancel();
-    _searchDebounceTimer = Timer(_searchDebounce, () {
-      if (!mounted) return;
-      final asciiQuery = value.replaceAll(RegExp(r'[^\x00-\x7F]'), '');
-      setState(() => _searchQuery = asciiQuery);
-    });
-  }
-
   void _onDestinationSelected(int index) {
-    if (index != _currentPageIndex) {
-      const tabTargets = {0: 'tab_home', 1: 'tab_explore', 3: 'tab_settings'};
+    final entering = index != _currentPageIndex;
+
+    // Leaving Search dismisses the keyboard so it doesn't linger over another
+    // tab. (Entering Search focuses the field below.)
+    if (index != _searchIndex) {
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
+
+    if (entering) {
+      const tabNames = {
+        _homeIndex: 'home',
+        _exploreIndex: 'explore',
+        _searchIndex: 'search',
+        3: 'settings',
+      };
+      final tab = tabNames[index];
+      if (tab != null) {
+        unawaited(
+          ref
+              .read(analyticsServiceProvider)
+              .logEvent(
+                name: AnalyticsEventConstants.tabSelected,
+                parameters: {
+                  AnalyticsEventConstants.paramTab: tab,
+                  AnalyticsEventConstants.paramFromTab:
+                      tabNames[_currentPageIndex] ?? 'unknown',
+                },
+              ),
+        );
+      }
+
+      const tabTargets = {
+        _homeIndex: 'tab_home',
+        _exploreIndex: 'tab_explore',
+        _searchIndex: 'search',
+        3: 'tab_settings',
+      };
       final target = tabTargets[index];
       if (target != null) {
         unawaited(
@@ -228,14 +278,36 @@ class _BottomNavigationBarViewState
       _currentPageIndex = index;
     });
 
-    if (index <= 1) {
+    if (index <= _exploreIndex) {
       ref
           .read(sharedPreferencesProvider)
           .setInt(SharedPreferenceConstants.lastMainTabIndex, index);
     }
 
-    if (index == 1) {
+    // Refresh watch presence and installed widgets each time Home is shown
+    // (pairing and the home screen may have changed).
+    if (index == _homeIndex && entering) {
+      unawaited(reportWatchPresence());
+      unawaited(reportInstalledHomeWidgets());
+    }
+
+    // Load explore data only on the first visit to the explore tab.
+    if (index == _exploreIndex) {
       _exploreViewKey.currentState?.loadData();
+    }
+
+    // Selecting Search focuses the field so the user can type immediately;
+    // re-tapping the active tab re-opens the keyboard too. The screen view is
+    // logged only on actual entry, not on every re-tap.
+    if (index == _searchIndex) {
+      if (entering) {
+        unawaited(
+          FirebaseAnalyticsService().logScreenView(screenName: 'Search'),
+        );
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _searchViewKey.currentState?.focusInput();
+      });
     }
   }
 }

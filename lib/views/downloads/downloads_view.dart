@@ -1,29 +1,27 @@
+import 'package:medito/widgets/adaptive/adaptive_page_body.dart';
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:async';
 
-import 'package:medito/constants/constants.dart';
 import 'package:medito/exceptions/app_error.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/models/models.dart';
 import 'package:medito/providers/providers.dart';
-import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/repositories/repositories.dart';
 import 'package:medito/utils/duration_extensions.dart';
 import 'package:medito/utils/utils.dart';
+import 'package:medito/scaffold_messenger_key.dart';
 import 'package:medito/views/downloads/widgets/download_list_item.dart';
-import 'package:medito/views/empty_widget.dart';
 import 'package:medito/views/player/widgets/bottom_actions/single_back_action_bar.dart';
 import 'package:medito/widgets/headers/medito_app_bar_small.dart';
 import 'package:medito/widgets/widgets.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import 'package:medito/constants/icons/medito_icons.dart';
-import 'package:medito/widgets/medito_icon.dart';
 
 import '../bottom_navigation/bottom_navigation_bar_view.dart';
 import '../player/player_view.dart';
+import 'package:medito/constants/theme/medito_text.dart';
 
 class DownloadsView extends ConsumerStatefulWidget {
   const DownloadsView({super.key, this.isRoot = false});
@@ -36,18 +34,14 @@ class DownloadsView extends ConsumerStatefulWidget {
 
 class _DownloadsViewState extends ConsumerState<DownloadsView>
     with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
-  final key = GlobalKey<AnimatedListState>();
   var scaffoldKey = GlobalKey<ScaffoldState>();
-  List<Track> downloadedTracks = [];
+
+  _PendingDelete? _pendingDelete;
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final downloadedTracks = ref.watch(downloadedTracksProvider);
-    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
-      data: (value) => value.isAndroidTv,
-      orElse: () => false,
-    );
 
     return Scaffold(
       bottomNavigationBar: widget.isRoot
@@ -75,124 +69,188 @@ class _DownloadsViewState extends ConsumerState<DownloadsView>
         hasCloseButton: !widget.isRoot,
       ),
       key: scaffoldKey,
-      body: downloadedTracks.when(
-        skipLoadingOnRefresh: false,
-        data: (data) {
-          if (data.isEmpty) {
-            return _getEmptyWidget();
-          }
+      body: AdaptivePageBody(
+        maxWidth: 760,
+        child: downloadedTracks.when(
+          skipLoadingOnRefresh: false,
+          data: (data) {
+            if (data.isEmpty) {
+              return _getEmptyWidget();
+            }
 
-          return _getDownloadList(data, isTv: isTv);
-        },
-        error: (err, stack) {
-          final error = err is AppError ? err : const UnknownError();
+            return _getDownloadList(data);
+          },
+          error: (err, stack) {
+            final error = err is AppError ? err : const UnknownError();
 
-          return MeditoErrorWidget(
-            error: error,
-            onTap: () => ref.refresh(downloadedTracksProvider),
-          );
-        },
-        loading: () => const TrackShimmerWidget(),
+            return MeditoErrorWidget(
+              error: error,
+              onTap: () => ref.refresh(downloadedTracksProvider),
+            );
+          },
+          loading: () => Semantics(
+            container: true,
+            excludeSemantics: true,
+            label: AppLocalizations.of(context)!.loading,
+            child: const DownloadListShimmer(),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _getDownloadList(List<Track> tracks, {required bool isTv}) {
-    if (isTv) {
-      return ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        children: tracks.map(_getTvDownloadItem).toList(),
-      );
-    }
+  Widget _getDownloadList(List<Track> tracks) {
+    final pending = _pendingDelete;
+    final visible = pending == null
+        ? tracks
+        : tracks.where((t) => _fileId(t) != _fileId(pending.track)).toList();
+    if (visible.isEmpty) return _getEmptyWidget();
 
     return ReorderableListView(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      // One heading stop, "Tracks 3", instead of the name and count apart.
+      header: Padding(
+        padding: const EdgeInsets.only(bottom: 20, top: 8),
+        child: MergeSemantics(
+          child: Semantics(
+            header: true,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.offline_pin_outlined,
+                  size: 20,
+                  color: context.text.muted.bodySmall.color,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  AppLocalizations.of(context)!.tracks,
+                  style: context.text.muted.bodySmall,
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${visible.length}',
+                    style: context.text.muted.caption,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      buildDefaultDragHandles: false,
       onReorderItem: (int oldIndex, int newIndex) {
-        setState(() {
-          var reorderedItem = tracks.removeAt(oldIndex);
-          tracks.insert(newIndex, reorderedItem);
-          ref.read(addTrackListInPreferenceProvider(tracks: tracks));
-        });
+        // Saving the order while a removal is pending would drop that track
+        // from preferences, leaving nothing for Undo to restore.
+        _commitPendingDelete();
+        final reordered = List.of(visible);
+        final item = reordered.removeAt(oldIndex);
+        reordered.insert(newIndex, item);
+        ref.read(addTrackListInPreferenceProvider(tracks: reordered));
+        ref.invalidate(downloadedTracksProvider);
       },
-      children: tracks.map((item) => _getSlidingItem(item)).toList(),
+      children: [
+        for (var i = 0; i < visible.length; i++) _getSlidingItem(visible[i], i),
+      ],
     );
   }
 
-  Widget _getTvDownloadItem(Track item) {
-    final firstFile = item.voices.first.audioFiles.first;
-
-    return Padding(
-      key: ValueKey('tv-${item.id}-${firstFile.id}'),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(
+  Widget _getEmptyWidget() => Center(
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => _openPlayer(ref, item),
-                borderRadius: BorderRadius.circular(10),
-                focusColor: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.16),
-                child: _getListItemWidget(item),
-              ),
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.download_rounded,
+              size: 36,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
-          const SizedBox(width: 8),
-          IconButton(
-            tooltip: AppLocalizations.of(context)!.delete,
-            onPressed: () => _confirmDelete(item),
-            icon: const MeditoIcon(
-              assetName: MeditoIcons.xmark,
-              color: Colors.redAccent,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _getEmptyWidget() => EmptyStateWidget(
-    message: AppLocalizations.of(context)!.emptyDownloadsMessage,
-  );
-
-  Widget _getSlidingItem(Track item) {
-    final firstFile = item.voices.first.audioFiles.first;
-    return InkWell(
-      key: ValueKey('${item.id}-${firstFile.id}'),
-      onTap: () {
-        _openPlayer(ref, item);
-      },
-      child: Dismissible(
-        key: UniqueKey(),
-        direction: DismissDirection.endToStart,
-        background: _getDismissibleBackgroundWidget(),
-        onDismissed: (direction) => _handleDismissible(direction, item),
-        child: _getListItemWidget(item),
-      ),
-    );
-  }
-
-  Widget _getDismissibleBackgroundWidget() => Container(
-    color: ColorConstants.charcoal,
-    child: Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Row(
-        mainAxisSize: MainAxisSize.max,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Spacer(),
-          const MeditoIcon(
-            assetName: MeditoIcons.xmark,
-            color: Colors.redAccent,
+          const SizedBox(height: 24),
+          Text(
+            AppLocalizations.of(context)!.emptyDownloadsMessage,
+            textAlign: TextAlign.center,
+            style: context.text.muted.bodySmall,
           ),
         ],
       ),
     ),
   );
 
-  DownloadListItemWidget _getListItemWidget(Track item) {
+  String _fileId(Track track) => track.voices.first.audioFiles.first.id;
+
+  Widget _getSlidingItem(Track item, int index) {
+    return Padding(
+      key: ValueKey('${item.id}-${_fileId(item)}'),
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Dismissible(
+        // Stable across rebuilds so an undone row slots straight back in.
+        key: ValueKey('${item.id}-${_fileId(item)}'),
+        direction: DismissDirection.endToStart,
+        background: _getDismissibleBackgroundWidget(),
+        onDismissed: (_) => _removeWithUndo(item),
+        child: Material(
+          color: Theme.of(context).cardColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.06),
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          // Swipe-to-delete is unreachable with a screen reader; offer the
+          // same delete (with undo) as an action on the row.
+          child: Semantics(
+            button: true,
+            customSemanticsActions: {
+              CustomSemanticsAction(
+                label: AppLocalizations.of(context)!.deleteDownload,
+              ): () =>
+                  _removeWithUndo(item),
+            },
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () => _openPlayer(ref, item),
+              child: _getListItemWidget(item, index),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _getDismissibleBackgroundWidget() {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.error,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Icon(Icons.delete_outline, color: colorScheme.onError),
+    );
+  }
+
+  DownloadListItemWidget _getListItemWidget(Track item, int index) {
     final firstVoice = item.voices.first;
     final firstFile = firstVoice.audioFiles.first;
     var audioLength = Duration(
@@ -200,26 +258,25 @@ class _DownloadsViewState extends ConsumerState<DownloadsView>
     ).inMinutes.toString();
     var guideName = firstVoice.guideName;
     var duration = _getDuration(audioLength);
-    var subTitle = guideName != null ? '$guideName — $duration' : duration;
-    var imageUrl = item.coverUrl;
+    var subTitle = guideName != null ? '$guideName · $duration' : duration;
 
     return DownloadListItemWidget(
-      PackImageListItemData(
-        title: item.title,
-        subtitle: subTitle,
-        cover: imageUrl,
-        coverSize: 70,
-      ),
+      title: item.title,
+      subtitle: subTitle,
+      coverUrl: item.coverUrl,
+      index: index,
     );
   }
 
   String _getDuration(String? length) => formatTrackLength(length);
 
-  void _openPlayer(WidgetRef ref, Track track) async {
+  void _openPlayer(WidgetRef ref, Track track) {
     final voice = track.voices.first;
     final file = voice.audioFiles.first;
     final request = PlaybackRequest.fromTrack(track, voice, file);
-    await ref.read(playerProvider.notifier).play(request);
+    // Prepare + open the player immediately; PlayerView starts playback and
+    // shows its own loading state (no wait on this screen).
+    ref.read(playerProvider.notifier).prepare(request);
     unawaited(
       Navigator.push(
         context,
@@ -228,78 +285,92 @@ class _DownloadsViewState extends ConsumerState<DownloadsView>
     );
   }
 
-  void _handleDismissible(DismissDirection _, Track item) async {
-    final deleted = await _confirmDelete(item);
-    if (!deleted) {
-      ref.invalidate(downloadedTracksProvider);
-    }
-  }
+  /// Hides the row at once and offers Undo; the audio file is only deleted
+  /// once the snackbar's window has passed. One removal is pending at a time:
+  /// a second swipe commits the first.
+  void _removeWithUndo(Track item) {
+    _commitPendingDelete();
+    final container = ProviderScope.containerOf(context, listen: false);
+    setState(() {
+      _pendingDelete = _PendingDelete(
+        track: item,
+        // Matches the snackbar's display time, so Undo works while visible.
+        timer: Timer(snackBarDuration(hasAction: true), _commitPendingDelete),
+        commit: () => _deleteDownload(container, item),
+      );
+    });
 
-  Future<bool> _confirmDelete(Track item) async {
-    bool? confirmDelete = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return MeditoDialog(
-          title: AppLocalizations.of(context)!.confirmDeletionTitle,
-          content: MeditoDialogBody(
-            '${AppLocalizations.of(context)!.confirmDeletionMessage} ${item.title}?',
-          ),
-          actions: [
-            MeditoDialogSecondaryButton(
-              label: AppLocalizations.of(context)!.cancel,
-              onPressed: () => Navigator.of(context).pop(false),
-            ),
-            MeditoDialogDestructiveButton(
-              label: AppLocalizations.of(context)!.delete,
-              onPressed: () => Navigator.of(context).pop(true),
-            ),
-          ],
-        );
+    scaffoldMessengerKey.currentState?.hideCurrentSnackBar();
+    final l10n = AppLocalizations.of(context)!;
+    showSnackBar(
+      context,
+      l10n.downloadRemoved(item.title),
+      actionLabel: l10n.undo,
+      onActionPressed: () {
+        final pending = _pendingDelete;
+        if (pending == null || pending.track != item) return;
+        pending.timer.cancel();
+        if (mounted) setState(() => _pendingDelete = null);
       },
     );
-
-    if (confirmDelete == true) {
-      if (mounted) {
-        await _deleteDownload(item);
-      }
-      if (mounted) {
-        showSnackBar(
-          context,
-          '"${item.title}" ${AppLocalizations.of(context)!.removed.toLowerCase()}',
-          backgroundColor: ColorConstants.white,
-        );
-      }
-      return true;
-    }
-
-    return false;
   }
 
-  Future<void> _deleteDownload(Track item) async {
+  void _commitPendingDelete() {
+    final pending = _pendingDelete;
+    if (pending == null) return;
+    pending.timer.cancel();
+    _pendingDelete = null;
+    if (mounted) setState(() {});
+    unawaited(pending.commit());
+  }
+
+  // Uses the container rather than ref so a removal still completes if the
+  // screen is closed during the undo window.
+  static Future<void> _deleteDownload(
+    ProviderContainer container,
+    Track item,
+  ) async {
     final firstFile = item.voices.first.audioFiles.first;
     final fileName =
         '${item.id}-${firstFile.id}${getAudioFileExtension(firstFile.path)}';
 
-    final isDownloaded = await ref
+    final isDownloaded = await container
         .read(downloaderRepositoryProvider)
         .isFileDownloaded(fileName);
     if (isDownloaded) {
-      await ref
+      await container
           .read(audioDownloaderProvider.notifier)
           .deleteTrackAudio(fileName);
     }
 
-    final trackList = await ref
-        .read(trackRepositoryProvider)
-        .fetchTrackFromPreference();
+    final trackRepository = container.read(trackRepositoryProvider);
+    final trackList = await trackRepository.fetchTrackFromPreference();
     trackList.removeWhere(
       (t) => t.voices.first.audioFiles.any((f) => f.id == firstFile.id),
     );
-    await ref.read(trackRepositoryProvider).addTrackInPreference(trackList);
+    await trackRepository.addTrackInPreference(trackList);
 
-    ref.invalidate(downloadedTracksProvider);
+    container.invalidate(downloadedTracksProvider);
+  }
+
+  @override
+  void dispose() {
+    _commitPendingDelete();
+    super.dispose();
   }
 
   @override
   bool get wantKeepAlive => true;
+}
+
+class _PendingDelete {
+  _PendingDelete({
+    required this.track,
+    required this.timer,
+    required this.commit,
+  });
+
+  final Track track;
+  final Timer timer;
+  final Future<void> Function() commit;
 }

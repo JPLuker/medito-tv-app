@@ -4,6 +4,7 @@ import 'package:medito/constants/constants.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/utils/utils.dart';
 import 'package:medito/widgets/dialogs/dialogs.dart';
+import 'package:medito/widgets/inputs/medito_text_field.dart';
 import 'package:intl/intl.dart';
 
 /// Confirmation dialog for adding a session to every day in a selected range.
@@ -44,7 +45,9 @@ class _BulkAddSessionsDialogState extends State<BulkAddSessionsDialog> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final dateFmt = DateFormat('MMM d, y');
+    final dateFmt = DateFormat.yMMMd(
+      Localizations.localeOf(context).toString(),
+    );
     final alreadyFilled = widget.dayCount - widget.newSessionsCount;
     final streakChanged = widget.projectedStreak != widget.currentStreak;
 
@@ -62,8 +65,7 @@ class _BulkAddSessionsDialogState extends State<BulkAddSessionsDialog> {
             const SizedBox(height: 4),
             Text(
               l10n.daysAlreadyHaveSession(alreadyFilled, widget.dayCount),
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontFamily: dmSans,
+              style: context.text.caption.copyWith(
                 color: theme.colorScheme.onSurface.withOpacityValue(0.7),
               ),
             ),
@@ -72,7 +74,7 @@ class _BulkAddSessionsDialogState extends State<BulkAddSessionsDialog> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: context.brandPurple.withOpacityValue(0.1),
+              color: context.brandAccent.withOpacityValue(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -80,14 +82,12 @@ class _BulkAddSessionsDialogState extends State<BulkAddSessionsDialog> {
               children: [
                 _StreakRow(
                   label: l10n.currentStreak,
-                  value:
-                      '${widget.currentStreak} ${widget.currentStreak == 1 ? l10n.day.toLowerCase() : l10n.days}',
+                  value: l10n.dayCount(widget.currentStreak),
                 ),
                 const SizedBox(height: 6),
                 _StreakRow(
                   label: l10n.newStreak,
-                  value:
-                      '${widget.projectedStreak} ${widget.projectedStreak == 1 ? l10n.day.toLowerCase() : l10n.days}',
+                  value: l10n.dayCount(widget.projectedStreak),
                   emphasize: streakChanged,
                 ),
                 const SizedBox(height: 6),
@@ -99,7 +99,7 @@ class _BulkAddSessionsDialogState extends State<BulkAddSessionsDialog> {
             ),
           ),
           const SizedBox(height: 16),
-          MeditoDialogTextField(
+          MeditoTextField(
             controller: _durationController,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -120,7 +120,7 @@ class _BulkAddSessionsDialogState extends State<BulkAddSessionsDialog> {
               const SizedBox(width: 12),
               Expanded(
                 child: MeditoDialogPrimaryButton(
-                  label: '${l10n.add} ${widget.newSessionsCount}',
+                  label: l10n.addSessionsTitle(widget.newSessionsCount),
                   onPressed: widget.newSessionsCount == 0
                       ? null
                       : () {
@@ -154,27 +154,30 @@ class _StreakRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontFamily: dmSans,
-            color: theme.colorScheme.onSurface.withOpacityValue(0.75),
+    // One stop per row ("Current streak, 3 days"); the label wraps rather
+    // than pushing the value off the edge at large text.
+    return MergeSemantics(
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: context.text.body.copyWith(
+                color: theme.colorScheme.onSurface.withOpacityValue(0.75),
+              ),
+            ),
           ),
-        ),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontFamily: dmSans,
-            fontWeight: FontWeight.w700,
-            color: emphasize
-                ? context.brandPurple
-                : theme.colorScheme.onSurface,
+          const SizedBox(width: 12),
+          Text(
+            value,
+            style: context.text.subtitle.copyWith(
+              color: emphasize
+                  ? context.brandAccent
+                  : theme.colorScheme.onSurface,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

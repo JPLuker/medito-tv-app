@@ -10,9 +10,9 @@ import 'package:medito/constants/styles/widget_styles.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/models/home/home_model.dart';
 import 'package:medito/providers/providers.dart';
-import 'package:medito/providers/device_capabilities_provider.dart';
 import 'package:medito/views/home/widgets/quote/quote_share_sheet.dart';
 import 'package:medito/widgets/medito_icon.dart';
+import 'package:medito/constants/theme/medito_text.dart';
 
 class QuoteWidget extends ConsumerStatefulWidget {
   const QuoteWidget({super.key, required this.data});
@@ -26,11 +26,6 @@ class QuoteWidget extends ConsumerStatefulWidget {
 class QuoteWidgetState extends ConsumerState<QuoteWidget> {
   @override
   Widget build(BuildContext context) {
-    final isTv = ref.watch(deviceCapabilitiesProvider).maybeWhen(
-      data: (value) => value.isAndroidTv,
-      orElse: () => false,
-    );
-
     // Wrap in Material + InkWell instead of GestureDetector so users get a
     // ripple on tap — that, plus the share pill below, is what tells them
     // the quote is interactive.
@@ -38,12 +33,17 @@ class QuoteWidgetState extends ConsumerState<QuoteWidget> {
       padding: const EdgeInsets.symmetric(horizontal: padding24),
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
-          onTap: widget.data == null || isTv ? null : _shareQuote,
-          borderRadius: BorderRadius.circular(kHomeCardRadius),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-            child: _buildQuoteContent(showShareAffordance: !isTv),
+        // Reads as "quote, — author, Share, button": the share glyph's label
+        // says what the tap does.
+        child: Semantics(
+          button: widget.data != null,
+          child: InkWell(
+            onTap: widget.data == null ? null : _shareQuote,
+            borderRadius: BorderRadius.circular(kHomeCardRadius),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+              child: _buildQuoteContent(),
+            ),
           ),
         ),
       ),
@@ -72,7 +72,7 @@ class QuoteWidgetState extends ConsumerState<QuoteWidget> {
     ).push(MaterialPageRoute(builder: (_) => QuoteShareScreen(data: data)));
   }
 
-  Widget _buildQuoteContent({required bool showShareAffordance}) {
+  Widget _buildQuoteContent() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
@@ -81,11 +81,7 @@ class QuoteWidgetState extends ConsumerState<QuoteWidget> {
           Text(
             widget.data!.quote,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: sourceSerif,
-              fontWeight: FontWeight.w300,
-              fontSize: 18,
-              height: 1.4,
+            style: context.text.body.copyWith(
               color: Theme.of(context).colorScheme.onSurface,
               fontStyle: FontStyle.italic,
             ),
@@ -103,27 +99,22 @@ class QuoteWidgetState extends ConsumerState<QuoteWidget> {
                 child: Text(
                   '— ${widget.data!.author}',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: dmSans,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
+                  style: context.text.bodySmall.copyWith(
                     color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
-              if (showShareAffordance) ...[
-                const SizedBox(width: 8),
-                MeditoIcon(
-                  assetName: defaultTargetPlatform == TargetPlatform.iOS
-                      ? MeditoIcons.shareIos
-                      : MeditoIcons.shareAndroid,
-                  size: 14,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.45),
-                  semanticLabel: AppLocalizations.of(context)!.tapToShare,
-                ),
-              ],
+              const SizedBox(width: 8),
+              MeditoIcon(
+                assetName: defaultTargetPlatform == TargetPlatform.iOS
+                    ? MeditoIcons.shareIos
+                    : MeditoIcons.shareAndroid,
+                size: 14,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.45),
+                semanticLabel: AppLocalizations.of(context)!.share,
+              ),
             ],
           ),
         ],

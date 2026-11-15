@@ -6,18 +6,7 @@ InputDecorationTheme inputDecorationTheme() {
   var outlineInputBorder = _outlineInputBorder();
 
   return InputDecorationTheme(
-    labelStyle: const TextStyle(
-      fontSize: 14.0,
-      fontStyle: FontStyle.normal,
-      color: ColorConstants.white,
-      fontFamily: dmSans,
-    ),
-    floatingLabelStyle: const TextStyle(
-      fontSize: 15.0,
-      fontStyle: FontStyle.normal,
-      color: ColorConstants.white,
-      fontFamily: dmSans,
-    ),
+    labelStyle: MeditoText.forBrightness(Brightness.dark).bodySmall,
     enabledBorder: outlineInputBorder,
     focusedBorder: outlineInputBorder,
     border: outlineInputBorder,

@@ -1,8 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:medito/constants/constants.dart';
+import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/utils/utils.dart';
 import 'package:medito/widgets/dialogs/medito_dialog.dart';
 import 'package:medito/widgets/dialogs/medito_dialog_buttons.dart';
+
+/// "Midnight (default)" for 0, otherwise the hour in the locale's time format
+/// (1:00 AM, 01:00, ...).
+String dayBoundaryLabel(BuildContext context, int hours) {
+  if (hours == 0) return AppLocalizations.of(context)!.dayStartsMidnightDefault;
+  return MaterialLocalizations.of(context).formatTimeOfDay(
+    TimeOfDay(hour: hours, minute: 0),
+    alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+  );
+}
 
 /// Dialog for picking when a new "day" begins for streak calculation.
 ///
@@ -28,38 +39,25 @@ class _DayBoundaryOffsetDialogState extends State<DayBoundaryOffsetDialog> {
     _selected = widget.currentHours.clamp(0, 6);
   }
 
-  String _labelFor(int hours) {
-    if (hours == 0) return 'Midnight (default)';
-    return '$hours:00 AM';
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
     final dirty = _selected != widget.currentHours;
+    final l10n = AppLocalizations.of(context)!;
 
     return MeditoDialog(
-      title: 'When does your day start?',
+      title: l10n.dayStartsDialogTitle,
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Pick when a new day begins for your streak. Useful if you '
-              'usually meditate late at night and want sessions after '
-              'midnight to still count for the previous day.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontFamily: dmSans,
-                height: 1.5,
-                color: onSurface.withOpacityValue(0.75),
-              ),
-            ),
+            MeditoDialogBody(l10n.dayStartsDialogBody),
             const SizedBox(height: 16),
             for (final hours in _options)
               _OffsetOptionTile(
-                label: _labelFor(hours),
+                label: dayBoundaryLabel(context, hours),
                 selected: hours == _selected,
                 onTap: () => setState(() => _selected = hours),
               ),
@@ -85,12 +83,8 @@ class _DayBoundaryOffsetDialogState extends State<DayBoundaryOffsetDialog> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Experimental. Changing this updates how every past '
-                      'session is grouped into days, so your current and '
-                      'longest streak may shift.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontFamily: dmSans,
-                        height: 1.4,
+                      l10n.dayStartsExperimentalNote,
+                      style: context.text.caption.copyWith(
                         color: onSurface.withOpacityValue(0.75),
                       ),
                     ),
@@ -103,11 +97,11 @@ class _DayBoundaryOffsetDialogState extends State<DayBoundaryOffsetDialog> {
       ),
       actions: [
         MeditoDialogSecondaryButton(
-          label: 'Cancel',
+          label: l10n.cancel,
           onPressed: () => Navigator.of(context).pop(),
         ),
         MeditoDialogPrimaryButton(
-          label: 'Save',
+          label: l10n.save,
           onPressed: dirty ? () => Navigator.of(context).pop(_selected) : null,
         ),
       ],
@@ -130,34 +124,36 @@ class _OffsetOptionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
-    final purple = context.brandPurple;
+    final accent = context.brandAccent;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-        child: Row(
-          children: [
-            Icon(
-              selected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_unchecked,
-              size: 20,
-              color: selected ? purple : onSurface.withOpacityValue(0.5),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontFamily: dmSans,
-                  color: onSurface,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+    // The radio state was only an icon: announce it as a radio button.
+    return Semantics(
+      inMutuallyExclusiveGroup: true,
+      checked: selected,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+          child: Row(
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
+                size: 20,
+                color: selected ? accent : onSurface.withOpacityValue(0.5),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: (selected ? context.text.subtitle : context.text.body)
+                      .copyWith(color: onSurface),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

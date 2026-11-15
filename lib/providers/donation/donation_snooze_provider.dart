@@ -1,4 +1,8 @@
+import 'dart:async';
+import 'package:medito/services/notifications/supporter_campaign_api.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../services/notifications/local_notifications.dart';
+import 'supporter_appeal_experiment.dart';
 
 import '../../constants/strings/shared_preference_constants.dart';
 import '../shared_preference/shared_preference_provider.dart';
@@ -17,6 +21,15 @@ class DonationSnoozeState {
     this.lastDonationAt,
     this.snoozedUntil,
   });
+
+  /// True when this install has ever completed a donation in-app. The
+  /// thank-you card is shown for both donors and "Hide for now" snoozers;
+  /// analytics use this to tell the two apart.
+  bool get isDonor => lastDonationAt != null;
+
+  /// 'donor' | 'hidden' — why the ask is suppressed. Only meaningful while
+  /// [isSnoozed] is true.
+  String get snoozeReason => isDonor ? 'donor' : 'hidden';
 }
 
 @riverpod
@@ -62,6 +75,7 @@ class DonationSnooze extends _$DonationSnooze {
     );
 
     ref.invalidateSelf();
+    unawaited(SupporterCampaignApi.updatePreferences(prefs));
   }
 
   Future<void> recordDonationSuccess(String frequency) async {
@@ -89,5 +103,9 @@ class DonationSnooze extends _$DonationSnooze {
     );
 
     ref.invalidateSelf();
+    unawaited(SupporterCampaignApi.updatePreferences(prefs));
+    await LocalNotifications.cancelSafely(
+      SupporterAppealExperiment.notificationId,
+    );
   }
 }

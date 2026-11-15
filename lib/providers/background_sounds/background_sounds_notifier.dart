@@ -1,3 +1,5 @@
+import '../../models/background_sounds/session_bell_pattern.dart';
+import '../../services/audio/session_bell_preview.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -11,11 +13,17 @@ import '../../repositories/downloader/downloader_repository.dart';
 import '../../src/audio_pigeon.g.dart';
 import '../../utils/logger.dart';
 import '../player/player_provider.dart';
+import '../timer/timer_bell_settings_provider.dart';
 
 part 'background_sounds_notifier.g.dart';
 
 final _api = MeditoAudioServiceApi();
 final iosBackgroundPlayer = AudioPlayer()..setLoopMode(LoopMode.all);
+
+/// Whether [iosBackgroundPlayer] holds an ambient sound to resume with the
+/// session. Session bells are separate (IosSessionBells), so this is no
+/// longer implied by "bells are off".
+bool iosAmbientActive = false;
 
 @riverpod
 Future<List<BackgroundSoundsModel>> backgroundSounds(Ref ref) {
@@ -24,8 +32,81 @@ Future<List<BackgroundSoundsModel>> backgroundSounds(Ref ref) {
   );
   ref.keepAlive();
 
-  return backgroundSoundsRepository.fetchBackgroundSounds();
+  // Offline the request can hang well past the HTTP timeout (token wait +
+  // DNS); fail it quickly so the pickers fall back to the cached list.
+  return backgroundSoundsRepository.fetchBackgroundSounds().timeout(
+    const Duration(seconds: 10),
+  );
 }
+
+/// What a background sound picker can show without waiting on the network.
+class BackgroundSoundCatalog {
+  const BackgroundSoundCatalog({
+    required this.sounds,
+    required this.downloadedIds,
+    required this.offline,
+    required this.loading,
+  });
+
+  /// Ambient sounds only (None and session bells are listed separately).
+  final List<BackgroundSoundsModel> sounds;
+
+  /// Sounds whose file is on this device, so they play offline.
+  final Set<String> downloadedIds;
+
+  /// The live list could not be fetched: only [downloadedIds] can play.
+  final bool offline;
+
+  /// The live list is still being fetched and nothing is cached yet.
+  final bool loading;
+
+  bool isAvailable(BackgroundSoundsModel sound) =>
+      !offline || downloadedIds.contains(sound.id);
+}
+
+/// Ids of the cached sounds whose file has been downloaded (see
+/// `_downloadAndPlay`, which stores each one as `<title>.mp3`).
+final _downloadedBackgroundSoundIdsProvider =
+    FutureProvider.autoDispose<Set<String>>((ref) async {
+      final downloader = ref.watch(downloaderRepositoryProvider);
+      final sounds = ref
+          .read(backgroundSoundsRepositoryProvider)
+          .fetchCachedBackgroundSounds();
+      final ids = <String>{};
+      for (final sound in sounds) {
+        if (await downloader.getDownloadedFile('${sound.title}.mp3') != null) {
+          ids.add(sound.id);
+        }
+      }
+      return ids;
+    });
+
+/// The live sound list when it loads, otherwise the cached one, with which
+/// sounds are playable offline. Lets the pickers render at once instead of a
+/// shimmer that never resolves without a connection.
+final backgroundSoundCatalogProvider =
+    Provider.autoDispose<BackgroundSoundCatalog>((ref) {
+      final live = ref.watch(backgroundSoundsProvider);
+      final cached = ref
+          .read(backgroundSoundsRepositoryProvider)
+          .fetchCachedBackgroundSounds();
+      final all = live.value ?? cached;
+      final ambient = [
+        for (final s in all)
+          if (s.id != kNoneBackgroundSoundId && s.id != kSessionBellsId) s,
+      ];
+      final offline = live.hasError && !live.isLoading;
+      final downloaded = offline
+          ? ref.watch(_downloadedBackgroundSoundIdsProvider).value ??
+                const <String>{}
+          : const <String>{};
+      return BackgroundSoundCatalog(
+        sounds: ambient,
+        downloadedIds: downloaded,
+        offline: offline,
+        loading: live.isLoading && ambient.isEmpty,
+      );
+    });
 
 @riverpod
 Future<List<BackgroundSoundsModel>?> fetchLocallySavedBackgroundSounds(
@@ -50,20 +131,48 @@ class BackgroundSoundsState {
   /// selected and nothing ever plays.
   final BackgroundSoundsModel? failedBgSound;
 
+  /// Scheduled bells. Independent of [selectedBgSound]: bells and an
+  /// ambient sound can play together.
+  final bool bellsEnabled;
+  final SessionBellPattern bellPattern;
+
+  /// Seconds between interval bells on top of [bellPattern]'s cues, or 0 for
+  /// off. Timer-only; tracks never set this.
+  final int bellIntervalSeconds;
+
   const BackgroundSoundsState({
     this.volume = 50,
     this.selectedBgSound,
     this.downloadingBgSound,
     this.failedBgSound,
+    this.bellsEnabled = false,
+    this.bellPattern = SessionBellPattern.beginningMiddleEnd,
+    this.bellIntervalSeconds = 0,
   });
 
+  /// Whether anything plays over the session (lights the player's sound
+  /// button).
+  bool get hasAnySound =>
+      bellsEnabled ||
+      (selectedBgSound != null &&
+          selectedBgSound!.id != kNoneBackgroundSoundId);
+
+  SessionBellPattern get selectedBellPattern =>
+      bellsEnabled ? bellPattern : SessionBellPattern.none;
+
   BackgroundSoundsState copyWith({
+    bool? bellsEnabled,
+    SessionBellPattern? bellPattern,
+    int? bellIntervalSeconds,
     double? volume,
     Object? selectedBgSound = _sentinel,
     Object? downloadingBgSound = _sentinel,
     Object? failedBgSound = _sentinel,
   }) {
     return BackgroundSoundsState(
+      bellsEnabled: bellsEnabled ?? this.bellsEnabled,
+      bellPattern: bellPattern ?? this.bellPattern,
+      bellIntervalSeconds: bellIntervalSeconds ?? this.bellIntervalSeconds,
       volume: volume ?? this.volume,
       selectedBgSound: selectedBgSound == _sentinel
           ? this.selectedBgSound
@@ -80,6 +189,13 @@ class BackgroundSoundsState {
 
 const _sentinel = Object();
 
+const _noneSound = BackgroundSoundsModel(
+  id: kNoneBackgroundSoundId,
+  title: 'None',
+  path: '',
+  duration: 0,
+);
+
 final backgroundSoundsNotifierProvider =
     NotifierProvider<BackgroundSoundsNotifier, BackgroundSoundsState>(
       () => BackgroundSoundsNotifier(),
@@ -87,6 +203,13 @@ final backgroundSoundsNotifierProvider =
 
 class BackgroundSoundsNotifier extends Notifier<BackgroundSoundsState> {
   StreamSubscription<Duration>? _fadeSubscription;
+
+  /// True while a home Timer session owns the player. The ambient sound is
+  /// one shared choice; bell choices are remembered per scope (on by
+  /// default for the Timer, off under tracks).
+  bool _timerScope = false;
+
+  void setTimerScope(bool isTimer) => _timerScope = isTimer;
 
   @override
   BackgroundSoundsState build() {
@@ -101,6 +224,7 @@ class BackgroundSoundsNotifier extends Notifier<BackgroundSoundsState> {
     ref.read(backgroundSoundsRepositoryProvider).handleOnChangeVolume(vol);
 
     var scaledVol = scaledVolume(vol);
+    if (!Platform.isAndroid) iosAudioHandler.sessionBells.setVolume(scaledVol);
     AppLogger.d('BG_SOUND', 'Scaled volume: $scaledVol');
 
     if (Platform.isAndroid) {
@@ -114,7 +238,11 @@ class BackgroundSoundsNotifier extends Notifier<BackgroundSoundsState> {
     state = state.copyWith(volume: vol);
   }
 
-  void handleOnChangeSound(BackgroundSoundsModel? sound) {
+  void handleOnChangeSound(
+    BackgroundSoundsModel? sound, {
+    bool preview = true,
+  }) {
+    unawaited(ref.read(sessionBellPreviewProvider).stop());
     AppLogger.d('BG_SOUND', 'Changing sound to: ${sound?.title}');
     // Any new selection clears a previous failure: the retry affordance belongs
     // to the row the user is actually on.
@@ -122,8 +250,15 @@ class BackgroundSoundsNotifier extends Notifier<BackgroundSoundsState> {
 
     if (sound == null) {
       AppLogger.d('BG_SOUND', 'Stopping background sound');
-      stopBackgroundSound();
+      _stopAmbient();
 
+      return;
+    }
+
+    // Bells used to be one of the background sounds; they are a switch now.
+    if (sound.id == kSessionBellsId) {
+      setSessionBells(true, preview: preview);
+      handleOnChangeSound(_noneSound, preview: preview);
       return;
     }
 
@@ -133,11 +268,12 @@ class BackgroundSoundsNotifier extends Notifier<BackgroundSoundsState> {
 
     if (sound.id == kNoneBackgroundSoundId) {
       AppLogger.d('BG_SOUND', 'None selected, stopping background sound');
-      stopBackgroundSound();
+      _stopAmbient();
 
       return;
     }
 
+    _stopAmbient();
     unawaited(_downloadAndPlay(sound));
   }
 
@@ -147,6 +283,111 @@ class BackgroundSoundsNotifier extends Notifier<BackgroundSoundsState> {
     AppLogger.d('BG_SOUND', 'Retrying download for: ${sound.title}');
     state = state.copyWith(selectedBgSound: sound, failedBgSound: null);
     unawaited(_downloadAndPlay(sound, forceRedownload: true));
+  }
+
+  /// Turns the scheduled bells on or off, alongside whatever ambient
+  /// sound is playing, and remembers it for this scope (tracks or timer).
+  /// [preview] rings a bell when switching on, so the user hears it.
+  void setSessionBells(bool enabled, {bool preview = true}) {
+    if (_timerScope) {
+      _setSessionBellPattern(
+        enabled
+            ? (state.bellPattern == SessionBellPattern.none
+                  ? SessionBellPattern.beginningEnd
+                  : state.bellPattern)
+            : SessionBellPattern.none,
+        preview: preview,
+      );
+      return;
+    }
+    ref
+        .read(backgroundSoundsRepositoryProvider)
+        .saveSessionBellsEnabled(enabled, forTimer: _timerScope);
+    state = state.copyWith(bellsEnabled: enabled);
+    unawaited(_applySessionBells(enabled, preview: preview));
+  }
+
+  void setSessionBellCue(SessionBellCue cue, bool selected) {
+    _setSessionBellPattern(
+      state.selectedBellPattern.withCue(cue, selected),
+      preview: selected,
+    );
+  }
+
+  void setSessionBellPattern(SessionBellPattern pattern) =>
+      _setSessionBellPattern(pattern, preview: true);
+
+  void _setSessionBellPattern(
+    SessionBellPattern pattern, {
+    required bool preview,
+  }) {
+    final enabled = pattern != SessionBellPattern.none;
+    final repo = ref.read(backgroundSoundsRepositoryProvider);
+    if (_timerScope) {
+      ref.read(timerBellSettingsProvider.notifier).setPattern(pattern);
+    } else {
+      repo.saveSessionBellPattern(pattern);
+      repo.saveSessionBellsEnabled(enabled);
+    }
+    state = state.copyWith(bellPattern: pattern, bellsEnabled: enabled);
+    unawaited(_applySessionBells(enabled, preview: preview));
+  }
+
+  /// Restore bells before iOS starts playback, so loading the bundled asset
+  /// cannot miss the opening cue. Android calls this once its service is ready.
+  Future<void> prepareSessionBells({required bool forTimer}) async {
+    _timerScope = forTimer;
+    final repo = ref.read(backgroundSoundsRepositoryProvider);
+    final timerSettings = forTimer ? ref.read(timerBellSettingsProvider) : null;
+    final pattern = timerSettings?.pattern ?? repo.getSessionBellPattern();
+    final intervalSeconds = timerSettings?.intervalSeconds ?? 0;
+    final hasAnyBell =
+        pattern != SessionBellPattern.none || intervalSeconds > 0;
+    state = state.copyWith(
+      volume: repo.getBgSoundVolume() ?? 50,
+      bellsEnabled: forTimer ? hasAnyBell : repo.getSessionBellsEnabled(),
+      bellPattern: pattern,
+      bellIntervalSeconds: intervalSeconds,
+    );
+    // Android starts with a native volume of zero. Previously this was only
+    // restored when an ambient sound played, so bells alone stayed silent.
+    if (Platform.isAndroid) {
+      await _api.setBackgroundSoundVolume(scaledVolume(state.volume));
+    }
+    await _applySessionBells(state.bellsEnabled, preview: false);
+  }
+
+  /// Encodes [pattern] and an optional interval into the single string the
+  /// platform bell schedules understand. The bare pattern name stays the same
+  /// for compatibility; an interval is appended as `"+<seconds>"`.
+  String _encodePattern(SessionBellPattern pattern, int intervalSeconds) =>
+      intervalSeconds > 0
+          ? '${pattern.name}+$intervalSeconds'
+          : pattern.name;
+
+  Future<void> _applySessionBells(bool enabled, {required bool preview}) async {
+    try {
+      final volume = scaledVolume(state.volume);
+      if (Platform.isAndroid) {
+        await _api.setSessionBells(
+          enabled,
+          _encodePattern(state.bellPattern, state.bellIntervalSeconds),
+        );
+      } else if (enabled) {
+        await iosAudioHandler.sessionBells.enable(
+          volume,
+          pattern: state.bellPattern,
+          intervalSeconds: state.bellIntervalSeconds,
+        );
+      } else {
+        await iosAudioHandler.sessionBells.disable();
+      }
+      if (enabled && preview && state.bellsEnabled) {
+        await ref.read(sessionBellPreviewProvider).play(volume);
+      }
+    } catch (error, stack) {
+      AppLogger.e('BELLS', 'Failed to switch session bells', error, stack);
+    }
   }
 
   /// Resolves [sound] to a local file — downloading it first if needed — and
@@ -294,6 +535,7 @@ class BackgroundSoundsNotifier extends Notifier<BackgroundSoundsState> {
         }
         AppLogger.d('BG_SOUND', 'Playing iOS background sound');
         iosBackgroundPlayer.setVolume(scaledVolume(state.volume));
+        iosAmbientActive = true;
         unawaited(iosBackgroundPlayer.play());
         _handleFadeAtEndForIos();
 
@@ -307,6 +549,9 @@ class BackgroundSoundsNotifier extends Notifier<BackgroundSoundsState> {
   }
 
   void togglePlayPause(bool isPlaying) {
+    // Bells follow the primary player in their own controller; this only
+    // pauses/resumes an ambient sound, if one is playing.
+    if (Platform.isIOS && !iosAmbientActive) return;
     AppLogger.d(
       'BG_SOUND',
       'Toggling background sound play/pause, current isPlaying: $isPlaying',
@@ -331,8 +576,22 @@ class BackgroundSoundsNotifier extends Notifier<BackgroundSoundsState> {
     }
   }
 
+  /// Session over: stops the ambient sound and the bells.
   void stopBackgroundSound() {
+    _stopAmbient();
+    if (Platform.isAndroid) {
+      unawaited(_api.setSessionBells(false, state.bellPattern.name));
+    } else {
+      unawaited(iosAudioHandler.sessionBells.disable());
+    }
+  }
+
+  /// Stops only the ambient sound (None picked, or switching sounds); the
+  /// bells keep their own on/off state.
+  void _stopAmbient() {
+    unawaited(ref.read(sessionBellPreviewProvider).stop());
     AppLogger.d('BG_SOUND', 'Stopping background sound');
+    iosAmbientActive = false;
     _fadeSubscription?.cancel();
     _fadeSubscription = null;
     if (Platform.isAndroid) {
@@ -349,10 +608,9 @@ class BackgroundSoundsNotifier extends Notifier<BackgroundSoundsState> {
   }
 
   void playBackgroundSoundFromPref() {
-    var selectedBgSound = ref
-        .read(backgroundSoundsRepositoryProvider)
-        .getSelectedBgSoundFromSharedPreferences();
-    handleOnChangeSound(selectedBgSound);
+    final repo = ref.read(backgroundSoundsRepositoryProvider);
+    final selectedBgSound = repo.getSelectedBgSoundFromSharedPreferences();
+    handleOnChangeSound(selectedBgSound, preview: false);
   }
 
   void getVolumeFromPref() {

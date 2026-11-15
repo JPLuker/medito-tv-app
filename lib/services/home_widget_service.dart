@@ -1,16 +1,53 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show Locale;
 
 import 'package:home_widget/home_widget.dart';
 import 'package:medito/models/local_all_stats.dart';
 import 'package:medito/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/strings/shared_preference_constants.dart';
 import '../utils/logger.dart';
 import 'device_capabilities_service.dart';
+
+/// The singular/plural streak unit ("day"/"days") the widgets show, in
+/// [locale]'s language. Falls back to English for a null or unsupported
+/// locale, matching the app's own fallback.
+({String day, String days}) widgetStreakUnitLabels(Locale? locale) {
+  final l10n = _widgetLocalizations(locale);
+  return (day: l10n.day, days: l10n.days);
+}
+
+/// The other words the native widgets show or speak, in [locale]'s language,
+/// keyed by the widget data key. The widgets recompute their figures between
+/// app opens, so the screen-reader templates keep `{value}`-style tokens for
+/// the widget to fill in. Each widget has the English text as its fallback.
+Map<String, String> widgetStrings(Locale? locale) {
+  final l10n = _widgetLocalizations(locale);
+  return {
+    'widget_streak_summary': l10n.widgetStreakSummary('{value}'),
+    'widget_consistency_summary': l10n.widgetConsistencySummary('{value}'),
+    'widget_done_today': l10n.meditatedToday,
+    'widget_not_done_today': l10n.widgetNotMeditatedToday,
+    'widget_recent_days': l10n.widgetRecentDays('{done}', '{total}'),
+    'widget_start_here': l10n.upNextStartHere,
+    'widget_continue': l10n.upNextTitle,
+    'widget_up_next_progress': l10n.widgetUpNextProgress(
+      '{completed}',
+      '{total}',
+    ),
+    'widget_pack_complete': l10n.widgetPackComplete,
+    'widget_choose_whats_next': l10n.widgetChooseWhatsNext,
+  };
+}
+
+AppLocalizations _widgetLocalizations(Locale? locale) => lookupAppLocalizations(
+  locale != null && AppLocalizations.delegate.isSupported(locale)
+      ? locale
+      : const Locale('en'),
+);
 
 class HomeWidgetService {
   static Future<bool> _supportsHomeWidgets() async {
@@ -25,8 +62,6 @@ class HomeWidgetService {
   }
 
   static const String _appGroupId = 'group.org.medito.widget';
-  static const String _widgetName = 'MeditationWidgetReceiver';
-  static const String _consistencyWidgetName = 'ConsistencyWidgetReceiver';
 
   // Coalesces rapid back-to-back broadcast requests into a single platform
   // round trip. Multiple sources (stats refresh, up-next change, theme change)
@@ -49,6 +84,7 @@ class HomeWidgetService {
   static const String _upNextTotalKey = 'up_next_total';
   static const String _upNextTrackIdKey = 'up_next_track_id';
   static const String _dayBoundaryOffsetHoursKey = 'day_boundary_offset_hours';
+  static const String _statDisplayKey = 'stat_display';
 
   static Future<void> _configure() async {
     if (Platform.isIOS) {
@@ -58,82 +94,82 @@ class HomeWidgetService {
 
   /// Saves the theme preference to the widget
   static Future<void> saveThemePreference(String themePreference) async {
-    if (!Platform.isAndroid || !await _supportsHomeWidgets()) {
+    if (!await _supportsHomeWidgets()) {
       return;
     }
 
     try {
+      await _configure();
       await HomeWidget.saveWidgetData<String>(
         _themePreferenceKey,
         themePreference,
       );
       AppLogger.d('WIDGET', 'Saved theme preference: $themePreference');
 
-      await _updateWidget(_widgetName);
-      await _updateWidget(_consistencyWidgetName);
+      await _triggerWidgetRefresh();
+      if (Platform.isIOS) {
+        await HomeWidget.updateWidget(iOSName: 'UpNextWidget');
+      }
     } catch (e) {
       AppLogger.e('WIDGET', 'Failed to save theme preference', e);
     }
   }
 
-  /// Updates the home widget with the latest stats data
-  static Future<void> updateWidget({
-    required LocalAllStats stats,
-    BuildContext? context,
-  }) async {
-    if (!await _supportsHomeWidgets()) {
-      return;
-    }
+  /// Saves which stat the in-app streak chip shows ('currentStreak' /
+  /// 'consistencyScore') so the iOS Lock Screen widget can follow it.
+  static Future<void> saveStatDisplay(String statDisplay) async {
+    if (!Platform.isIOS) return;
 
     try {
-      // Resolve localised strings before any await so we never touch BuildContext
-      // across an async gap.
-      final l10n = context != null ? AppLocalizations.of(context) : null;
-      final dayLabel = l10n?.day ?? 'day';
-      final daysLabel = l10n?.days ?? 'days';
-
       await _configure();
-
-      final meditationDates = _extractMeditationDates(stats);
-      final freezeDates = stats.freezeUsageDates.toList();
-      final dayBoundaryOffsetHours = await _readDayBoundaryOffsetHours();
-
-      final consistencyPercentage = (stats.consistencyScore * 100)
-          .round()
-          .clamp(0, 100);
-      await Future.wait([
-        HomeWidget.saveWidgetData<int>(_streakCurrentKey, stats.streakCurrent),
-        HomeWidget.saveWidgetData<String>(
-          _meditationDatesKey,
-          jsonEncode(meditationDates),
-        ),
-        HomeWidget.saveWidgetData<String>(
-          _freezeDatesKey,
-          jsonEncode(freezeDates),
-        ),
-        HomeWidget.saveWidgetData<String>(_dayLabelKey, dayLabel),
-        HomeWidget.saveWidgetData<String>(_daysLabelKey, daysLabel),
-        HomeWidget.saveWidgetData<int>(
-          _lastUpdatedKey,
-          DateTime.now().millisecondsSinceEpoch,
-        ),
-        HomeWidget.saveWidgetData<int>(
-          _totalTracksCompletedKey,
-          stats.totalTracksCompleted,
-        ),
-        HomeWidget.saveWidgetData<int>(
-          _consistencyScoreKey,
-          consistencyPercentage,
-        ),
-        HomeWidget.saveWidgetData<int>(
-          _dayBoundaryOffsetHoursKey,
-          dayBoundaryOffsetHours,
-        ),
-      ]);
-
-      await _triggerWidgetRefresh();
+      await HomeWidget.saveWidgetData<String>(_statDisplayKey, statDisplay);
+      await HomeWidget.updateWidget(iOSName: 'PracticeWidget');
     } catch (e) {
-      AppLogger.e('WIDGET', 'Failed to update widget', e);
+      AppLogger.e('WIDGET', 'Failed to save stat display', e);
+    }
+  }
+
+  // The in-app language, set from the app root once [localeProvider] is read.
+  // Null until then, which resolves to English like the app itself.
+  static Locale? _locale;
+
+  // [widgetStrings] only change with the language, so they're written once
+  // per process and language rather than with every stats update.
+  static Locale? _savedStringsLocale;
+  static bool _stringsSaved = false;
+
+  static Future<void> _saveWidgetStrings() async {
+    if (_stringsSaved && _savedStringsLocale == _locale) return;
+    final locale = _locale;
+    await Future.wait([
+      for (final entry in widgetStrings(locale).entries)
+        _saveWithTimeout(entry.key, entry.value),
+    ]);
+    _stringsSaved = true;
+    _savedStringsLocale = locale;
+  }
+
+  /// Records the app's current language so the streak unit written to the
+  /// widgets matches it, and rewrites the labels immediately if it changed.
+  static Future<void> setLocale(Locale? locale) async {
+    if (locale == _locale) return;
+    _locale = locale;
+    if (!Platform.isAndroid && !Platform.isIOS) return;
+
+    try {
+      await _configure();
+      final labels = widgetStreakUnitLabels(locale);
+      await Future.wait([
+        _saveWithTimeout(_dayLabelKey, labels.day),
+        _saveWithTimeout(_daysLabelKey, labels.days),
+        _saveWidgetStrings(),
+      ]);
+      await _triggerWidgetRefresh();
+      if (Platform.isIOS) {
+        await HomeWidget.updateWidget(iOSName: 'UpNextWidget');
+      }
+    } catch (e) {
+      AppLogger.e('WIDGET', 'Failed to save widget day labels', e);
     }
   }
 
@@ -146,19 +182,21 @@ class HomeWidgetService {
     try {
       await _configure();
 
+      final labels = widgetStreakUnitLabels(_locale);
       final meditationDates = _extractMeditationDates(stats);
       final freezeDates = stats.freezeUsageDates.toList();
       final consistencyPercentage = (stats.consistencyScore * 100)
           .round()
           .clamp(0, 100);
       final dayBoundaryOffsetHours = await _readDayBoundaryOffsetHours();
+      final statDisplay = await _readStatDisplay();
 
       await Future.wait([
         _saveWithTimeout(_streakCurrentKey, stats.streakCurrent),
         _saveWithTimeout(_meditationDatesKey, jsonEncode(meditationDates)),
         _saveWithTimeout(_freezeDatesKey, jsonEncode(freezeDates)),
-        _saveWithTimeout(_dayLabelKey, 'day'),
-        _saveWithTimeout(_daysLabelKey, 'days'),
+        _saveWithTimeout(_dayLabelKey, labels.day),
+        _saveWithTimeout(_daysLabelKey, labels.days),
         _saveWithTimeout(
           _lastUpdatedKey,
           DateTime.now().millisecondsSinceEpoch,
@@ -166,6 +204,8 @@ class HomeWidgetService {
         _saveWithTimeout(_totalTracksCompletedKey, stats.totalTracksCompleted),
         _saveWithTimeout(_consistencyScoreKey, consistencyPercentage),
         _saveWithTimeout(_dayBoundaryOffsetHoursKey, dayBoundaryOffsetHours),
+        _saveWithTimeout(_statDisplayKey, statDisplay),
+        _saveWidgetStrings(),
       ]);
 
       await _triggerWidgetRefresh();
@@ -182,6 +222,21 @@ class HomeWidgetService {
     } catch (e) {
       AppLogger.w('WIDGET', 'Failed to read day boundary offset: $e');
       return 0;
+    }
+  }
+
+  // Pushed with every stats update (not only when the choice changes) so users
+  // who picked a stat before the Lock Screen widget existed are covered.
+  static Future<String> _readStatDisplay() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(
+            SharedPreferenceConstants.streakCircleDisplayPreference,
+          ) ??
+          'consistencyScore';
+    } catch (e) {
+      AppLogger.w('WIDGET', 'Failed to read stat display: $e');
+      return 'consistencyScore';
     }
   }
 
@@ -221,18 +276,11 @@ class HomeWidgetService {
     try {
       await HomeWidget.updateWidget(iOSName: 'StreakWidget');
       await HomeWidget.updateWidget(iOSName: 'ConsistencyWidget');
+      await HomeWidget.updateWidget(iOSName: 'PracticeWidget');
       AppLogger.d('WIDGET', 'iOS widget reload triggered');
     } catch (e) {
       AppLogger.e('WIDGET', 'Failed to trigger iOS widget reload', e);
     }
-  }
-
-  static Future<void> _updateWidget(String widgetName) async {
-    if (!Platform.isAndroid) {
-      return;
-    }
-
-    await _sendWidgetUpdateBroadcast();
   }
 
   static Future<void> _sendWidgetUpdateBroadcast() async {
@@ -282,6 +330,7 @@ class HomeWidgetService {
         HomeWidget.saveWidgetData<String>(_upNextTrackIdKey, trackId),
         HomeWidget.saveWidgetData<int>(_upNextCompletedKey, completed),
         HomeWidget.saveWidgetData<int>(_upNextTotalKey, total),
+        _saveWidgetStrings(),
       ]);
 
       await _triggerWidgetRefresh();

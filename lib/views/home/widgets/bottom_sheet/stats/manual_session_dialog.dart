@@ -1,3 +1,4 @@
+import 'package:medito/widgets/inputs/medito_segmented_tabs.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -5,6 +6,7 @@ import 'package:medito/constants/constants.dart';
 import 'package:medito/l10n/app_localizations.dart';
 import 'package:medito/utils/utils.dart';
 import 'package:medito/widgets/dialogs/dialogs.dart';
+import 'package:medito/widgets/inputs/medito_text_field.dart';
 
 /// Streak/session preview for a chosen date range, computed by the caller so
 /// the dialog stays free of stats wiring.
@@ -192,47 +194,11 @@ class _ManualSessionDialogState extends State<ManualSessionDialog>
   }
 
   Widget _buildTabBar(BuildContext context, AppLocalizations l10n) {
-    return Row(
-      children: [
-        Expanded(child: _buildTabItem(0, l10n.singleDay)),
-        Expanded(child: _buildTabItem(1, l10n.dateRange)),
-      ],
-    );
-  }
-
-  Widget _buildTabItem(int index, String label) {
-    final theme = Theme.of(context);
-    final isSelected = _tabController!.index == index;
-    final selectedColor = theme.colorScheme.onSurface;
-    final unselectedColor = theme.colorScheme.onSurface.withOpacityValue(0.5);
-
-    return InkWell(
-      onTap: () => _tabController!.animateTo(index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: isSelected
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.outline.withOpacityValue(0.2),
-              width: isSelected ? 2 : 1,
-            ),
-          ),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontFamily: dmSans,
-              color: isSelected ? selectedColor : unselectedColor,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            ),
-          ),
-        ),
-      ),
+    return MeditoSegmentedTabs(
+      labels: [l10n.singleDay, l10n.dateRange],
+      selectedIndex: _tabController!.index,
+      onChanged: _tabController!.animateTo,
+      height: 44,
     );
   }
 
@@ -247,17 +213,17 @@ class _ManualSessionDialogState extends State<ManualSessionDialog>
         const SizedBox(height: 20),
         _buildTimePickerTile(context, l10n),
         const SizedBox(height: 12),
-        MeditoDialogTextField(
+        MeditoTextField(
           controller: _durationController,
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           onChanged: (_) => setState(() {}),
-          labelText:
-              '${l10n.duration} (in ${l10n.minutes.toLowerCase()}, ${l10n.optional.toLowerCase()})',
+          labelText: l10n.durationMinutesOptional,
           hintText: l10n.minutes,
           prefixIcon: Icon(Icons.timer, color: theme.colorScheme.onSurface),
           suffixIcon: _durationController.text.isNotEmpty
               ? IconButton(
+                  tooltip: l10n.clearField,
                   icon: Icon(
                     Icons.clear,
                     size: 20,
@@ -272,11 +238,15 @@ class _ManualSessionDialogState extends State<ManualSessionDialog>
         ),
         if (_isFutureSession()) ...[
           const SizedBox(height: 12),
-          Text(
-            l10n.cannotAddFutureSession,
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontFamily: dmSans,
-              color: theme.colorScheme.error,
+          // Appears as the time changes; the disabled Add button alone
+          // doesn't say why.
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              l10n.cannotAddFutureSession,
+              style: context.text.caption.copyWith(
+                color: theme.colorScheme.error,
+              ),
             ),
           ),
         ],
@@ -337,11 +307,13 @@ class _ManualSessionDialogState extends State<ManualSessionDialog>
         ),
         if (!_rangeOrderValid) ...[
           const SizedBox(height: 12),
-          Text(
-            l10n.endDateBeforeStartError,
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontFamily: dmSans,
-              color: theme.colorScheme.error,
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              l10n.endDateBeforeStartError,
+              style: context.text.caption.copyWith(
+                color: theme.colorScheme.error,
+              ),
             ),
           ),
         ],
@@ -350,7 +322,7 @@ class _ManualSessionDialogState extends State<ManualSessionDialog>
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: context.brandPurple.withOpacityValue(0.1),
+              color: context.brandAccent.withOpacityValue(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -358,14 +330,12 @@ class _ManualSessionDialogState extends State<ManualSessionDialog>
               children: [
                 _PreviewRow(
                   label: l10n.currentStreak,
-                  value:
-                      '${preview.currentStreak} ${preview.currentStreak == 1 ? l10n.day.toLowerCase() : l10n.days}',
+                  value: l10n.dayCount(preview.currentStreak),
                 ),
                 const SizedBox(height: 6),
                 _PreviewRow(
                   label: l10n.newStreak,
-                  value:
-                      '${preview.projectedStreak} ${preview.projectedStreak == 1 ? l10n.day.toLowerCase() : l10n.days}',
+                  value: l10n.dayCount(preview.projectedStreak),
                   emphasize: streakChanged,
                 ),
                 const SizedBox(height: 6),
@@ -378,7 +348,7 @@ class _ManualSessionDialogState extends State<ManualSessionDialog>
           ),
         ],
         const SizedBox(height: 16),
-        MeditoDialogTextField(
+        MeditoTextField(
           controller: _bulkDurationController,
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -400,7 +370,7 @@ class _ManualSessionDialogState extends State<ManualSessionDialog>
             Expanded(
               child: MeditoDialogPrimaryButton(
                 label: preview != null && preview.newSessionsCount > 0
-                    ? '${l10n.add} ${preview.newSessionsCount}'
+                    ? l10n.addSessionsTitle(preview.newSessionsCount)
                     : l10n.add,
                 onPressed: (preview == null || preview.newSessionsCount == 0)
                     ? null
@@ -445,57 +415,60 @@ class _ManualSessionDialogState extends State<ManualSessionDialog>
 
   Widget _buildTimePickerTile(BuildContext context, AppLocalizations l10n) {
     final theme = Theme.of(context);
-    return InkWell(
-      onTap: () => _selectTime(context),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: theme.colorScheme.outline.withOpacityValue(0.3),
-            width: 0.5,
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: () => _selectTime(context),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: theme.colorScheme.outline.withOpacityValue(0.3),
+              width: 0.5,
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.access_time,
-              size: 20,
-              color: theme.colorScheme.onSurface,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.time,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontFamily: dmSans,
-                      color: theme.colorScheme.onSurface.withOpacityValue(0.75),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _selectedTime != null
-                        ? _selectedTime!.format(context)
-                        : l10n.selectTime,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontFamily: dmSans,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                ],
+          child: Row(
+            children: [
+              Icon(
+                Icons.access_time,
+                size: 20,
+                color: theme.colorScheme.onSurface,
               ),
-            ),
-            Icon(
-              Icons.chevron_right,
-              color: theme.colorScheme.onSurface.withOpacityValue(0.6),
-              size: 20,
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.time,
+                      style: context.text.caption.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacityValue(
+                          0.75,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _selectedTime != null
+                          ? _selectedTime!.format(context)
+                          : l10n.selectTime,
+                      style: context.text.body.copyWith(
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: theme.colorScheme.onSurface.withOpacityValue(0.6),
+                size: 20,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -508,40 +481,40 @@ class _ManualSessionDialogState extends State<ManualSessionDialog>
     required VoidCallback onTap,
   }) {
     final theme = Theme.of(context);
-    final fmt = DateFormat('MMM d, y');
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: theme.colorScheme.outline.withOpacityValue(0.3),
-            width: 0.5,
+    final fmt = DateFormat.yMMMd(Localizations.localeOf(context).toString());
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: theme.colorScheme.outline.withOpacityValue(0.3),
+              width: 0.5,
+            ),
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontFamily: dmSans,
-                color: theme.colorScheme.onSurface.withOpacityValue(0.75),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: context.text.caption.copyWith(
+                  color: theme.colorScheme.onSurface.withOpacityValue(0.75),
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              fmt.format(value),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontFamily: dmSans,
-                color: theme.colorScheme.onSurface,
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 4),
+              Text(
+                fmt.format(value),
+                style: context.text.subtitle.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -562,27 +535,30 @@ class _PreviewRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontFamily: dmSans,
-            color: theme.colorScheme.onSurface.withOpacityValue(0.75),
+    // One stop per row ("Current streak, 3 days"); the label wraps rather
+    // than pushing the value off the edge at large text.
+    return MergeSemantics(
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: context.text.body.copyWith(
+                color: theme.colorScheme.onSurface.withOpacityValue(0.75),
+              ),
+            ),
           ),
-        ),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontFamily: dmSans,
-            fontWeight: FontWeight.w700,
-            color: emphasize
-                ? context.brandPurple
-                : theme.colorScheme.onSurface,
+          const SizedBox(width: 12),
+          Text(
+            value,
+            style: context.text.subtitle.copyWith(
+              color: emphasize
+                  ? context.brandAccent
+                  : theme.colorScheme.onSurface,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
